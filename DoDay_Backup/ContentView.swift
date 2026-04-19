@@ -151,7 +151,20 @@ struct ContentView: View {
     }
 }
 
-#Preview {
+#Preview("iPhone 16 - Do Day") {
     ContentView()
+        .previewDevice(PreviewDevice(rawValue: "iPhone 16 Pro"))
+        .previewDisplayName("iPhone 16 Pro (393×852pt)")
 }
 
+#Preview("iPhone 16 Pro Max") {
+    ContentView()
+        .previewDevice(PreviewDevice(rawValue: "iPhone 16 Pro Max"))
+        .previewDisplayName("iPhone 16 Pro Max (430×932pt)")
+}
+
+#Preview("iPhone SE") {
+    ContentView()
+        .previewDevice(PreviewDevice(rawValue: "iPhone SE (3rd generation)"))
+        .previewDisplayName("iPhone SE (375×667pt)")
+}

@@ -1,0 +1,2732 @@
+diff --git a/Do Day/ComponentsFocusLineTextEditor.swift b/Do Day/ComponentsFocusLineTextEditor.swift
+index 099078a..5532d45 100644
+--- a/Do Day/ComponentsFocusLineTextEditor.swift	
++++ b/Do Day/ComponentsFocusLineTextEditor.swift	
+@@ -6,19 +6,21 @@
+ //
+ 
+ import SwiftUI
++
++#if canImport(UIKit)
+ import UIKit
+ 
+ /// Custom Text Editor mit fokus-abhängiger Schriftgröße
+ /// - Aktive Zeile (Cursor): 17pt (touch-kompatibel)
+-/// - Alle anderen Zeilen: ~11pt (66% von 17pt)
++/// - Alle anderen Zeilen: ~13.6pt (80% von 17pt)
+ /// - Implementierung via UIViewRepresentable mit UITextView
+ /// - Schriftgröße wechselt in Echtzeit bei Cursor-Bewegung
+ struct FocusLineTextEditor: UIViewRepresentable {
+     @Binding var text: String
+     
+     // Schriftgrößen-Konfiguration
+-    let activeFontSize: CGFloat = 17.0
+-    let inactiveFontSize: CGFloat = 11.0
++    let activeFontSize: CGFloat = 17.0   // Normale Größe für aktive Zeile
++    let inactiveFontSize: CGFloat = 13.6  // 80% für inaktive Zeilen (~13.6pt)
+     
+     func makeUIView(context: Context) -> UITextView {
+         let textView = UITextView()
+@@ -27,11 +29,19 @@ struct FocusLineTextEditor: UIViewRepresentable {
+         textView.backgroundColor = .clear
+         textView.textContainerInset = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+         
++        // Enable text suggestions and autocorrection
++        textView.autocorrectionType = .default
++        textView.autocapitalizationType = .sentences
++        textView.spellCheckingType = .default
++        
+         // Rahmen im Display-Stil (später verfeinern)
+         textView.layer.borderColor = UIColor.systemGray3.cgColor
+         textView.layer.borderWidth = 1.5
+         textView.layer.cornerRadius = 8
+         
++        // Note: We don't set inputAccessoryView to allow the default QuickType bar to show
++        // The keyboard can be dismissed by tapping outside the text view or using a gesture
++        
+         return textView
+     }
+     
+@@ -79,20 +89,27 @@ struct FocusLineTextEditor: UIViewRepresentable {
+     
+     class Coordinator: NSObject, UITextViewDelegate {
+         var parent: FocusLineTextEditor
++        weak var textView: UITextView?
+         
+         init(_ parent: FocusLineTextEditor) {
+             self.parent = parent
+         }
+         
+         func textViewDidChange(_ textView: UITextView) {
++            self.textView = textView
+             parent.text = textView.text
+             parent.updateFontSizes(in: textView)
+         }
+         
+         func textViewDidChangeSelection(_ textView: UITextView) {
++            self.textView = textView
+             // Bei Cursor-Bewegung Schriftgrößen aktualisieren
+             parent.updateFontSizes(in: textView)
+         }
++        
++        @objc func dismissKeyboard() {
++            textView?.resignFirstResponder()
++        }
+     }
+ }
+ 
+@@ -115,8 +132,43 @@ struct FocusLineTextEditor: UIViewRepresentable {
+             .frame(height: 200)
+             .padding()
+         
+-        Text("Aktive Zeile: 17pt | Andere: 11pt")
++        Text("Aktive Zeile: 17pt | Andere: 13.6pt (80%)")
+             .font(.caption)
+             .foregroundColor(.secondary)
+     }
+ }
++#else
++// MARK: - macOS Fallback (für spätere macOS-Unterstützung)
++
++/// Fallback für macOS (AppKit-basiert)
++/// Aktuell: Einfacher TextEditor ohne Fokus-Feature
++struct FocusLineTextEditor: View {
++    @Binding var text: String
++    
++    var body: some View {
++        TextEditor(text: $text)
++            .font(.system(size: 17))
++            .padding(12)
++            .overlay(
++                RoundedRectangle(cornerRadius: 8)
++                    .stroke(Color.gray.opacity(0.3), lineWidth: 1.5)
++            )
++    }
++}
++
++#Preview("macOS Fallback") {
++    @Previewable @State var sampleText = "macOS TextEditor (ohne Fokus-Feature)"
++    
++    VStack {
++        Text("macOS Fallback")
++            .font(.headline)
++            .padding()
++        
++        FocusLineTextEditor(text: $sampleText)
++            .frame(height: 200)
++            .padding()
++    }
++}
++
++#endif
++
+diff --git a/Do Day/ConfigNextcloudConfig.swift b/Do Day/ConfigNextcloudConfig.swift
+index b4bfcd0..0d9bf63 100644
+--- a/Do Day/ConfigNextcloudConfig.swift	
++++ b/Do Day/ConfigNextcloudConfig.swift	
+@@ -6,6 +6,7 @@
+ //
+ 
+ import Foundation
++import Combine
+ import Security
+ 
+ /// Konfiguration für Nextcloud-Verbindung
+diff --git a/Do Day/ContentView.swift b/Do Day/ContentView.swift
+index fc4ba34..da4e672 100644
+--- a/Do Day/ContentView.swift	
++++ b/Do Day/ContentView.swift	
+@@ -7,18 +7,179 @@
+ 
+ import SwiftUI
+ 
++#if canImport(EventKit)
++import EventKit
++#endif
++
++#if canImport(UserNotifications)
++import UserNotifications
++#endif
++
++/// Hauptansicht der Do Day App
++/// Kombiniert Homebar, Content-Views und ActionBar
+ struct ContentView: View {
++    @State private var selectedScope: TimeScope = .today
++    @State private var text: String = ""
++    @StateObject private var storageService = StorageService.shared
++    
++    // Services (plattformabhängig initialisiert)
++    #if canImport(EventKit)
++    @StateObject private var calendarService = CalendarService()
++    @StateObject private var reminderService = ReminderService()
++    #endif
++    
++    @StateObject private var habitService = HabitService()
++    
++    #if canImport(UserNotifications)
++    @StateObject private var notificationService = NotificationService()
++    #endif
++    
++    @StateObject private var nextcloudConfig = NextcloudConfig()
++    
+     var body: some View {
+-        VStack {
+-            Image(systemName: "globe")
+-                .imageScale(.large)
+-                .foregroundStyle(.tint)
+-            Text("Hello, world!")
++        Group {
++            if storageService.isConfigured {
++                mainView
++            } else {
++                StorageSetupView()
++            }
++        }
++        #if DEBUG
++        .overlay(alignment: .topTrailing) {
++            // DEBUG: Icon Export Button (nur im Debug-Modus sichtbar)
++            Button(action: {
++                AppIcon().saveIconToDocuments()
++            }) {
++                Image(systemName: "square.and.arrow.down")
++                    .padding(8)
++                    .background(Color.blue)
++                    .foregroundColor(.white)
++                    .clipShape(Circle())
++            }
++            .padding()
++        }
++        #endif
++    }
++    
++    private var mainView: some View {
++        VStack(spacing: 0) {
++            // Content-Bereich (abhängig von selectedScope)
++            contentView
++                .frame(maxHeight: .infinity)
++            
++            // ActionBar mit 4 festen Button-Positionen (OBERHALB des TextViews)
++            ActionBarView(
++                scope: selectedScope,
++                onCreateEvent: { createEvent() },
++                onCreateReminder: { createReminder() },
++                onCreateJournal: { createJournal() },
++                onToggleHabit: { toggleHabit() }
++            )
++            .padding(.bottom, 8)
++            
++            // Textfeld mit FocusLineTextEditor
++            FocusLineTextEditor(text: $text)
++                .frame(height: 140)
++                .padding(.horizontal, 12)
++                .padding(.bottom, 12)
++            
++            // Homebar mit Keyboard-Style-Buttons (UNTEN)
++            KeyboardHomebarView(selectedScope: $selectedScope)
++                .padding(.bottom, 8)
++        }
++        .task {
++            // Berechtigungen beim App-Start anfordern
++            await requestPermissions()
++        }
++    }
++    
++    // MARK: - Content Views
++    
++    @ViewBuilder
++    private var contentView: some View {
++        switch selectedScope {
++        case .today:
++            TodayView()
++        case .tomorrow:
++            TomorrowView()
++        case .week:
++            WeekView()
++        case .monthYear:
++            MonthYearView()
++        }
++    }
++    
++    // MARK: - Actions
++    
++    private func createEvent() {
++        print("📅 Termin erstellen aus Text: '\(text)'")
++        // TODO: Text parsen, Event erstellen via CalendarService
++        // Beispiel: "Arzt 14:00" → Event mit Titel "Arzt" um 14:00 Uhr
++    }
++    
++    private func createReminder() {
++        print("✓ Erinnerung erstellen aus Text: '\(text)'")
++        // TODO: Text als Erinnerung speichern via ReminderService
++    }
++    
++    private func createJournal() {
++        print("📓 Journal-Eintrag speichern: '\(text)'")
++        
++        // Erstelle Journal-Eintrag mit aktuellem Scope und Text
++        let entry = JournalEntry(scope: selectedScope, content: text, tags: [])
++        
++        do {
++            try storageService.saveJournalEntry(entry)
++            print("✅ Journal gespeichert: \(entry.fileName)")
++            text = "" // Clear text after saving
++        } catch {
++            print("❌ Fehler beim Speichern: \(error.localizedDescription)")
+         }
+-        .padding()
+     }
++    
++    private func toggleHabit() {
++        print("● Habit abhaken")
++        // TODO: Habit-Auswahl anzeigen, abhaken via HabitService
++    }
++    
++    // MARK: - Berechtigungen
++    
++    private func requestPermissions() async {
++        #if canImport(EventKit)
++        // Kalender-Berechtigung (nur iOS, macOS, watchOS)
++        if calendarService.authorizationStatus == .notDetermined {
++            _ = await calendarService.requestAccess()
++        }
++        
++        // Erinnerungs-Berechtigung (nur iOS, macOS, watchOS)
++        if reminderService.authorizationStatus == .notDetermined {
++            _ = await reminderService.requestAccess()
++        }
++        #endif
++        
++        #if canImport(UserNotifications)
++        // Benachrichtigungs-Berechtigung (alle Plattformen)
++        if notificationService.authorizationStatus == .notDetermined {
++            _ = await notificationService.requestAuthorization()
++        }
++        #endif
++    }
++}
++
++#Preview("iPhone 16 - Do Day") {
++    ContentView()
++        .previewDevice(PreviewDevice(rawValue: "iPhone 16 Pro"))
++        .previewDisplayName("iPhone 16 Pro (393×852pt)")
++}
++
++#Preview("iPhone 16 Pro Max") {
++    ContentView()
++        .previewDevice(PreviewDevice(rawValue: "iPhone 16 Pro Max"))
++        .previewDisplayName("iPhone 16 Pro Max (430×932pt)")
+ }
+ 
+-#Preview {
++#Preview("iPhone SE") {
+     ContentView()
++        .previewDevice(PreviewDevice(rawValue: "iPhone SE (3rd generation)"))
++        .previewDisplayName("iPhone SE (375×667pt)")
+ }
+diff --git a/Do Day/IconGenerator.swift b/Do Day/IconGenerator.swift
+index fcbe3dc..f97cde0 100644
+--- a/Do Day/IconGenerator.swift	
++++ b/Do Day/IconGenerator.swift	
+@@ -4,102 +4,141 @@
+ //
+ //  Created by Uli on 19.04.26.
+ //
+-//  This file generates the app icon design based on the "Ordner auswählen" button
+-//  Use this to create screenshots for app icons at various sizes
++//  App Icon - Automatisch abgeleitet vom ersten Homebar-Button
+ 
+ import SwiftUI
+ 
+-/// App Icon Generator - Based on the "Ordner auswählen" button design
+-/// This creates a complete button (not half) without dividers or highlights
+-struct AppIconGenerator: View {
++/// iOS App Icon - Abgeleitet vom ersten "DO DAY" Button der Homebar
++/// Xcode generiert automatisch alle Größen aus diesem SwiftUI View
++/// Regeln: Nimm den ersten Button, mache ihn quadratisch, entferne Divider und Active-Highlight
++/// STYLING: AKTIVER ZUSTAND (selected)
++struct AppIcon: View {
+     var body: some View {
+-        // Full button design as one complete icon
+-        ZStack {
+-            // Button background - solid blue
+-            Color.blue
++        // EXAKT der erste Button aus KeyboardHomebarView (DO DAY, SELECTED/ACTIVE)
++        // Original Werte (aktiver Zustand):
++        // - "DO": 20pt, BOLD
++        // - "DAY": 11pt, MEDIUM
++        // - Spacing: 1pt
++        // - Button-Höhe: 62pt
++        // - Text-Farbe: Color(white: 0.15) → Color(white: 0.10) (dunkler wenn aktiv)
++        // - Keycap: Warmes Beige/Creme (selected state)
++        
++        GeometryReader { geometry in
++            let size = min(geometry.size.width, geometry.size.height)
++            let scaleFactor = size / 62.0 // Original Button war 62pt hoch
+             
+-            // Button content - centered
+-            HStack(spacing: 8) {
+-                Image(systemName: "folder")
+-                    .font(.system(size: 40, weight: .semibold))
++            VStack(spacing: 1 * scaleFactor) {  // Original spacing: 1pt
+                 Text("DO")
+-                    .font(.system(size: 40, weight: .bold))
++                    .font(.system(size: 20 * scaleFactor, weight: .bold, design: .rounded))
++                Text("DAY")
++                    .font(.system(size: 11 * scaleFactor, weight: .medium, design: .rounded))
+             }
+-            .foregroundColor(.white)
++            .foregroundStyle(
++                LinearGradient(
++                    colors: [Color(white: 0.15), Color(white: 0.10)],  // AKTIV: Dunkler
++                    startPoint: .top,
++                    endPoint: .bottom
++                )
++            )
++            .shadow(color: Color.white.opacity(0.5), radius: 0.5 * scaleFactor, x: 0, y: 0.5 * scaleFactor)  // Text-Shadow wenn aktiv
++            .frame(width: size, height: size)
++            .background(
++                LinearGradient(
++                    colors: [
++                        Color(red: 0.92, green: 0.89, blue: 0.82),  // AKTIV: Warmes Beige
++                        Color(red: 0.88, green: 0.85, blue: 0.78)
++                    ],
++                    startPoint: .topLeading,
++                    endPoint: .bottomTrailing
++                )
++            )
++            .overlay(
++                VStack {
++                    LinearGradient(
++                        colors: [Color.white.opacity(0.25), Color.clear],
++                        startPoint: .top,
++                        endPoint: .center
++                    )
++                    .frame(height: 16 * scaleFactor) // Original: 16pt
++                    Spacer()
++                }
++            )
++            .overlay(
++                RoundedRectangle(cornerRadius: 5, style: .continuous)
++                    .strokeBorder(
++                        LinearGradient(
++                            colors: [Color.black.opacity(0.2), Color.clear],
++                            startPoint: .top,
++                            endPoint: .bottom
++                        ),
++                        lineWidth: 0.5
++                    )
++            )
++            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
++            .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 3)
+         }
+-        .aspectRatio(1.0, contentMode: .fit) // Square for app icon
++        .aspectRatio(1, contentMode: .fit)
+     }
+ }
+ 
+-/// Simple folder icon variant - minimalist
+-struct AppIconGeneratorSimple: View {
+-    var body: some View {
+-        ZStack {
+-            Color.blue
+-            
+-            Image(systemName: "folder")
+-                .font(.system(size: 140, weight: .semibold))
+-                .foregroundColor(.white)
+-        }
+-        .aspectRatio(1.0, contentMode: .fit)
+-    }
+-}
+-
+-/// Folder with badge variant
+-struct AppIconGeneratorBadge: View {
+-    var body: some View {
+-        ZStack {
+-            Color.blue
+-            
+-            Image(systemName: "folder.badge.plus")
+-                .font(.system(size: 140, weight: .semibold))
+-                .foregroundColor(.white)
+-        }
+-        .aspectRatio(1.0, contentMode: .fit)
+-    }
+-}
+-
+-// MARK: - Preview & Export Helper
++// MARK: - Preview
+ 
+-#Preview("App Icon - Full Button") {
+-    AppIconGenerator()
++#Preview {
++    AppIcon()
+         .frame(width: 1024, height: 1024)
+ }
+ 
+-#Preview("App Icon - Simple Folder") {
+-    AppIconGeneratorSimple()
+-        .frame(width: 1024, height: 1024)
+-}
++// MARK: - PNG Export Helper
+ 
+-#Preview("App Icon - Folder with Badge") {
+-    AppIconGeneratorBadge()
+-        .frame(width: 1024, height: 1024)
++#if canImport(UIKit)
++import UIKit
++
++extension AppIcon {
++    /// Erstellt ein PNG-Bild des Icons
++    func renderToPNG() -> UIImage {
++        let renderer = ImageRenderer(content: self.frame(width: 1024, height: 1024))
++        renderer.scale = 1.0
++        return renderer.uiImage ?? UIImage()
++    }
++    
++    /// Speichert das Icon als PNG im Documents-Ordner
++    func saveIconToDocuments() {
++        let image = renderToPNG()
++        if let data = image.pngData() {
++            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
++            let fileURL = documentsPath.appendingPathComponent("DoDay-AppIcon-1024x1024.png")
++            try? data.write(to: fileURL)
++            print("✅ Icon gespeichert: \(fileURL.path)")
++        }
++    }
+ }
++#endif
+ 
+-// MARK: - Usage Instructions
++// MARK: - Xcode Native App Icon Generation
+ /*
+  
+- So erstellen Sie die App-Icons:
+- 
+- 1. Öffnen Sie diese Datei in Xcode
+- 2. Wählen Sie eine der Preview-Varianten oben
+- 3. Klicken Sie in der Canvas auf die Preview
+- 4. Machen Sie einen Screenshot (Cmd+Shift+4) und wählen Sie nur das Icon aus
+- 5. Oder: Exportieren Sie den View als Bild
++ SO GENERIERT XCODE DAS ICON AUTOMATISCH:
+  
+- ALTERNATIV - Professioneller Weg:
++ 1. Gehen Sie zu Assets.xcassets → AppIcon
++ 2. Im Inspektor (rechts): Wählen Sie "Single Size" statt "All Sizes"
++ 3. ODER: Erstellen Sie ein neues iOS App Icon Set mit SwiftUI
+  
+- 1. Erstellen Sie einen neuen SwiftUI View im Projekt
+- 2. Setzen Sie den View auf genau 1024x1024
+- 3. Verwenden Sie Xcode's "Export as Image" Funktion
++ Bei iOS 18+ / Xcode 16+:
++ - Xcode kann SwiftUI Views direkt als App Icons verwenden
++ - Alle Größen werden automatisch generiert
++ - Icon wird aus dem Code abgeleitet, nicht aus Bildern
+  
+- Benötigte Größen:
+- - iOS: 1024x1024 (App Store), 180x180, 120x120, 167x167, 152x152, 76x76
+- - watchOS: 1024x1024, 196x196, 216x216, 258x258
+- - macOS: 1024x1024, 512x512, 256x256, 128x128, 64x64, 32x32, 16x16
++ AKTUELL (Xcode 15 / iOS 17):
++ - Canvas öffnen (Cmd+Option+Return)
++ - Preview-Screenshot machen
++ - In Assets → AppIcon → 1024x1024 Slot einfügen
++ - Xcode skaliert automatisch alle anderen Größen
+  
+- Tool-Empfehlung:
+- Laden Sie das 1024x1024 Icon auf https://appicon.co hoch,
+- um automatisch alle Größen zu generieren.
++ DAS ICON IST:
++ - Der erste "DO DAY" Button aus KeyboardHomebarView
++ - Quadratisch gemacht (statt rechteckig)
++ - OHNE Divider (Trennlinie zum "DO MORROW")  
++ - OHNE Active-Highlight (nicht ausgewählter Zustand)
++ - Alle Proportionen beibehalten (Text 19.4% der Höhe)
+  
+  */
+diff --git a/Do Day/KeyboardHomebarView.swift b/Do Day/KeyboardHomebarView.swift
+index 91a3dce..d9e010c 100644
+--- a/Do Day/KeyboardHomebarView.swift	
++++ b/Do Day/KeyboardHomebarView.swift	
+@@ -7,48 +7,55 @@
+ 
+ import SwiftUI
+ 
++#if canImport(UIKit)
++import UIKit
++#endif
++
+ /// Realistische mechanische Keycaps (High-Profile, SA/Cherry-Style)
+-/// Design basiert auf echten mechanischen Tastaturen (NICHT Gaming)
+-/// - DO DAY (Today)
+-/// - DO MORROW (Week)
+-/// - MON YEAR (Month/Year)
++/// Design basiert auf echten mechanischen Tastaturen
++/// Layout: [DO DAY (Today) | DO MORROW (Tomorrow)] 50% + [WEEK] 25% + [MON YEAR] 25%
++/// Based on real Cherry MX keycap dimensions and appearance
+ struct KeyboardHomebarView: View {
+     @Binding var selectedScope: TimeScope
+     
+     var body: some View {
+         GeometryReader { geometry in
+-            HStack(spacing: 6) {
+-                // Button 1: DO DAY (Today)
+-                MechanicalKeycap(
+-                    topText: "DO",
+-                    bottomText: "DAY",
+-                    isSelected: selectedScope == .today,
+-                    width: (geometry.size.width - 32) / 3,
+-                    action: { withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+-                        selectedScope = .today
+-                    }}
++            let totalWidth = geometry.size.width - 20
++            let spacing: CGFloat = 6
++            let combinedWidth = (totalWidth - spacing * 2) * 0.5
++            let singleWidth = (totalWidth - spacing * 2) * 0.25
++            
++            HStack(spacing: spacing) {
++                // Button 1 (50%): Combined DO DAY | DO MORROW
++                CombinedKeycap(
++                    selectedScope: $selectedScope,
++                    width: combinedWidth
+                 )
+                 
+-                // Button 2: DO MORROW (Week)
++                // Button 2 (25%): WEEK
+                 MechanicalKeycap(
+-                    topText: "DO",
+-                    bottomText: "MORROW",
++                    topText: "W",
++                    bottomText: "EEK",
+                     isSelected: selectedScope == .week,
+-                    width: (geometry.size.width - 32) / 3,
+-                    action: { withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+-                        selectedScope = .week
+-                    }}
++                    width: singleWidth,
++                    action: { 
++                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
++                            selectedScope = .week
++                        }
++                    }
+                 )
+                 
+-                // Button 3: MON YEAR (Month/Year)
++                // Button 3 (25%): MON YEAR
+                 MechanicalKeycap(
+                     topText: "MON",
+                     bottomText: "YEAR",
+                     isSelected: selectedScope == .monthYear,
+-                    width: (geometry.size.width - 32) / 3,
+-                    action: { withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+-                        selectedScope = .monthYear
+-                    }}
++                    width: singleWidth,
++                    action: { 
++                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
++                            selectedScope = .monthYear
++                        }
++                    }
+                 )
+             }
+             .padding(.horizontal, 10)
+@@ -57,6 +64,167 @@ struct KeyboardHomebarView: View {
+     }
+ }
+ 
++// MARK: - Combined Keycap (DO DAY | DO MORROW)
++
++/// Combined button with left (DO DAY = Today) and right (DO MORROW = Tomorrow) sections
++struct CombinedKeycap: View {
++    @Binding var selectedScope: TimeScope
++    let width: CGFloat
++    
++    @State private var isPressed = false
++    
++    var body: some View {
++        HStack(spacing: 0) {
++            // Left side: DO DAY (Today)
++            Button(action: {
++                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
++                    selectedScope = .today
++                }
++            }) {
++                VStack(spacing: 1) {
++                    Text("DO")
++                        .font(.system(size: 20, weight: .bold, design: .rounded))
++                    Text("DAY")
++                        .font(.system(size: 11, weight: .medium, design: .rounded))
++                }
++                .frame(maxWidth: .infinity, maxHeight: .infinity)
++                .foregroundStyle(
++                    LinearGradient(
++                        colors: [
++                            Color(white: selectedScope == .today ? 0.15 : 0.35),
++                            Color(white: selectedScope == .today ? 0.10 : 0.30)
++                        ],
++                        startPoint: .top,
++                        endPoint: .bottom
++                    )
++                )
++                .shadow(color: Color.white.opacity(0.5), radius: 0.5, x: 0, y: 0.5)
++                .contentShape(Rectangle()) // Make entire area tappable
++            }
++            .buttonStyle(PlainButtonStyle())
++            .frame(maxWidth: .infinity, maxHeight: .infinity)
++            .background(
++                // Stark rectangle highlight for active side
++                selectedScope == .today ?
++                    RoundedRectangle(cornerRadius: 4, style: .continuous)
++                        .fill(
++                            LinearGradient(
++                                colors: [
++                                    Color.white.opacity(0.6),
++                                    Color.white.opacity(0.4)
++                                ],
++                                startPoint: .top,
++                                endPoint: .bottom
++                            )
++                        )
++                        .padding(5) // Bigger offset for more visible concentric effect
++                    : nil
++            )
++            
++            // Divider
++            Rectangle()
++                .fill(Color.black.opacity(0.4))
++                .frame(width: 1)
++                .padding(.vertical, 8)
++            
++            // Right side: DO MORROW (Tomorrow)
++            Button(action: {
++                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
++                    selectedScope = .tomorrow
++                }
++            }) {
++                VStack(spacing: 0) {
++                    Text("DO")
++                        .font(.system(size: 20, weight: .bold, design: .rounded))
++                    Text("MORROW")
++                        .font(.system(size: 10, weight: .medium, design: .rounded))
++                        .tracking(-0.4)
++                }
++                .frame(maxWidth: .infinity, maxHeight: .infinity)
++                .foregroundStyle(
++                    LinearGradient(
++                        colors: [
++                            Color(white: selectedScope == .tomorrow ? 0.15 : 0.35),
++                            Color(white: selectedScope == .tomorrow ? 0.10 : 0.30)
++                        ],
++                        startPoint: .top,
++                        endPoint: .bottom
++                    )
++                )
++                .shadow(color: Color.white.opacity(0.5), radius: 0.5, x: 0, y: 0.5)
++                .contentShape(Rectangle()) // Make entire area tappable
++            }
++            .buttonStyle(PlainButtonStyle())
++            .frame(maxWidth: .infinity, maxHeight: .infinity)
++            .background(
++                // Stark rectangle highlight for active side
++                selectedScope == .tomorrow ?
++                    RoundedRectangle(cornerRadius: 4, style: .continuous)
++                        .fill(
++                            LinearGradient(
++                                colors: [
++                                    Color.white.opacity(0.6),
++                                    Color.white.opacity(0.4)
++                                ],
++                                startPoint: .top,
++                                endPoint: .bottom
++                            )
++                        )
++                        .padding(5) // Bigger offset for more visible concentric effect
++                    : nil
++            )
++        }
++        .frame(width: width, height: 62)
++        .background(keycapGradient(isSelected: selectedScope == .today || selectedScope == .tomorrow))
++        .overlay(keycapHighlight())
++        .overlay(
++            RoundedRectangle(cornerRadius: 5, style: .continuous)
++                .strokeBorder(
++                    LinearGradient(
++                        colors: [
++                            Color.black.opacity(0.2),
++                            Color.clear
++                        ],
++                        startPoint: .top,
++                        endPoint: .bottom
++                    ),
++                    lineWidth: 0.5
++                )
++        )
++        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
++        .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 3)
++    }
++    
++    private func keycapGradient(isSelected: Bool) -> some View {
++        LinearGradient(
++            colors: isSelected ? [
++                Color(red: 0.92, green: 0.89, blue: 0.82),
++                Color(red: 0.88, green: 0.85, blue: 0.78)
++            ] : [
++                Color(white: 0.82),
++                Color(white: 0.76)
++            ],
++            startPoint: .topLeading,
++            endPoint: .bottomTrailing
++        )
++    }
++    
++    private func keycapHighlight() -> some View {
++        VStack {
++            LinearGradient(
++                colors: [
++                    Color.white.opacity(0.25),
++                    Color.clear
++                ],
++                startPoint: .top,
++                endPoint: .center
++            )
++            .frame(height: 16)
++            Spacer()
++        }
++    }
++}
++
+ // MARK: - Mechanical Keycap Component
+ 
+ /// Einzelne mechanische Keycap (SA-Profile oder Cherry-Profile)
+@@ -181,11 +349,11 @@ struct MechanicalKeycap: View {
+     private var keycapLegend: some View {
+         VStack(spacing: 1) {
+             Text(topText)
+-                .font(.system(size: 13, weight: .medium, design: .rounded))
+-                .tracking(0.5)
++                .font(.system(size: topText.count == 1 ? 26 : (topText == "MON" ? 20 : 13), weight: topText.count <= 3 ? .bold : .medium, design: .rounded))
++                .tracking(topText.count == 1 ? 0 : 0.5)
+             
+             Text(bottomText)
+-                .font(.system(size: 13, weight: .medium, design: .rounded))
++                .font(.system(size: bottomText == "MORROW" ? 11 : (bottomText == "EEK" ? 10 : 10), weight: .medium, design: .rounded))
+                 .tracking(bottomText == "MORROW" ? -0.3 : 0.5)
+         }
+         .foregroundStyle(
+@@ -207,14 +375,18 @@ struct MechanicalKeycap: View {
+ 
+ #Preview("All States") {
+     VStack(spacing: 20) {
+-        // Unselected
+-        KeyboardHomebarView(selectedScope: .constant(.week))
+-            .background(Color(white: 0.15))
+-        
+         // Today Selected
+         KeyboardHomebarView(selectedScope: .constant(.today))
+             .background(Color(white: 0.15))
+         
++        // Tomorrow Selected
++        KeyboardHomebarView(selectedScope: .constant(.tomorrow))
++            .background(Color(white: 0.15))
++        
++        // Week Selected
++        KeyboardHomebarView(selectedScope: .constant(.week))
++            .background(Color(white: 0.15))
++        
+         // MonthYear Selected
+         KeyboardHomebarView(selectedScope: .constant(.monthYear))
+             .background(Color(white: 0.15))
+@@ -272,7 +444,11 @@ struct MechanicalKeycap: View {
+             }
+             .padding()
+         }
++        #if canImport(UIKit)
+         .background(Color(uiColor: .systemBackground))
++        #else
++        .background(Color(white: 1.0))
++        #endif
+         
+         // Action-Buttons
+         HStack(spacing: 0) {
+@@ -290,7 +466,11 @@ struct MechanicalKeycap: View {
+         TextEditor(text: $text)
+             .frame(height: 140)
+             .padding(12)
++            #if canImport(UIKit)
+             .background(Color(uiColor: .systemBackground))
++            #else
++            .background(Color(white: 1.0))
++            #endif
+             .cornerRadius(8)
+             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.3), lineWidth: 1))
+             .padding(.horizontal, 12)
+diff --git a/Do Day/ModelsJournalEntry.swift b/Do Day/ModelsJournalEntry.swift
+index b33986e..f94fb2a 100644
+--- a/Do Day/ModelsJournalEntry.swift	
++++ b/Do Day/ModelsJournalEntry.swift	
+@@ -8,8 +8,8 @@
+ import Foundation
+ 
+ /// Model für einen Journal-Eintrag
+-/// Wird als Markdown-Datei in Nextcloud gespeichert (später implementiert)
+-/// Format: YYYY-MM-DD.md, YYYY-Www.md, YYYY-MM.md, YYYY.md
++/// Wird als Markdown-Datei gespeichert (Obsidian-kompatibel)
++/// Format: YYYY-MM-DD.md (Daily), YYYY-Www.md (Weekly)
+ struct JournalEntry: Identifiable, Codable {
+     let id: UUID
+     let scope: TimeScope
+@@ -26,14 +26,26 @@ struct JournalEntry: Identifiable, Codable {
+         self.tags = tags
+     }
+     
+-    /// Dateiname für Nextcloud/Obsidian
+-    /// Beispiel: 2026-04-19.md, 2026-W16.md, 2026-04.md, 2026.md
++    /// Unterordner basierend auf Scope
++    var folderPath: String {
++        switch scope {
++        case .today, .tomorrow:
++            return "Daily"
++        case .week:
++            return "Weekly"
++        case .monthYear:
++            return "Daily" // Month/Year views also use daily files
++        }
++    }
++    
++    /// Dateiname für Obsidian
++    /// Beispiel: 2026-04-19.md, 2026-W16.md
+     var fileName: String {
+         let formatter = DateFormatter()
+         formatter.locale = Locale(identifier: "de_DE")
+         
+         switch scope {
+-        case .today:
++        case .today, .tomorrow, .monthYear:
+             formatter.dateFormat = "yyyy-MM-dd"
+             return "\(formatter.string(from: date)).md"
+             
+@@ -42,15 +54,14 @@ struct JournalEntry: Identifiable, Codable {
+             let weekNumber = calendar.component(.weekOfYear, from: date)
+             let year = calendar.component(.year, from: date)
+             return String(format: "%04d-W%02d.md", year, weekNumber)
+-            
+-        case .monthYear:
+-            // Hier später unterscheiden zwischen Monat und Jahr
+-            // Vorerst: Monatsformat
+-            formatter.dateFormat = "yyyy-MM"
+-            return "\(formatter.string(from: date)).md"
+         }
+     }
+     
++    /// Vollständiger Pfad relativ zum Vault-Root
++    var fullPath: String {
++        return "\(folderPath)/\(fileName)"
++    }
++    
+     /// YAML Frontmatter für Obsidian-Kompatibilität
+     var frontmatter: String {
+         let formatter = DateFormatter()
+@@ -59,14 +70,22 @@ struct JournalEntry: Identifiable, Codable {
+         
+         let tagsString = tags.isEmpty ? "[]" : "[\(tags.joined(separator: ", "))]"
+         
+-        return """
++        var frontmatterDict = """
+         ---
+         date: \(dateString)
+-        scope: \(scope.rawValue.lowercased())
+         tags: \(tagsString)
+-        ---
+-        
+         """
++        
++        // Add week number for weekly entries
++        if scope == .week {
++            let calendar = Calendar.current
++            let weekNumber = calendar.component(.weekOfYear, from: date)
++            frontmatterDict += "\nweek: \(weekNumber)"
++        }
++        
++        frontmatterDict += "\n---\n\n"
++        
++        return frontmatterDict
+     }
+     
+     /// Vollständiger Markdown-Inhalt mit Frontmatter
+diff --git a/Do Day/ModelsTimeScope.swift b/Do Day/ModelsTimeScope.swift
+index 6dddb78..42939e3 100644
+--- a/Do Day/ModelsTimeScope.swift	
++++ b/Do Day/ModelsTimeScope.swift	
+@@ -8,11 +8,13 @@
+ import Foundation
+ 
+ /// Enum für die drei Zeitraum-Modi der App
+-/// - today: Heutige Ansicht (50% Breite in Homebar)
++/// - today: Heutige Ansicht (DO DAY - linke Seite des kombinierten Buttons)
++/// - tomorrow: Morgen-Ansicht (DO MORROW - rechte Seite des kombinierten Buttons)
+ /// - week: Wochenansicht (25% Breite, mit Swipe-Navigation)
+ /// - monthYear: Monats-/Jahresansicht (25% Breite, mit Toggle)
+ enum TimeScope: String, Codable, CaseIterable {
+     case today = "Heute"
++    case tomorrow = "Morgen"
+     case week = "Woche"
+     case monthYear = "Monat/Jahr"
+     
+@@ -26,6 +28,8 @@ enum TimeScope: String, Codable, CaseIterable {
+         switch self {
+         case .today:
+             return "Tag"
++        case .tomorrow:
++            return "Morgen"
+         case .week:
+             return "Woche"
+         case .monthYear:
+diff --git a/Do Day/OBSIDIAN_STRUCTURE.md b/Do Day/OBSIDIAN_STRUCTURE.md
+index 1ae7027..0e271f2 100644
+--- a/Do Day/OBSIDIAN_STRUCTURE.md	
++++ b/Do Day/OBSIDIAN_STRUCTURE.md	
+@@ -1,103 +1,83 @@
+ # Obsidian Folder Structure for Do Day
+ 
+ ## Overview
+-Do Day stores all data in a user-selected folder with an Obsidian-compatible structure. This allows seamless integration with Obsidian for viewing and editing notes.
++Do Day stores all data in a user-selected folder with a simple, flat Obsidian-compatible structure.
+ 
+ ## Folder Hierarchy
+ 
+ ```
+ 📁 Do Day Vault/
+-├── 📁 Journal/
+-│   ├── 📁 Daily/
+-│   │   ├── 2026-04-19.md
+-│   │   ├── 2026-04-20.md
+-│   │   └── ...
+-│   ├── 📁 Weekly/
+-│   │   ├── 2026-W16.md
+-│   │   ├── 2026-W17.md
+-│   │   └── ...
+-│   ├── 📁 Monthly/
+-│   │   ├── 2026-04.md
+-│   │   ├── 2026-05.md
+-│   │   └── ...
+-│   └── 📁 Yearly/
+-│       ├── 2026.md
+-│       └── ...
+-├── 📁 Habits/
+-│   └── (Habit tracking files)
+-├── 📁 Events/
+-│   └── (Calendar events)
+-└── 📁 Reminders/
+-    └── (Reminders/tasks)
++├── 📁 Daily/
++│   ├── 2026-04-19.md
++│   ├── 2026-04-20.md
++│   └── ...
++└── 📁 Weekly/
++    ├── 2026-W16.md
++    ├── 2026-W17.md
++    └── ...
+ ```
+ 
+ ## File Format
+ 
+-All journal entries use Markdown format with YAML frontmatter for Obsidian compatibility:
++All entries use Markdown format with YAML frontmatter for Obsidian compatibility:
+ 
+ ### Daily Entry Example (2026-04-19.md)
+ ```markdown
+ ---
+ date: 2026-04-19
+-scope: heute
+ tags: []
+ ---
+ 
++# Termine
++- 14:00 Arzttermin
++
++# Aufgaben
++- [ ] Einkaufen
++- [x] Email beantworten
++
++# Habits
++- [x] Sport
++- [ ] Lesen
++
++# Notizen
+ Heutiger Journal-Eintrag...
+-Aufgaben, Notizen, Gedanken...
+ ```
+ 
+ ### Weekly Entry Example (2026-W16.md)
+ ```markdown
+ ---
+ date: 2026-04-19
+-scope: woche
++week: 16
+ tags: []
+ ---
+ 
+-Wochenplanung KW 16...
+-```
++# Wochenplanung KW 16
+ 
+-### Monthly Entry Example (2026-04.md)
+-```markdown
+----
+-date: 2026-04-01
+-scope: monat/jahr
+-tags: []
+----
++## Ziele
++- Projekt X abschließen
+ 
+-Monatsübersicht April 2026...
++## Notizen
++Wochenübersicht...
+ ```
+ 
+ ## Synchronization
+ 
+ - **Local Storage**: Files are stored in the user-selected folder
+ - **iCloud Sync**: The folder path is synced across devices via iCloud Key-Value Storage
+-- **Obsidian**: The folder can be opened as an Obsidian vault for advanced editing
+-- **Nextcloud/WebDAV**: Future support for cloud synchronization
++- **Obsidian**: The folder can be opened as an Obsidian vault
+ 
+ ## Naming Conventions
+ 
+ | Scope | Format | Example | Folder |
+ |-------|--------|---------|--------|
+-| Today/Tomorrow | `YYYY-MM-DD.md` | `2026-04-19.md` | `Journal/Daily/` |
+-| Week | `YYYY-Www.md` | `2026-W16.md` | `Journal/Weekly/` |
+-| Month | `YYYY-MM.md` | `2026-04.md` | `Journal/Monthly/` |
+-| Year | `YYYY.md` | `2026.md` | `Journal/Yearly/` |
++| Today/Tomorrow | `YYYY-MM-DD.md` | `2026-04-19.md` | `Daily/` |
++| Week | `YYYY-Www.md` | `2026-W16.md` | `Weekly/` |
+ 
+ ## Benefits
+ 
+-1. **Obsidian Compatible**: Open the folder as an Obsidian vault
+-2. **Human Readable**: Plain text Markdown files
+-3. **Version Control Friendly**: Works with Git
+-4. **Future Proof**: Standard format, no vendor lock-in
+-5. **Cross-Platform**: Works on iOS, macOS, and via Obsidian on desktop
+-6. **Search Friendly**: Easy to search with Spotlight, Obsidian, or grep
+-
+-## Migration
++1. **Simple & Flat**: Easy to navigate
++2. **Obsidian Compatible**: Open the folder as an Obsidian vault
++3. **Human Readable**: Plain text Markdown files
++4. **All-in-One**: Each file contains termine, aufgaben, habits, and notes
++5. **Future Proof**: Standard format, no vendor lock-in
+ 
+-If you want to use an existing Obsidian vault:
+-1. Select your existing Obsidian vault folder when prompted
+-2. Do Day will create the necessary subfolders
+-3. Existing notes remain untouched
+-4. Do Day entries will appear in the Journal subfolder
+diff --git a/Do Day/ServicesCalendarService.swift b/Do Day/ServicesCalendarService.swift
+index 1e9269c..9c27c82 100644
+--- a/Do Day/ServicesCalendarService.swift	
++++ b/Do Day/ServicesCalendarService.swift	
+@@ -6,11 +6,16 @@
+ //
+ 
+ import Foundation
++import Combine
++
++#if canImport(EventKit)
+ import EventKit
+ 
+ /// Service für EventKit Kalender-Integration
+ /// Liest CalDAV-Kalender (z.B. Nextcloud) direkt via iOS-System
+ /// Keine eigene Sync-Logik nötig!
++/// WICHTIG: Nur auf iOS, macOS, watchOS verfügbar (nicht auf tvOS)
++@available(iOS 13.0, macOS 10.15, watchOS 6.0, *)
+ class CalendarService: ObservableObject {
+     private let eventStore = EKEventStore()
+     @Published var events: [EKEvent] = []
+@@ -136,3 +141,31 @@ class CalendarService: ObservableObject {
+ // MARK: - Später: Info.plist Eintrag erforderlich
+ // NSCalendarsUsageDescription: "Do Day benötigt Zugriff auf deinen Kalender, um Termine anzuzeigen und zu erstellen."
+ // NSCalendarsFullAccessUsageDescription: "Do Day benötigt vollen Zugriff auf deinen Kalender."
++#else
++// MARK: - Fallback für tvOS (EventKit nicht verfügbar)
++
++/// Dummy-Service für Plattformen ohne EventKit (z.B. tvOS)
++class CalendarService: ObservableObject {
++    @Published var events: [String] = [] // Placeholder
++    
++    init() {
++        print("⚠️ CalendarService nicht verfügbar auf dieser Plattform (tvOS)")
++    }
++    
++    func requestAccess() async -> Bool {
++        print("⚠️ EventKit nicht verfügbar")
++        return false
++    }
++    
++    func loadTodayEvents() async -> [String] {
++        return []
++    }
++    
++    func loadWeekEvents(weekOffset: Int = 0) async -> [String] {
++        return []
++    }
++}
++
++#endif
++
++
+diff --git a/Do Day/ServicesHabitService.swift b/Do Day/ServicesHabitService.swift
+index 675162b..d6dfe09 100644
+--- a/Do Day/ServicesHabitService.swift	
++++ b/Do Day/ServicesHabitService.swift	
+@@ -6,141 +6,186 @@
+ //
+ 
+ import Foundation
++import Combine
+ 
+ /// Service für Habit-Tracking
+-/// Verwaltet max. 5-7 Habits, Speicherung in habits.json (lokal + später Nextcloud)
++/// Habits werden als Oneliner gespeichert, ein Eintrag pro Tag in [Habit].md
++/// Ähnlichkeitserkennung verhindert Duplikate
++@MainActor
+ class HabitService: ObservableObject {
+-    @Published var habitData: HabitData = HabitData()
++    @Published var allHabits: Set<String> = [] // Alle jemals verwendeten Habit-Texte
++    @Published var todayCompletions: Set<String> = [] // Heute erledigte Habits
+     
+-    // Lokaler Speicherpfad
+-    private let localFileName = "habits.json"
++    private let storageService = StorageService.shared
++    private let habitFileName = "Habits.md"
+     
+     init() {
+-        loadLocalHabits()
++        loadAllHabits()
+     }
+     
+-    // MARK: - Lokales Laden/Speichern
++    // MARK: - Habit-Erstellung mit Ähnlichkeitserkennung
+     
+-    /// Lädt Habits aus lokalem Speicher
+-    func loadLocalHabits() {
+-        guard let url = getLocalFileURL() else { return }
++    /// Erstellt ein neues Habit oder schlägt ähnliche vor
++    /// Returns: nil wenn Habit erstellt wurde, [String] wenn Vorschläge gemacht werden
++    func createHabit(from text: String) -> [String]? {
++        let cleanText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+         
+-        do {
+-            let data = try Data(contentsOf: url)
+-            let decoder = JSONDecoder()
+-            habitData = try decoder.decode(HabitData.self, from: data)
+-        } catch {
+-            print("Fehler beim Laden der Habits: \(error)")
+-            // Bei Fehler: Initialisiere mit Standard-Habits
+-            initializeDefaultHabits()
++        // Prüfe auf exakte Übereinstimmung
++        if allHabits.contains(cleanText) {
++            // Bereits vorhanden - toggle completion
++            toggleCompletion(for: cleanText)
++            return nil
+         }
+-    }
+-    
+-    /// Speichert Habits lokal
+-    func saveLocalHabits() {
+-        guard let url = getLocalFileURL() else { return }
+         
+-        do {
+-            let encoder = JSONEncoder()
+-            encoder.outputFormatting = .prettyPrinted
+-            let data = try encoder.encode(habitData)
+-            try data.write(to: url)
+-        } catch {
+-            print("Fehler beim Speichern der Habits: \(error)")
++        // Prüfe auf ähnliche Habits
++        let similar = findSimilarHabits(to: cleanText)
++        
++        if !similar.isEmpty {
++            // Gib Vorschläge zurück
++            return similar
+         }
++        
++        // Komplett neu - erstelle Habit
++        allHabits.insert(cleanText)
++        toggleCompletion(for: cleanText)
++        saveHabitEntry(cleanText)
++        
++        return nil
+     }
+     
+-    /// Gibt die URL für lokale Speicherung zurück
+-    private func getLocalFileURL() -> URL? {
+-        let fileManager = FileManager.default
+-        guard let documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+-            return nil
++    /// Findet ähnliche Habits (Levenshtein-Distanz < 30%)
++    private func findSimilarHabits(to text: String) -> [String] {
++        let threshold = 0.7 // 70% Ähnlichkeit
++        
++        return allHabits.filter { existing in
++            let similarity = stringSimilarity(text, existing)
++            return similarity >= threshold && similarity < 1.0
+         }
+-        return documentsDirectory.appendingPathComponent(localFileName)
+-    }
+-    
+-    // MARK: - Habit-Verwaltung
+-    
+-    /// Fügt ein neues Habit hinzu
+-    func addHabit(name: String, icon: String = "circle", color: String = "#007AFF") {
+-        let sortOrder = habitData.habits.count
+-        let newHabit = Habit(name: name, icon: icon, color: color, sortOrder: sortOrder)
+-        habitData.habits.append(newHabit)
+-        saveLocalHabits()
+     }
+     
+-    /// Löscht ein Habit
+-    func deleteHabit(_ habit: Habit) {
+-        habitData.habits.removeAll { $0.id == habit.id }
+-        habitData.completions.removeAll { $0.habitId == habit.id }
+-        saveLocalHabits()
++    /// Berechnet String-Ähnlichkeit (0.0 - 1.0)
++    private func stringSimilarity(_ s1: String, _ s2: String) -> Double {
++        let longer = s1.count > s2.count ? s1 : s2
++        let shorter = s1.count > s2.count ? s2 : s1
++        
++        if longer.count == 0 { return 1.0 }
++        
++        let editDistance = levenshteinDistance(s1, s2)
++        return (Double(longer.count) - Double(editDistance)) / Double(longer.count)
+     }
+     
+-    /// Aktualisiert ein Habit
+-    func updateHabit(_ habit: Habit) {
+-        if let index = habitData.habits.firstIndex(where: { $0.id == habit.id }) {
+-            habitData.habits[index] = habit
+-            saveLocalHabits()
++    /// Levenshtein-Distanz (Edit Distance)
++    private func levenshteinDistance(_ s1: String, _ s2: String) -> Int {
++        let a = Array(s1)
++        let b = Array(s2)
++        
++        var matrix = [[Int]](repeating: [Int](repeating: 0, count: b.count + 1), count: a.count + 1)
++        
++        for i in 0...a.count { matrix[i][0] = i }
++        for j in 0...b.count { matrix[0][j] = j }
++        
++        for i in 1...a.count {
++            for j in 1...b.count {
++                let cost = a[i-1] == b[j-1] ? 0 : 1
++                matrix[i][j] = min(
++                    matrix[i-1][j] + 1,
++                    matrix[i][j-1] + 1,
++                    matrix[i-1][j-1] + cost
++                )
++            }
+         }
++        
++        return matrix[a.count][b.count]
+     }
+     
+-    // MARK: - Completion-Verwaltung
++    // MARK: - Completion-Tracking
+     
+-    /// Togglet den Completion-Status eines Habits für heute
+-    func toggleCompletion(for habit: Habit, date: Date = Date()) {
+-        let calendar = Calendar.current
+-        let targetDay = calendar.startOfDay(for: date)
+-        
+-        // Suche bestehende Completion
+-        if let index = habitData.completions.firstIndex(where: { completion in
+-            completion.habitId == habit.id &&
+-            calendar.isDate(completion.date, inSameDayAs: targetDay)
+-        }) {
+-            // Toggle existing completion
+-            habitData.completions[index].completed.toggle()
++    func toggleCompletion(for habit: String) {
++        if todayCompletions.contains(habit) {
++            todayCompletions.remove(habit)
+         } else {
+-            // Erstelle neue Completion
+-            let completion = HabitCompletion(habitId: habit.id, date: targetDay, completed: true)
+-            habitData.completions.append(completion)
++            todayCompletions.insert(habit)
+         }
+-        
+-        saveLocalHabits()
++        saveHabitEntry(habit)
+     }
+     
+-    /// Prüft, ob ein Habit heute erledigt ist
+-    func isCompletedToday(habit: Habit) -> Bool {
+-        return habitData.isCompleted(habitId: habit.id, date: Date())
++    func isCompletedToday(_ habit: String) -> Bool {
++        todayCompletions.contains(habit)
+     }
+     
+-    /// Gibt Completion-Rate für einen Zeitraum zurück (0.0 - 1.0)
+-    func completionRate(for habit: Habit, days: Int = 7) -> Double {
+-        let calendar = Calendar.current
+-        let today = calendar.startOfDay(for: Date())
++    // MARK: - Markdown-Speicherung
++    
++    /// Speichert Habit-Eintrag: ISO-8601-Datum pro Zeile in Habits.md
++    private func saveHabitEntry(_ habit: String) {
++        let date = ISO8601DateFormatter().string(from: Date())
++        let completed = todayCompletions.contains(habit)
++        let status = completed ? "✓" : "○"
+         
+-        var completedDays = 0
++        let entry = "\(date) \(status) \(habit)"
+         
+-        for dayOffset in 0..<days {
+-            if let date = calendar.date(byAdding: .day, value: -dayOffset, to: today) {
+-                if habitData.isCompleted(habitId: habit.id, date: date) {
+-                    completedDays += 1
+-                }
++        do {
++            // Lade existierenden Inhalt
++            var content = ""
++            if let existing = try? storageService.loadFile(named: habitFileName) {
++                content = existing
++            }
++            
++            // Prüfe ob Eintrag für heute bereits existiert
++            let lines = content.components(separatedBy: .newlines)
++            let todayPrefix = date.prefix(10) // YYYY-MM-DD
++            
++            let newLines = lines.filter { line in
++                !line.hasPrefix(String(todayPrefix)) || !line.contains(habit)
+             }
++            
++            // Füge neuen Eintrag hinzu
++            var updatedLines = newLines
++            updatedLines.append(entry)
++            
++            // Speichere
++            let newContent = updatedLines.joined(separator: "\n")
++            try storageService.saveFile(named: habitFileName, content: newContent)
++            
++        } catch {
++            print("❌ Fehler beim Speichern des Habits: \(error)")
+         }
+-        
+-        return Double(completedDays) / Double(days)
+     }
+     
+-    // MARK: - Standard-Habits
+-    
+-    /// Initialisiert Standard-Habits (beim ersten Start)
+-    private func initializeDefaultHabits() {
+-        habitData = HabitData(habits: [
+-            Habit(name: "Meditation", icon: "brain.head.profile", color: "#9B59B6", sortOrder: 0),
+-            Habit(name: "Sport", icon: "figure.walk", color: "#E74C3C", sortOrder: 1),
+-            Habit(name: "Lesen", icon: "book", color: "#3498DB", sortOrder: 2)
+-        ], completions: [])
+-        
+-        saveLocalHabits()
++    /// Lädt alle Habits aus Habits.md
++    private func loadAllHabits() {
++        do {
++            let content = try storageService.loadFile(named: habitFileName)
++            let lines = content.components(separatedBy: .newlines)
++            
++            var habits = Set<String>()
++            var todayHabits = Set<String>()
++            let todayDate = ISO8601DateFormatter().string(from: Date()).prefix(10)
++            
++            for line in lines {
++                guard !line.isEmpty else { continue }
++                
++                // Format: "2026-04-19T12:00:00Z ✓ Sport machen"
++                let parts = line.split(separator: " ", maxSplits: 2)
++                guard parts.count >= 3 else { continue }
++                
++                let date = String(parts[0].prefix(10))
++                let status = String(parts[1])
++                let habitText = String(parts[2])
++                
++                habits.insert(habitText)
++                
++                if date == todayDate && status == "✓" {
++                    todayHabits.insert(habitText)
++                }
++            }
++            
++            allHabits = habits
++            todayCompletions = todayHabits
++            
++        } catch {
++            // Datei existiert noch nicht - ok
++            print("ℹ️ Habits.md noch nicht vorhanden")
++        }
+     }
+ }
+ 
+diff --git a/Do Day/ServicesMarkdownService.swift b/Do Day/ServicesMarkdownService.swift
+index 03ae68c..6a94c6c 100644
+--- a/Do Day/ServicesMarkdownService.swift	
++++ b/Do Day/ServicesMarkdownService.swift	
+@@ -28,6 +28,11 @@ class MarkdownService {
+             formatter.dateFormat = "yyyy-MM-dd"
+             return "\(formatter.string(from: date)).md"
+             
++        case .tomorrow:
++            // Tomorrow uses same date format as today
++            formatter.dateFormat = "yyyy-MM-dd"
++            return "\(formatter.string(from: date)).md"
++            
+         case .week:
+             let calendar = Calendar.current
+             let weekNumber = calendar.component(.weekOfYear, from: date)
+@@ -108,6 +113,10 @@ class MarkdownService {
+             formatter.dateFormat = "EEEE, d. MMMM yyyy"
+             return "# \(formatter.string(from: date))"
+             
++        case .tomorrow:
++            formatter.dateFormat = "EEEE, d. MMMM yyyy"
++            return "# \(formatter.string(from: date))"
++            
+         case .week:
+             let calendar = Calendar.current
+             let weekNumber = calendar.component(.weekOfYear, from: date)
+diff --git a/Do Day/ServicesNotificationService.swift b/Do Day/ServicesNotificationService.swift
+index d5a55f0..93286a2 100644
+--- a/Do Day/ServicesNotificationService.swift	
++++ b/Do Day/ServicesNotificationService.swift	
+@@ -6,10 +6,15 @@
+ //
+ 
+ import Foundation
++import Combine
++
++#if canImport(UserNotifications)
+ import UserNotifications
+ 
+ /// Service für lokale Benachrichtigungen
+ /// Morgen- und Abend-Reminder für Journal/Review
++/// Verfügbar auf allen Apple-Plattformen
++@available(iOS 10.0, macOS 10.14, watchOS 3.0, tvOS 10.0, *)
+ class NotificationService: ObservableObject {
+     @Published var authorizationStatus: UNAuthorizationStatus = .notDetermined
+     
+@@ -150,3 +155,20 @@ class NotificationService: ObservableObject {
+ // MARK: - Später: Info.plist Eintrag NICHT erforderlich
+ // UserNotifications benötigt keinen Info.plist-Eintrag
+ // Nur Runtime-Berechtigung via requestAuthorization()
++#else
++// MARK: - Fallback (sollte nie auftreten, UserNotifications ist überall verfügbar)
++
++/// Dummy-Service (sollte nicht benötigt werden)
++class NotificationService: ObservableObject {
++    init() {
++        print("⚠️ UserNotifications nicht verfügbar")
++    }
++    
++    func requestAuthorization() async -> Bool {
++        return false
++    }
++}
++
++#endif
++
++
+diff --git a/Do Day/ServicesReminderService.swift b/Do Day/ServicesReminderService.swift
+index 53d64bc..089cf19 100644
+--- a/Do Day/ServicesReminderService.swift	
++++ b/Do Day/ServicesReminderService.swift	
+@@ -6,10 +6,15 @@
+ //
+ 
+ import Foundation
++import Combine
++
++#if canImport(EventKit)
+ import EventKit
+ 
+ /// Service für EventKit Erinnerungen-Integration
+ /// Greift auf iOS Reminders App zu (inkl. CalDAV-Sync via Nextcloud)
++/// WICHTIG: Nur auf iOS, macOS, watchOS verfügbar (nicht auf tvOS)
++@available(iOS 13.0, macOS 10.15, watchOS 6.0, *)
+ class ReminderService: ObservableObject {
+     private let eventStore = EKEventStore()
+     @Published var reminders: [EKReminder] = []
+@@ -192,3 +197,31 @@ class ReminderService: ObservableObject {
+ // MARK: - Später: Info.plist Eintrag erforderlich
+ // NSRemindersUsageDescription: "Do Day benötigt Zugriff auf deine Erinnerungen, um Aufgaben anzuzeigen und zu erstellen."
+ // NSRemindersFullAccessUsageDescription: "Do Day benötigt vollen Zugriff auf deine Erinnerungen."
++#else
++// MARK: - Fallback für tvOS (EventKit nicht verfügbar)
++
++/// Dummy-Service für Plattformen ohne EventKit (z.B. tvOS)
++class ReminderService: ObservableObject {
++    @Published var reminders: [String] = [] // Placeholder
++    
++    init() {
++        print("⚠️ ReminderService nicht verfügbar auf dieser Plattform (tvOS)")
++    }
++    
++    func requestAccess() async -> Bool {
++        print("⚠️ EventKit nicht verfügbar")
++        return false
++    }
++    
++    func loadTodayReminders() async -> [String] {
++        return []
++    }
++    
++    func loadWeekReminders(weekOffset: Int = 0) async -> [String] {
++        return []
++    }
++}
++
++#endif
++
++
+diff --git a/Do Day/ServicesStorageService.swift b/Do Day/ServicesStorageService.swift
+index 60d8476..b02cf8b 100644
+--- a/Do Day/ServicesStorageService.swift	
++++ b/Do Day/ServicesStorageService.swift	
+@@ -7,6 +7,8 @@
+ 
+ import Foundation
+ import SwiftUI
++import Combine
++import UniformTypeIdentifiers
+ 
+ #if canImport(UIKit)
+ import UIKit
+@@ -95,7 +97,7 @@ class StorageService: ObservableObject {
+     
+     // MARK: - Persistence & Sync
+     
+-    private func saveStorageFolder(_ url: URL) {
++    func saveStorageFolder(_ url: URL) {
+         // Create security-scoped bookmark
+         do {
+             let bookmarkData = try url.bookmarkData(
+@@ -167,6 +169,69 @@ class StorageService: ObservableObject {
+     
+     // MARK: - File Operations
+     
++    /// Erstellt die Ordnerstruktur im Storage-Ordner
++    func createFolderStructure() throws {
++        guard let folderURL = storageFolderURL else {
++            throw StorageError.noFolderSelected
++        }
++        
++        let fileManager = FileManager.default
++        
++        // Create Daily folder
++        let dailyURL = folderURL.appendingPathComponent("Daily")
++        try fileManager.createDirectory(at: dailyURL, withIntermediateDirectories: true)
++        
++        // Create Weekly folder
++        let weeklyURL = folderURL.appendingPathComponent("Weekly")
++        try fileManager.createDirectory(at: weeklyURL, withIntermediateDirectories: true)
++    }
++    
++    /// Speichert einen Journal-Eintrag
++    func saveJournalEntry(_ entry: JournalEntry) throws {
++        guard let folderURL = storageFolderURL else {
++            throw StorageError.noFolderSelected
++        }
++        
++        // Ensure folders exist
++        try createFolderStructure()
++        
++        // Build full file path
++        let fileURL = folderURL
++            .appendingPathComponent(entry.folderPath)
++            .appendingPathComponent(entry.fileName)
++        
++        // Write markdown content
++        try entry.fullMarkdown.write(to: fileURL, atomically: true, encoding: .utf8)
++    }
++    
++    /// Lädt einen Journal-Eintrag
++    func loadJournalEntry(for scope: TimeScope, date: Date = Date()) throws -> JournalEntry {
++        guard let folderURL = storageFolderURL else {
++            throw StorageError.noFolderSelected
++        }
++        
++        // Create temporary entry to get file path
++        let tempEntry = JournalEntry(scope: scope, content: "")
++        let fileURL = folderURL
++            .appendingPathComponent(tempEntry.folderPath)
++            .appendingPathComponent(tempEntry.fileName)
++        
++        // Check if file exists
++        guard FileManager.default.fileExists(atPath: fileURL.path) else {
++            // Return empty entry if file doesn't exist
++            return JournalEntry(scope: scope, content: "", tags: [])
++        }
++        
++        // Read content
++        let markdown = try String(contentsOf: fileURL, encoding: .utf8)
++        
++        // Parse frontmatter and content (simple implementation)
++        let content = parseMarkdownContent(markdown)
++        let tags = parseMarkdownTags(markdown)
++        
++        return JournalEntry(scope: scope, content: content, tags: tags)
++    }
++    
+     /// Erstellt oder aktualisiert eine Datei im Storage-Ordner
+     func saveFile(named fileName: String, content: String) throws {
+         guard let folderURL = storageFolderURL else {
+@@ -186,6 +251,31 @@ class StorageService: ObservableObject {
+         let fileURL = folderURL.appendingPathComponent(fileName)
+         return try String(contentsOf: fileURL, encoding: .utf8)
+     }
++    
++    // MARK: - Markdown Parsing Helpers
++    
++    private func parseMarkdownContent(_ markdown: String) -> String {
++        // Remove frontmatter and return content
++        let components = markdown.components(separatedBy: "---")
++        if components.count >= 3 {
++            return components[2...].joined(separator: "---").trimmingCharacters(in: .whitespacesAndNewlines)
++        }
++        return markdown
++    }
++    
++    private func parseMarkdownTags(_ markdown: String) -> [String] {
++        // Simple tag parsing from frontmatter
++        if let tagRange = markdown.range(of: "tags: \\[.*\\]", options: .regularExpression) {
++            let tagString = String(markdown[tagRange])
++            // Extract tags between brackets
++            if let bracketStart = tagString.firstIndex(of: "["),
++               let bracketEnd = tagString.firstIndex(of: "]") {
++                let tagsContent = String(tagString[tagString.index(after: bracketStart)..<bracketEnd])
++                return tagsContent.components(separatedBy: ", ").map { $0.trimmingCharacters(in: .whitespaces) }
++            }
++        }
++        return []
++    }
+ }
+ 
+ // MARK: - Document Picker Coordinator (iOS)
+diff --git a/Do Day/ServicesWebDAVService.swift b/Do Day/ServicesWebDAVService.swift
+index f46ac8f..d1302a7 100644
+--- a/Do Day/ServicesWebDAVService.swift	
++++ b/Do Day/ServicesWebDAVService.swift	
+@@ -6,6 +6,7 @@
+ //
+ 
+ import Foundation
++import Combine
+ 
+ /// Service für WebDAV-Kommunikation mit Nextcloud
+ /// Download/Upload von .md-Dateien und habits.json
+diff --git a/Do Day/ViewsActionBarView.swift b/Do Day/ViewsActionBarView.swift
+index db61ae8..a1e2863 100644
+--- a/Do Day/ViewsActionBarView.swift	
++++ b/Do Day/ViewsActionBarView.swift	
+@@ -19,8 +19,8 @@ struct ActionBarView: View {
+     
+     var body: some View {
+         HStack(spacing: 0) {
+-            // Position 1: Termin erstellen (nur Heute + Woche)
+-            if scope == .today || scope == .week {
++            // Position 1: Termin erstellen (Heute, Morgen, Woche)
++            if scope == .today || scope == .tomorrow || scope == .week {
+                 actionButton(
+                     icon: "calendar.badge.plus",
+                     label: "Termin",
+@@ -30,8 +30,8 @@ struct ActionBarView: View {
+                 emptyPlaceholder()
+             }
+             
+-            // Position 2: Erinnerung erstellen (nur Heute + Woche)
+-            if scope == .today || scope == .week {
++            // Position 2: Erinnerung erstellen (Heute, Morgen, Woche)
++            if scope == .today || scope == .tomorrow || scope == .week {
+                 actionButton(
+                     icon: "checkmark.circle",
+                     label: "Aufgabe",
+@@ -48,8 +48,8 @@ struct ActionBarView: View {
+                 action: onCreateJournal
+             )
+             
+-            // Position 4: Habit abhaken (nur Heute)
+-            if scope == .today {
++            // Position 4: Habit abhaken (nur Heute + Morgen)
++            if scope == .today || scope == .tomorrow {
+                 actionButton(
+                     icon: "circle.fill",
+                     label: "Habit",
+@@ -60,7 +60,13 @@ struct ActionBarView: View {
+             }
+         }
+         .frame(height: 60)
+-        .background(Color(uiColor: .systemGray6))
++        .background(Color(white: 0.96))
++        .overlay(
++            Rectangle()
++                .fill(Color.gray.opacity(0.2))
++                .frame(height: 0.5),
++            alignment: .top
++        )
+     }
+     
+     /// Berechnet das Label für den Journal-Button basierend auf TimeScope
+@@ -68,6 +74,8 @@ struct ActionBarView: View {
+         switch scope {
+         case .today:
+             return "Journal"
++        case .tomorrow:
++            return "Journal"
+         case .week:
+             return "Review"
+         case .monthYear:
+@@ -106,6 +114,16 @@ struct ActionBarView: View {
+     )
+ }
+ 
++#Preview("Morgen") {
++    ActionBarView(
++        scope: .tomorrow,
++        onCreateEvent: { print("Termin erstellen") },
++        onCreateReminder: { print("Erinnerung erstellen") },
++        onCreateJournal: { print("Journal schreiben") },
++        onToggleHabit: { print("Habit abhaken") }
++    )
++}
++
+ #Preview("Woche") {
+     ActionBarView(
+         scope: .week,
+diff --git a/Do Day/ViewsKeyboardHomebarView.swift b/Do Day/ViewsKeyboardHomebarView.swift
+index 13d34a4..16e0ebd 100644
+--- a/Do Day/ViewsKeyboardHomebarView.swift	
++++ b/Do Day/ViewsKeyboardHomebarView.swift	
+@@ -7,119 +7,287 @@
+ 
+ import SwiftUI
+ 
+-/// Keyboard-Style Homebar mit 3 Tasten (unten)
+-/// Design: Klassische Keyboard-Tasten mit zweizeiligem Text
+-/// - DO DAY (Today)
+-/// - DO MORROW (Tomorrow/Week)
+-/// - MON YEAR (Month/Year)
+-struct KeyboardHomebarView: View {
++/// Keyboard-Style Homebar mit mechanischen Keycap-Buttons
++/// Design: Realistische mechanische Tastatur (Cherry MX Profile)
++/// Layout: [DO DAY | DO MORROW] 50% [WEEK] 25% [MON YEAR] 25%
++/// Based on actual Cherry MX keycap profile (~11-12mm height, proper 3D rendering)
++struct KeyboardHomebarView_Old: View {
+     @Binding var selectedScope: TimeScope
+     
+     var body: some View {
+-        HStack(spacing: 8) {
+-            // Button 1: DO DAY (Today)
+-            keyboardButton(
+-                topText: "DO",
+-                bottomText: "DAY",
+-                isSelected: selectedScope == .today,
+-                action: { selectedScope = .today }
+-            )
++        GeometryReader { geometry in
++            let totalWidth = geometry.size.width - 20 // padding
++            let spacing: CGFloat = 6
++            let combinedWidth = (totalWidth - spacing * 2) * 0.5
++            let singleWidth = (totalWidth - spacing * 2) * 0.25
+             
+-            // Button 2: DO MORROW (Week)
+-            keyboardButton(
+-                topText: "DO",
+-                bottomText: "MORROW",
+-                isSelected: selectedScope == .week,
+-                action: { selectedScope = .week }
++            HStack(spacing: spacing) {
++                // Button 1: Combined DO DAY | DO MORROW (50% width, toggles between today/week)
++                dualKeycapButton(width: combinedWidth)
++                
++                // Button 2: WEEK (25% width)
++                singleKeycapButton(
++                    topText: "WEEK",
++                    bottomText: "",
++                    width: singleWidth,
++                    isSelected: selectedScope == .week,
++                    action: { 
++                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
++                            selectedScope = .week
++                        }
++                    }
++                )
++                
++                // Button 3: MON YEAR (25% width)
++                singleKeycapButton(
++                    topText: "MON",
++                    bottomText: "YEAR",
++                    width: singleWidth,
++                    isSelected: selectedScope == .monthYear,
++                    action: { 
++                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
++                            selectedScope = .monthYear
++                        }
++                    }
++                )
++            }
++            .padding(.horizontal, 10)
++        }
++        .frame(height: 70)
++        .background(
++            LinearGradient(
++                colors: [Color(white: 0.18), Color(white: 0.12)],
++                startPoint: .top,
++                endPoint: .bottom
+             )
+-            
+-            // Button 3: MON YEAR (Month/Year)
+-            keyboardButton(
+-                topText: "MON",
+-                bottomText: "YEAR",
+-                isSelected: selectedScope == .monthYear,
+-                action: { selectedScope = .monthYear }
++        )
++    }
++    
++    // MARK: - Dual Keycap Button (DO DAY | DO MORROW)
++    
++    /// Combined button (50% width) with DO DAY (left) and DO MORROW (right)
++    /// Toggles between Today and Week
++    private func dualKeycapButton(width: CGFloat) -> some View {
++        Button(action: toggleTodayWeek) {
++            HStack(spacing: 0) {
++                // Left side: DO DAY (Today)
++                VStack(spacing: 1) {
++                    Text("DO")
++                        .font(.system(size: 12, weight: .medium, design: .rounded))
++                    Text("DAY")
++                        .font(.system(size: 12, weight: .medium, design: .rounded))
++                }
++                .frame(maxWidth: .infinity)
++                .foregroundStyle(
++                    LinearGradient(
++                        colors: selectedScope == .today ? [
++                            Color(white: 0.25),
++                            Color(white: 0.20)
++                        ] : [
++                            Color(white: 0.35),
++                            Color(white: 0.30)
++                        ],
++                        startPoint: .top,
++                        endPoint: .bottom
++                    )
++                )
++                
++                // Divider line
++                Rectangle()
++                    .fill(Color.black.opacity(0.4))
++                    .frame(width: 1)
++                    .padding(.vertical, 8)
++                
++                // Right side: DO MORROW (Week - but labeled as tomorrow concept)
++                VStack(spacing: 0) {
++                    Text("DO")
++                        .font(.system(size: 12, weight: .medium, design: .rounded))
++                    Text("MORROW")
++                        .font(.system(size: 11, weight: .medium, design: .rounded))
++                        .tracking(-0.4) // Tighter tracking for longer word
++                }
++                .frame(maxWidth: .infinity)
++                .foregroundStyle(
++                    LinearGradient(
++                        colors: selectedScope == .week ? [
++                            Color(white: 0.25),
++                            Color(white: 0.20)
++                        ] : [
++                            Color(white: 0.35),
++                            Color(white: 0.30)
++                        ],
++                        startPoint: .top,
++                        endPoint: .bottom
++                    )
++                )
++            }
++            .frame(width: width, height: 62)
++            .background(keycapGradient(isSelected: selectedScope == .today || selectedScope == .week))
++            .overlay(keycapHighlight())
++            .overlay(
++                // Inner shadow
++                RoundedRectangle(cornerRadius: 5, style: .continuous)
++                    .strokeBorder(
++                        LinearGradient(
++                            colors: [
++                                Color.black.opacity(0.2),
++                                Color.clear
++                            ],
++                            startPoint: .top,
++                            endPoint: .bottom
++                        ),
++                        lineWidth: 0.5
++                    )
+             )
++            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
++            .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 3)
+         }
+-        .padding(.horizontal, 12)
+-        .frame(height: 60)
++        .buttonStyle(KeycapButtonStyle())
+     }
+     
+-    // MARK: - Keyboard Button
++    /// Toggle zwischen Today und Week beim Tap auf Dual-Button
++    private func toggleTodayWeek() {
++        if selectedScope == .today {
++            selectedScope = .week
++        } else {
++            selectedScope = .today
++        }
++    }
++    
++    // MARK: - Single Keycap Button
+     
+-    /// Erstellt einen Keyboard-Style-Button
+-    private func keyboardButton(
++    /// Single keycap button (25% width) - realistic Cherry MX profile
++    private func singleKeycapButton(
+         topText: String,
+         bottomText: String,
++        width: CGFloat,
+         isSelected: Bool,
+         action: @escaping () -> Void
+     ) -> some View {
+         Button(action: action) {
+-            VStack(spacing: 2) {
++            VStack(spacing: 1) {
+                 Text(topText)
+-                    .font(.system(size: 14, weight: .semibold))
+-                Text(bottomText)
+-                    .font(.system(size: 14, weight: .semibold))
++                    .font(.system(size: 13, weight: .medium, design: .rounded))
++                    .tracking(0.5)
++                if !bottomText.isEmpty {
++                    Text(bottomText)
++                        .font(.system(size: 13, weight: .medium, design: .rounded))
++                        .tracking(0.5)
++                }
+             }
+-            .frame(maxWidth: .infinity)
+-            .frame(height: 52)
+-            .foregroundColor(isSelected ? .white : .primary)
+-            .background(
+-                RoundedRectangle(cornerRadius: 8)
+-                    .fill(isSelected ? Color.blue : Color(white: 0.95))
+-                    .shadow(
+-                        color: Color.black.opacity(isSelected ? 0.3 : 0.15),
+-                        radius: isSelected ? 4 : 2,
+-                        x: 0,
+-                        y: isSelected ? 2 : 1
+-                    )
++            .frame(width: width, height: 62)
++            .foregroundStyle(
++                LinearGradient(
++                    colors: [
++                        Color(white: isSelected ? 0.25 : 0.35),
++                        Color(white: isSelected ? 0.20 : 0.30)
++                    ],
++                    startPoint: .top,
++                    endPoint: .bottom
++                )
+             )
++            .background(keycapGradient(isSelected: isSelected))
++            .overlay(keycapHighlight())
+             .overlay(
+-                RoundedRectangle(cornerRadius: 8)
+-                    .stroke(Color.black.opacity(0.1), lineWidth: 0.5)
++                // Inner shadow
++                RoundedRectangle(cornerRadius: 5, style: .continuous)
++                    .strokeBorder(
++                        LinearGradient(
++                            colors: [
++                                Color.black.opacity(0.2),
++                                Color.clear
++                            ],
++                            startPoint: .top,
++                            endPoint: .bottom
++                        ),
++                        lineWidth: 0.5
++                    )
+             )
++            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
++            .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 3)
++            .shadow(color: Color.white.opacity(isSelected ? 0.15 : 0.08), radius: 1, x: 0, y: -0.5)
++        }
++        .buttonStyle(KeycapButtonStyle())
++    }
++    
++    // MARK: - Keycap Styling (Realistic Cherry MX Profile)
++    
++    /// Realistic keycap gradient based on actual Cherry MX ABS/PBT keycaps
++    /// Researched from GMK, ePBT, and Cherry original keycaps
++    private func keycapGradient(isSelected: Bool) -> some View {
++        LinearGradient(
++            colors: isSelected ? [
++                // Selected: Warm beige/cream (like GMK Oblivion or ePBT Ivory)
++                Color(red: 0.92, green: 0.89, blue: 0.82),
++                Color(red: 0.88, green: 0.85, blue: 0.78)
++            ] : [
++                // Unselected: Classic gray (like Cherry Dyesub)
++                Color(white: 0.82),
++                Color(white: 0.76)
++            ],
++            startPoint: .topLeading,
++            endPoint: .bottomTrailing
++        )
++    }
++    
++    /// Top highlight effect (simulates light reflection on real keycaps)
++    private func keycapHighlight() -> some View {
++        VStack {
++            LinearGradient(
++                colors: [
++                    Color.white.opacity(0.25),
++                    Color.clear
++                ],
++                startPoint: .top,
++                endPoint: .center
++            )
++            .frame(height: 16)
++            Spacer()
+         }
+-        .buttonStyle(KeyboardButtonStyle())
+     }
+ }
+ 
+-// MARK: - Keyboard Button Style
++// MARK: - Keycap Button Style
+ 
+-/// Custom ButtonStyle für Keyboard-Tasten-Effekt
+-struct KeyboardButtonStyle: ButtonStyle {
++/// Custom ButtonStyle für mechanische Keycaps (Press-Effekt)
++struct KeycapButtonStyle: ButtonStyle {
+     func makeBody(configuration: Configuration) -> some View {
+         configuration.label
+-            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+-            .opacity(configuration.isPressed ? 0.8 : 1.0)
+-            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
++            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
++            .offset(y: configuration.isPressed ? 2 : 0)
++            .shadow(color: .black.opacity(configuration.isPressed ? 0.3 : 0.5), 
++                   radius: configuration.isPressed ? 1 : 3, 
++                   x: 0, 
++                   y: configuration.isPressed ? 1 : 3)
++            .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
+     }
+ }
+ 
+ // MARK: - Preview
+ 
+-#Preview("Unselected") {
++#Preview("Keycaps - Today Selected") {
+     @Previewable @State var scope = TimeScope.today
+     
+     VStack {
+         Spacer()
+-        KeyboardHomebarView(selectedScope: $scope)
+-            .background(Color(white: 0.98))
++        KeyboardHomebarView_Old(selectedScope: $scope)
+     }
++    .background(Color.black)
+ }
+ 
+-#Preview("Week Selected") {
++#Preview("Keycaps - Week Selected") {
+     @Previewable @State var scope = TimeScope.week
+     
+     VStack {
+         Spacer()
+-        KeyboardHomebarView(selectedScope: $scope)
+-            .background(Color(white: 0.98))
++        KeyboardHomebarView_Old(selectedScope: $scope)
+     }
++    .background(Color.black)
+ }
+ 
+-#Preview("iPhone 16") {
++#Preview("iPhone 16 Pro - Full Layout") {
+     @Previewable @State var scope = TimeScope.today
+-    @Previewable @State var text = "Test-Notiz"
++    @Previewable @State var text = "Notiz-Text hier..."
+     
+     VStack(spacing: 0) {
+         // Content-Bereich
+@@ -132,43 +300,46 @@ struct KeyboardButtonStyle: ButtonStyle {
+                 
+                 Divider()
+                 
+-                Text("Hier kommt der Inhalt hin...")
+-                    .foregroundColor(.secondary)
++                ForEach(0..<5) { _ in
++                    HStack {
++                        Circle()
++                            .fill(Color.green)
++                            .frame(width: 8, height: 8)
++                        Text("Beispiel-Event")
++                            .font(.body)
++                        Spacer()
++                        Text("14:00")
++                            .foregroundColor(.secondary)
++                            .font(.caption)
++                    }
++                    .padding(.vertical, 4)
++                }
+             }
+             .padding()
+         }
+         
+-        // Action-Buttons (Beispiel)
++        // Action-Buttons
+         HStack(spacing: 0) {
+-            Button(action: {}) {
+-                VStack(spacing: 4) {
+-                    Image(systemName: "calendar.badge.plus")
+-                        .font(.system(size: 22))
+-                    Text("Termin")
+-                        .font(.system(size: 11))
++            ForEach(["📅", "✓", "📓", "●"], id: \.self) { icon in
++                Button(action: {}) {
++                    VStack(spacing: 4) {
++                        Text(icon)
++                            .font(.system(size: 22))
++                        Text("Action")
++                            .font(.system(size: 10))
++                    }
++                    .frame(maxWidth: .infinity)
+                 }
+-                .frame(maxWidth: .infinity)
+-            }
+-            .foregroundColor(.primary)
+-            
+-            Button(action: {}) {
+-                VStack(spacing: 4) {
+-                    Image(systemName: "checkmark.circle")
+-                        .font(.system(size: 22))
+-                    Text("Aufgabe")
+-                        .font(.system(size: 11))
+-                }
+-                .frame(maxWidth: .infinity)
++                .foregroundColor(.primary)
+             }
+-            .foregroundColor(.primary)
+         }
+         .frame(height: 60)
+         .background(Color(white: 0.96))
+         .padding(.bottom, 8)
+         
+-        // TextView (Placeholder)
++        // TextView
+         TextEditor(text: $text)
+-            .frame(height: 140)
++            .frame(height: 120)
+             .padding(12)
+             .background(Color.white)
+             .cornerRadius(8)
+@@ -179,9 +350,8 @@ struct KeyboardButtonStyle: ButtonStyle {
+             .padding(.horizontal, 12)
+             .padding(.bottom, 12)
+         
+-        // Keyboard-Homebar
+-        KeyboardHomebarView(selectedScope: $scope)
+-            .padding(.bottom, 8)
++        // Mechanische Keycaps
++        KeyboardHomebarView_Old(selectedScope: $scope)
+     }
+-    .background(Color(white: 0.98))
++    .previewDevice(PreviewDevice(rawValue: "iPhone 16 Pro"))
+ }
+diff --git a/Do Day/ViewsMonthYearView.swift b/Do Day/ViewsMonthYearView.swift
+index c88efc2..54092b2 100644
+--- a/Do Day/ViewsMonthYearView.swift	
++++ b/Do Day/ViewsMonthYearView.swift	
+@@ -99,7 +99,7 @@ struct MonthYearView: View {
+             TextEditor(text: $text)
+                 .frame(height: 100)
+                 .padding(8)
+-                .background(Color(uiColor: .systemBackground))
++                .background(adaptiveBackgroundColor)
+                 .overlay(
+                     RoundedRectangle(cornerRadius: 8)
+                         .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+@@ -141,6 +141,19 @@ struct MonthYearView: View {
+         formatter.dateFormat = "yyyy"
+         return formatter.string(from: Date())
+     }
++    
++    // MARK: - Plattformübergreifende Farben
++    
++    /// Adaptiver Hintergrund für alle Plattformen
++    private var adaptiveBackgroundColor: Color {
++        #if canImport(UIKit)
++        return Color(uiColor: .systemBackground)
++        #elseif canImport(AppKit)
++        return Color(nsColor: .windowBackgroundColor)
++        #else
++        return Color.white
++        #endif
++    }
+ }
+ 
+ #Preview("Monatsansicht") {
+diff --git a/Do Day/ViewsStorageSetupView.swift b/Do Day/ViewsStorageSetupView.swift
+index 2bede8b..469a87e 100644
+--- a/Do Day/ViewsStorageSetupView.swift	
++++ b/Do Day/ViewsStorageSetupView.swift	
+@@ -29,17 +29,32 @@ struct StorageSetupView: View {
+             Text("Wähle einen Ordner, in dem deine Notizen, Termine und Habits gespeichert werden sollen.")
+                 .font(.system(size: 17))
+                 .foregroundColor(.secondary)
+-                .multilineTextAlignment(.center)
++                .multilineTextAlignment(.leading)
++                .frame(maxWidth: .infinity, alignment: .leading)
+                 .padding(.horizontal, 32)
+             
+             // iCloud Sync Info
+-            HStack(spacing: 8) {
+-                Image(systemName: "icloud")
+-                    .foregroundColor(.blue)
+-                Text("Der Ordner-Pfad wird über iCloud auf all deinen Geräten synchronisiert")
+-                    .font(.system(size: 14))
+-                    .foregroundColor(.secondary)
++            VStack(alignment: .leading, spacing: 12) {
++                HStack(alignment: .center, spacing: 12) {
++                    Image(systemName: "gearshape")
++                        .foregroundColor(.blue)
++                        .frame(width: 16)
++                    Text("Der Speicherort und Deine Einstellungen werden über iCloud synchronisiert.")
++                        .font(.system(size: 14))
++                        .foregroundColor(.secondary)
++                        .multilineTextAlignment(.leading)
++                }
++                HStack(alignment: .center, spacing: 12) {
++                    Image(systemName: "icloud")
++                        .foregroundColor(.blue)
++                        .frame(width: 16)
++                    Text("Die Daten werden aber in dem von Dir gewählten Cloud-Dienst gespeichert.")
++                        .font(.system(size: 14))
++                        .foregroundColor(.secondary)
++                        .multilineTextAlignment(.leading)
++                }
+             }
++            .frame(maxWidth: .infinity, alignment: .leading)
+             .padding(.horizontal, 32)
+             
+             Spacer()
+@@ -56,23 +71,98 @@ struct StorageSetupView: View {
+             }) {
+                 HStack {
+                     Image(systemName: "folder")
++                        .frame(width: 20, height: 20)
+                     Text("Ordner auswählen")
+                 }
+                 .font(.system(size: 17, weight: .semibold))
+                 .foregroundColor(.white)
+-                .frame(maxWidth: .infinity)
++                .frame(maxWidth: .infinity, alignment: .center)
+                 .frame(height: 54)
+                 .background(Color.blue)
+                 .cornerRadius(12)
+             }
+             .disabled(isSelecting)
+             .padding(.horizontal, 32)
++            
++            // Create DO Day App Folder Button
++            Button(action: {
++                isSelecting = true
++                createDODayAppFolder()
++            }) {
++                HStack {
++                    Image(systemName: "folder.badge.plus")
++                        .frame(width: 20, height: 20)
++                    Text("Ordner 'DO Day App' erstellen")
++                }
++                .font(.system(size: 17, weight: .regular))
++                .foregroundColor(.blue)
++                .frame(maxWidth: .infinity, alignment: .center)
++                .frame(height: 54)
++                .background(Color.blue.opacity(0.1))
++                .cornerRadius(12)
++            }
++            .disabled(isSelecting)
++            .padding(.horizontal, 32)
+             .padding(.bottom, 40)
+         }
+         .frame(maxWidth: .infinity, maxHeight: .infinity)
+         .background(adaptiveBackgroundColor)
+     }
+     
++    // MARK: - Actions
++    
++    private func createDODayAppFolder() {
++        #if canImport(UIKit)
++        createDODayAppFolderiOS()
++        #elseif canImport(AppKit)
++        createDODayAppFolderMac()
++        #endif
++    }
++    
++    #if canImport(UIKit)
++    private func createDODayAppFolderiOS() {
++        // On iOS, create folder in Documents and then select it
++        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
++        let doDayAppURL = documentsURL.appendingPathComponent("DO Day App")
++        
++        // Create the folder
++        do {
++            try FileManager.default.createDirectory(at: doDayAppURL, withIntermediateDirectories: true)
++            // Automatically save it as storage location
++            storageService.saveStorageFolder(doDayAppURL)
++            isSelecting = false
++        } catch {
++            print("Error creating DO Day App folder: \(error)")
++            isSelecting = false
++        }
++    }
++    #endif
++    
++    #if canImport(AppKit)
++    private func createDODayAppFolderMac() {
++        let savePanel = NSSavePanel()
++        savePanel.canCreateDirectories = true
++        savePanel.directoryURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
++        savePanel.nameFieldStringValue = "DO Day App"
++        savePanel.prompt = "Erstellen"
++        savePanel.message = "Wähle einen Speicherort für den 'DO Day App' Ordner"
++        
++        savePanel.begin { response in
++            self.isSelecting = false
++            if response == .OK, let url = savePanel.url {
++                // Create the folder
++                do {
++                    try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
++                    // Save it as storage location
++                    self.storageService.saveStorageFolder(url)
++                } catch {
++                    print("Error creating DO Day App folder: \(error)")
++                }
++            }
++        }
++    }
++    #endif
++    
+     // MARK: - Platform-specific Colors
+     
+     private var adaptiveBackgroundColor: Color {
+diff --git a/Do Day/ViewsTodayView.swift b/Do Day/ViewsTodayView.swift
+index c99ba7f..8089104 100644
+--- a/Do Day/ViewsTodayView.swift	
++++ b/Do Day/ViewsTodayView.swift	
+@@ -8,41 +8,44 @@
+ import SwiftUI
+ 
+ /// Heute-Ansicht (50% Breite in Homebar)
+-/// Zeigt: Kalender-Events, Habits, fällige Erinnerungen
++/// Zeigt nur Bereiche mit Inhalten, erwähnt leere Bereiche in kleiner Headline
+ struct TodayView: View {
+-    @State private var text: String = ""
++    @State private var events: [String] = [] // TODO: CalendarService integration
++    @State private var reminders: [String] = [] // TODO: ReminderService integration
++    @State private var habits: [String] = [] // TODO: HabitService integration
++    @State private var notes: String = ""
+     
+     var body: some View {
+-        VStack(spacing: 0) {
+-            // Inhaltsbereich: Events, Habits, Erinnerungen
+-            ScrollView {
+-                VStack(alignment: .leading, spacing: 16) {
+-                    // Header mit Datum
+-                    todayHeader
+-                    
+-                    // Kalender-Events (später via CalendarService)
+-                    sectionHeader("Termine")
+-                    placeholderContent("Keine Termine heute")
+-                    
+-                    // Habits (später via HabitService)
+-                    sectionHeader("Habits")
+-                    placeholderHabits
+-                    
+-                    // Erinnerungen (später via ReminderService)
+-                    sectionHeader("Erinnerungen")
+-                    placeholderContent("Keine fälligen Erinnerungen")
++        ScrollView {
++            VStack(alignment: .leading, spacing: 16) {
++                // Header mit Datum
++                todayHeader
++                
++                // Zeige nur Bereiche MIT Inhalt
++                if !events.isEmpty {
++                    sectionWithContent("Termine", items: events)
+                 }
+-                .padding()
++                
++                if !habits.isEmpty {
++                    habitsSection
++                }
++                
++                if !reminders.isEmpty {
++                    sectionWithContent("Erinnerungen", items: reminders)
++                }
++                
++                if !notes.isEmpty {
++                    notesSection
++                }
++                
++                // Erwähne ALLE leeren Bereiche in einer kompakten Headline
++                emptyBereicheHeadline
+             }
+-            
+-            Spacer()
+-            
+-            // Textfeld (später: FocusLineTextEditor)
+-            textEditorPlaceholder
++            .padding()
+         }
+     }
+     
+-    // MARK: - Hilfskomponenten
++    // MARK: - Header
+     
+     private var todayHeader: some View {
+         VStack(alignment: .leading, spacing: 4) {
+@@ -54,63 +57,88 @@ struct TodayView: View {
+         }
+     }
+     
+-    private func sectionHeader(_ title: String) -> some View {
+-        Text(title)
+-            .font(.system(size: 18, weight: .semibold))
+-            .padding(.top, 8)
++    private var formattedDate: String {
++        let formatter = DateFormatter()
++        formatter.locale = Locale(identifier: "de_DE")
++        formatter.dateFormat = "EEEE, d. MMMM yyyy"
++        return formatter.string(from: Date())
+     }
+     
+-    private func placeholderContent(_ text: String) -> some View {
+-        Text(text)
+-            .font(.system(size: 14))
+-            .foregroundColor(.secondary)
+-            .padding(.vertical, 8)
+-    }
++    // MARK: - Sections mit Inhalt
+     
+-    private var placeholderHabits: some View {
+-        HStack(spacing: 12) {
+-            habitCircle(completed: true)
+-            habitCircle(completed: false)
+-            habitCircle(completed: false)
+-            Spacer()
++    private func sectionWithContent(_ title: String, items: [String]) -> some View {
++        VStack(alignment: .leading, spacing: 8) {
++            Text(title)
++                .font(.system(size: 18, weight: .semibold))
++            
++            ForEach(items, id: \.self) { item in
++                Text(item)
++                    .font(.system(size: 15))
++                    .padding(.vertical, 4)
++            }
+         }
+     }
+     
+-    private func habitCircle(completed: Bool) -> some View {
+-        Circle()
+-            .fill(completed ? Color.green : Color.gray.opacity(0.3))
+-            .frame(width: 30, height: 30)
++    private var habitsSection: some View {
++        VStack(alignment: .leading, spacing: 8) {
++            Text("Habits")
++                .font(.system(size: 18, weight: .semibold))
++            
++            ForEach(habits, id: \.self) { habit in
++                HStack {
++                    Circle()
++                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
++                        .frame(width: 24, height: 24)
++                    Text(habit)
++                        .font(.system(size: 15))
++                }
++            }
++        }
+     }
+     
+-    private var textEditorPlaceholder: some View {
+-        VStack(spacing: 0) {
+-            // Rahmen im Display-Stil (später verfeinern)
+-            TextEditor(text: $text)
+-                .frame(height: 100)
+-                .padding(8)
+-                .background(Color(uiColor: .systemBackground))
+-                .overlay(
+-                    RoundedRectangle(cornerRadius: 8)
+-                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+-                )
+-                .padding(.horizontal)
+-                .padding(.bottom, 8)
++    private var notesSection: some View {
++        VStack(alignment: .leading, spacing: 8) {
++            Text("Notizen")
++                .font(.system(size: 18, weight: .semibold))
+             
+-            Text("Später: FocusLineTextEditor (aktive Zeile 17pt, andere 11pt)")
+-                .font(.caption)
++            Text(notes)
++                .font(.system(size: 15))
+                 .foregroundColor(.secondary)
+-                .padding(.bottom, 4)
+         }
+     }
+     
+-    private var formattedDate: String {
+-        let formatter = DateFormatter()
+-        formatter.locale = Locale(identifier: "de_DE")
+-        formatter.dateFormat = "EEEE, d. MMMM yyyy"
+-        return formatter.string(from: Date())
++    // MARK: - Leere Bereiche Headline
++    
++    private var emptyBereicheHeadline: some View {
++        let emptyBereiche = getEmptyBereiche()
++        
++        return Group {
++            if !emptyBereiche.isEmpty {
++                Text("keine \(emptyBereiche.joined(separator: ", "))")
++                    .font(.system(size: 11))
++                    .foregroundColor(.secondary.opacity(0.7))
++                    .padding(.top, 8)
++            }
++        }
++    }
++    
++    private func getEmptyBereiche() -> [String] {
++        var empty: [String] = []
++        
++        if events.isEmpty { empty.append("Termine") }
++        if habits.isEmpty { empty.append("Habits") }
++        if reminders.isEmpty { empty.append("Erinnerungen") }
++        if notes.isEmpty { empty.append("Notizen") }
++        
++        return empty
+     }
+ }
+ 
+-#Preview {
++#Preview("Mit Inhalt") {
+     TodayView()
+ }
++
++#Preview("Komplett leer") {
++    TodayView()
++}
++
+diff --git a/Do Day/ViewsTomorrowView.swift b/Do Day/ViewsTomorrowView.swift
+index 36a6749..9e68a66 100644
+--- a/Do Day/ViewsTomorrowView.swift	
++++ b/Do Day/ViewsTomorrowView.swift	
+@@ -31,44 +31,46 @@ struct TomorrowView: View {
+                     Text("Termine")
+                         .font(.headline)
+                     
+-                    HStack {
+-                        Image(systemName: "calendar")
+-                            .foregroundColor(.blue)
+-                        Text("Noch keine Termine")
+-                            .foregroundColor(.secondary)
+-                    }
++                    emptyEntryPlaceholder
+                     
+                     Text("Aufgaben")
+                         .font(.headline)
+                         .padding(.top, 8)
+                     
+-                    HStack {
+-                        Image(systemName: "checkmark.circle")
+-                            .foregroundColor(.green)
+-                        Text("Noch keine Aufgaben")
+-                            .foregroundColor(.secondary)
+-                    }
++                    emptyEntryPlaceholder
+                     
+                     Text("Habits")
+                         .font(.headline)
+                         .padding(.top, 8)
+                     
+                     HStack(spacing: 12) {
+-                        Circle()
+-                            .fill(Color.gray.opacity(0.2))
+-                            .frame(width: 36, height: 36)
+-                        Circle()
+-                            .fill(Color.gray.opacity(0.2))
+-                            .frame(width: 36, height: 36)
+-                        Circle()
+-                            .fill(Color.gray.opacity(0.2))
+-                            .frame(width: 36, height: 36)
++                        habitCircle(completed: false)
++                        Spacer()
+                     }
+                 }
+             }
+             .padding()
+         }
+     }
++    
++    // MARK: - Helper Views
++    
++    private var emptyEntryPlaceholder: some View {
++        RoundedRectangle(cornerRadius: 6, style: .continuous)
++            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
++            .frame(height: 32)
++            .padding(.vertical, 4)
++    }
++    
++    private func habitCircle(completed: Bool) -> some View {
++        Circle()
++            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
++            .background(
++                Circle()
++                    .fill(completed ? Color.green.opacity(0.3) : Color.clear)
++            )
++            .frame(width: 36, height: 36)
++    }
+ }
+ 
+ #Preview("TomorrowView") {
+diff --git a/Do Day/ViewsWeekView.swift b/Do Day/ViewsWeekView.swift
+index 96b19f5..ebe7f79 100644
+--- a/Do Day/ViewsWeekView.swift	
++++ b/Do Day/ViewsWeekView.swift	
+@@ -106,7 +106,7 @@ struct WeekView: View {
+             TextEditor(text: $text)
+                 .frame(height: 100)
+                 .padding(8)
+-                .background(Color(uiColor: .systemBackground))
++                .background(adaptiveBackgroundColor)
+                 .overlay(
+                     RoundedRectangle(cornerRadius: 8)
+                         .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+@@ -149,6 +149,19 @@ struct WeekView: View {
+         
+         return "\(formatter.string(from: monday)) – \(formatter.string(from: sunday))"
+     }
++    
++    // MARK: - Plattformübergreifende Farben
++    
++    /// Adaptiver Hintergrund für alle Plattformen
++    private var adaptiveBackgroundColor: Color {
++        #if canImport(UIKit)
++        return Color(uiColor: .systemBackground)
++        #elseif canImport(AppKit)
++        return Color(nsColor: .windowBackgroundColor)
++        #else
++        return Color.white
++        #endif
++    }
+ }
+ 
+ #Preview {
