@@ -1,24 +1,30 @@
-# Vorlage für den Docker-Rechner (cd.msmr.co) – an dein Traefik-Setup anpassen
-# (Netzwerk-Name, certresolver und entrypoint wie bei deinen anderen Diensten).
+# Service-Block für die bestehende docker-compose.yml auf dem Docker-Rechner.
+# Werte (Netzwerk "traefik", certresolver "letsencrypt", entrypoint "websecure")
+# entsprechen dem vorhandenen Setup der anderen Dienste (z. B. cd.msmr.co).
 #
 # Wichtig: Der /dav-Rewrite aus dem ursprünglichen Konzept entfällt!
 # Das Backend spricht serverseitig mit der Nextcloud – der Browser nur mit /api.
 services:
   doday:
-    # Variante A: lokal bauen     → docker compose up -d --build
-    build: ..
+    # Variante A: lokal bauen     → docker compose up -d --build doday
+    build: ./doday
     # Variante B: später via GHCR → image: ghcr.io/<github-user>/doday:latest
     restart: unless-stopped
-    env_file: .env # NEXTCLOUD_URL, NEXTCLOUD_USER, NEXTCLOUD_APP_PASSWORD, …
+    env_file: ./doday/.env # NEXTCLOUD_URL, NEXTCLOUD_USER, NEXTCLOUD_APP_PASSWORD, …
     networks:
-      - web
+      - traefik
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.doday.rule=Host(`do.msmr.co`)
-      - traefik.http.routers.doday.entrypoints=websecure
-      - traefik.http.routers.doday.tls.certresolver=letsencrypt
-      - traefik.http.services.doday.loadbalancer.server.port=3000
+      - "traefik.enable=true"
+      - "traefik.http.routers.doday.rule=Host(`do.msmr.co`)"
+      - "traefik.http.routers.doday.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.doday.entrypoints=websecure"
+      - "traefik.http.routers.doday.tls.domains[0].main=do.msmr.co"
+      # Port IM Container (doday-Backend lauscht auf 3000 – kein ports:-Mapping nötig)
+      - "traefik.http.services.doday.loadbalancer.server.port=3000"
+      - "traefik.docker.network=traefik"
 
+# Nur nötig, falls die Datei eigenständig genutzt wird – in der bestehenden
+# Compose-Datei ist das Netzwerk "traefik" bereits deklariert.
 networks:
-  web:
-    external: true # Name deines bestehenden Traefik-Netzwerks
+  traefik:
+    external: true
