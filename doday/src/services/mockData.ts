@@ -5,9 +5,9 @@
 import type { Achievement, CalendarEvent, Habit, ISODate, Task } from '../models/types';
 import { parseTags } from './tagService';
 import { InMemoryTagRegistry } from './tagRegistry';
-import { isoDate } from '../utils/dates';
+import { isoDate, shiftDays } from '../utils/dates';
 
-/** Alles, was die Tagesansicht braucht */
+/** Alle App-Daten (heute + morgen) – die Ansichten filtern sich ihren Tag heraus */
 export interface DayData {
   date: Date;
   events: CalendarEvent[];
@@ -18,26 +18,41 @@ export interface DayData {
 
 /** n Tage vor heute als ISO-Datum */
 function daysAgo(n: number): ISODate {
-  const date = new Date();
-  date.setDate(date.getDate() - n);
-  return isoDate(date);
+  return isoDate(shiftDays(new Date(), -n));
 }
 
-/** Uhrzeit heute als ISO-Zeitstempel, z. B. at("09:30") → "2026-06-12T09:30:00" */
-function at(time: string): string {
-  return `${isoDate(new Date())}T${time}:00`;
+/** Uhrzeit als ISO-Zeitstempel, z. B. at("09:30") → heute, at("09:30", 1) → morgen */
+function at(time: string, dayOffset = 0): string {
+  return `${isoDate(shiftDays(new Date(), dayOffset))}T${time}:00`;
 }
 
 /** Aufgabe aus rawText bauen – title und tags werden geparst, wie später bei CalDAV */
-function makeTask(id: string, rawText: string, completed = false): Task {
+function makeTask(
+  id: string,
+  rawText: string,
+  opts: { completed?: boolean; due?: ISODate } = {},
+): Task {
   const { cleanText, tags } = parseTags(rawText);
-  return { id, rawText, title: cleanText, tags, completed, due: isoDate(new Date()) };
+  return {
+    id,
+    rawText,
+    title: cleanText,
+    tags,
+    completed: opts.completed ?? false,
+    due: opts.due ?? isoDate(new Date()),
+  };
 }
 
-/** Termin aus rawText bauen */
-function makeEvent(id: string, rawText: string, start: string, end: string): CalendarEvent {
+/** Termin aus rawText bauen (dayOffset 0 = heute, 1 = morgen) */
+function makeEvent(
+  id: string,
+  rawText: string,
+  start: string,
+  end: string,
+  dayOffset = 0,
+): CalendarEvent {
   const { cleanText, tags } = parseTags(rawText);
-  return { id, rawText, title: cleanText, tags, start: at(start), end: at(end) };
+  return { id, rawText, title: cleanText, tags, start: at(start, dayOffset), end: at(end, dayOffset) };
 }
 
 /** Beispieldaten für die heutige Tagesansicht */
@@ -46,25 +61,45 @@ export function loadMockData(): DayData {
     date: new Date(),
 
     events: [
+      // heute
       makeEvent('e1', 'Standup #Arbeit.Projekte', '09:00', '09:15'),
       makeEvent('e2', 'Zahnarzt #Gesundheit', '11:30', '12:15'),
       makeEvent('e3', 'Abendessen mit Anna', '19:00', '21:00'),
+      // morgen (für die Ansicht "Do Morrow")
+      makeEvent('e4', 'Physiotherapie #Gesundheit', '10:00', '10:45', 1),
     ],
 
     tasks: [
+      // heute
       makeTask('t1', 'Keller entrümpeln #Zuhause.Aufräumen'),
       makeTask('t2', 'Garage sortieren #Zuhause.Aufräumen'),
       makeTask('t3', 'Fenster putzen #Zuhause'),
-      makeTask('t4', 'Müll rausbringen #Zuhause', true),
+      makeTask('t4', 'Müll rausbringen #Zuhause', { completed: true }),
       makeTask('t5', 'Angebot schreiben #Arbeit'),
       makeTask('t6', 'Wochenbericht vorbereiten #Arbeit.Projekte'),
       makeTask('t7', 'Buch zurückgeben'),
+      // morgen
+      makeTask('t8', 'Wocheneinkauf planen #Zuhause', { due: daysAgo(-1) }),
+      makeTask('t9', 'Sprint-Review vorbereiten #Arbeit.Projekte', { due: daysAgo(-1) }),
     ],
 
     habits: [
-      { id: 'h1', title: 'Bewegung', schedule: 'daily', log: [daysAgo(2), daysAgo(1), daysAgo(0)] },
-      { id: 'h2', title: 'Journal', schedule: 'daily', log: [daysAgo(1)] },
-      { id: 'h3', title: 'Lesen', schedule: 'daily', log: [daysAgo(3), daysAgo(1)] },
+      {
+        id: 'h1',
+        title: 'Bewegung',
+        schedule: 'daily',
+        log: [daysAgo(2), daysAgo(1), daysAgo(0)],
+        color: '#7fa3b8',
+      },
+      { id: 'h2', title: 'Journal', schedule: 'daily', log: [daysAgo(1)], color: '#b8a37f' },
+      {
+        id: 'h3',
+        title: 'Lesen',
+        schedule: 'weekly',
+        log: [daysAgo(3), daysAgo(1)],
+        color: '#a38db8',
+        target: 3,
+      },
     ],
 
     achievements: [
