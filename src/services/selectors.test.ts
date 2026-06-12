@@ -12,6 +12,7 @@ import {
   weeksInRange,
   habitDoneInRange,
   tasksByDay,
+  eventsByDay,
 } from './selectors';
 import type { CalendarEvent, Habit, Task } from '../models/types';
 
@@ -207,5 +208,20 @@ describe('tasksByDay', () => {
     // Vorwoche enthält "heute" nicht → Aufgabe ohne Datum taucht nicht auf
     const lastWeek = { start: '2026-06-01', end: '2026-06-07' };
     expect(tasksByDay([undated], lastWeek, today).days).toEqual([]);
+  });
+});
+
+describe('eventsByDay', () => {
+  it('liefert nur Tage mit Terminen, Termine chronologisch sortiert', () => {
+    const range = { start: '2026-06-08', end: '2026-06-10' };
+    const events = [
+      event('spät', '2026-06-08T19:00:00', '2026-06-08T20:00:00'),
+      event('früh', '2026-06-08T09:00:00', '2026-06-08T10:00:00'),
+      event('außerhalb', '2026-06-20T09:00:00', '2026-06-20T10:00:00'),
+    ];
+    const result = eventsByDay(events, range);
+    expect(result).toHaveLength(1);
+    expect(result[0].date).toBe('2026-06-08');
+    expect(result[0].events.map((e) => e.id)).toEqual(['früh', 'spät']);
   });
 });

@@ -126,3 +126,15 @@ export function tasksByDay(tasks: Task[], range: DateRange, today: ISODate): Ran
     .filter((day) => day.tasks.length > 0);
   return { overdue, days };
 }
+
+export interface DayEvents {
+  date: ISODate;
+  events: CalendarEvent[];
+}
+
+/** Termine eines Zeitraums, nach Tagen gruppiert – nur Tage mit Terminen */
+export function eventsByDay(events: CalendarEvent[], range: DateRange): DayEvents[] {
+  return datesInRange(range)
+    .map((date) => ({ date, events: eventsOn(events, date) }))
+    .filter((day) => day.events.length > 0);
+}
