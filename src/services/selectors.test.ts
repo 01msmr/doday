@@ -11,6 +11,7 @@ import {
   datesInRange,
   weeksInRange,
   habitDoneInRange,
+  tasksByDay,
 } from './selectors';
 import type { CalendarEvent, Habit, Task } from '../models/types';
 
@@ -174,5 +175,37 @@ describe('habitDoneInRange', () => {
 
   it('liefert ein leeres Array, wenn nichts im Zeitraum liegt', () => {
     expect(habitDoneInRange(habit([]), { start: '2026-06-08', end: '2026-06-14' })).toEqual([]);
+  });
+});
+
+describe('tasksByDay', () => {
+  const range = { start: '2026-06-08', end: '2026-06-14' };
+  const today = '2026-06-12';
+
+  it('gruppiert Aufgaben nach Fälligkeitstag – nur Tage mit Aufgaben', () => {
+    const tasks = [task('mo', '2026-06-08'), task('mi', '2026-06-10'), task('mi2', '2026-06-10')];
+    const result = tasksByDay(tasks, range, today);
+    expect(result.days).toEqual([
+      { date: '2026-06-08', tasks: [tasks[0]] },
+      { date: '2026-06-10', tasks: [tasks[1], tasks[2]] },
+    ]);
+  });
+
+  it('sammelt unerledigte Aufgaben von VOR dem Zeitraum als überfällig', () => {
+    const old = task('alt', '2026-06-01');
+    const doneOld: Task = { ...task('erledigt', '2026-06-02'), completed: true };
+    const result = tasksByDay([old, doneOld], range, today);
+    expect(result.overdue).toEqual([old]); // erledigte Altlasten zählen nicht
+    expect(result.days).toEqual([]);
+  });
+
+  it('zeigt Aufgaben ohne Datum unter dem heutigen Tag – nur wenn heute im Zeitraum liegt', () => {
+    const undated = task('ohne');
+    expect(tasksByDay([undated], range, today).days).toEqual([
+      { date: '2026-06-12', tasks: [undated] },
+    ]);
+    // Vorwoche enthält "heute" nicht → Aufgabe ohne Datum taucht nicht auf
+    const lastWeek = { start: '2026-06-01', end: '2026-06-07' };
+    expect(tasksByDay([undated], lastWeek, today).days).toEqual([]);
   });
 });

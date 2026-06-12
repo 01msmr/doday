@@ -99,3 +99,30 @@ export function habitDoneInRange(habit: Habit, range: DateRange): ISODate[] {
     .filter((day) => day >= range.start && day <= range.end)
     .sort();
 }
+
+export interface DayTasks {
+  date: ISODate;
+  tasks: Task[];
+}
+
+export interface RangeTasks {
+  /** Vor dem Zeitraum fällig und unerledigt – „Altlasten" */
+  overdue: Task[];
+  /** Nur Tage MIT Aufgaben, chronologisch */
+  days: DayTasks[];
+}
+
+/**
+ * Aufgaben eines Zeitraums, nach Tagen gruppiert. Aufgaben ohne Fälligkeit
+ * gelten als „heute dran" (gleiche Regel wie tasksDueOn) und erscheinen
+ * nur, wenn der Zeitraum den heutigen Tag enthält.
+ */
+export function tasksByDay(tasks: Task[], range: DateRange, today: ISODate): RangeTasks {
+  const overdue = tasks.filter(
+    (task) => !task.completed && !!task.due && task.due < range.start,
+  );
+  const days = datesInRange(range)
+    .map((date) => ({ date, tasks: tasksDueOn(tasks, date, today) }))
+    .filter((day) => day.tasks.length > 0);
+  return { overdue, days };
+}
