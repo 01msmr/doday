@@ -1,6 +1,6 @@
 // Tests zuerst (TDD): Datums-Helfer.
 import { describe, it, expect } from 'vitest';
-import { isoDate, timeOf, shiftDays, startOfWeek } from './dates';
+import { isoDate, timeOf, shiftDays, startOfWeek, localDateOf } from './dates';
 
 describe('isoDate', () => {
   it('formatiert ein Datum als YYYY-MM-DD mit führenden Nullen', () => {
@@ -9,8 +9,29 @@ describe('isoDate', () => {
 });
 
 describe('timeOf', () => {
-  it('liest die Uhrzeit HH:MM aus einem ISO-Zeitstempel', () => {
+  it('liest die Uhrzeit HH:MM aus einem lokalen ISO-Zeitstempel', () => {
     expect(timeOf('2026-06-12T09:30:00')).toBe('09:30');
+  });
+
+  it('rechnet UTC-Zeitstempel (CalDAV) in die lokale Uhrzeit um', () => {
+    const utc = '2026-06-12T07:00:00Z';
+    const expected = new Intl.DateTimeFormat('de-DE', {
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(utc));
+    expect(timeOf(utc)).toBe(expected);
+  });
+});
+
+describe('localDateOf', () => {
+  it('liefert das lokale Datum für lokale/floating Zeitstempel', () => {
+    expect(localDateOf('2026-06-12T10:00:00')).toBe('2026-06-12');
+    expect(localDateOf('2026-06-13')).toBe('2026-06-13');
+  });
+
+  it('rechnet UTC-Zeitstempel auf den LOKALEN Tag um (Mitternachts-Kante)', () => {
+    const utc = '2026-06-12T22:30:00Z';
+    expect(localDateOf(utc)).toBe(isoDate(new Date(utc)));
   });
 });
 

@@ -1,16 +1,21 @@
 // Tages-Auswahl: filtert die Gesamtdaten auf einen konkreten Tag.
 // "Do Day" und "Do Morrow" sind damit dieselbe Ansicht – nur mit anderem Datum.
 import type { CalendarEvent, ISODate, Task } from '../models/types';
+import { localDateOf } from '../utils/dates';
 
-/** Aufgaben, die an diesem Tag fällig sind */
-export function tasksDueOn(tasks: Task[], date: ISODate): Task[] {
-  return tasks.filter((task) => task.due === date);
+/**
+ * Aufgaben, die an diesem Tag fällig sind.
+ * Aufgaben OHNE Fälligkeit gelten als "heute dran" – sie erscheinen nur,
+ * wenn der angefragte Tag der heutige ist (nicht bei Do Morrow).
+ */
+export function tasksDueOn(tasks: Task[], date: ISODate, today: ISODate): Task[] {
+  return tasks.filter((task) => (task.due ? task.due === date : date === today));
 }
 
-/** Termine, die an diesem Tag beginnen – chronologisch sortiert */
+/** Termine, die an diesem LOKALEN Tag beginnen (UTC wird umgerechnet) – sortiert */
 export function eventsOn(events: CalendarEvent[], date: ISODate): CalendarEvent[] {
   return events
-    .filter((event) => event.start.startsWith(date))
+    .filter((event) => localDateOf(event.start) === date)
     .sort((a, b) => a.start.localeCompare(b.start));
 }
 

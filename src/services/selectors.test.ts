@@ -13,10 +13,16 @@ function event(id: string, start: string, end: string): CalendarEvent {
 }
 
 describe('tasksDueOn', () => {
-  it('liefert nur Aufgaben mit passendem Fälligkeitsdatum', () => {
-    const tasks = [task('heute', '2026-06-12'), task('morgen', '2026-06-13'), task('ohne')];
-    expect(tasksDueOn(tasks, '2026-06-12').map((t) => t.id)).toEqual(['heute']);
-    expect(tasksDueOn(tasks, '2026-06-13').map((t) => t.id)).toEqual(['morgen']);
+  it('liefert Aufgaben mit passendem Fälligkeitsdatum', () => {
+    const tasks = [task('heute', '2026-06-12'), task('morgen', '2026-06-13')];
+    expect(tasksDueOn(tasks, '2026-06-12', '2026-06-12').map((t) => t.id)).toEqual(['heute']);
+    expect(tasksDueOn(tasks, '2026-06-13', '2026-06-12').map((t) => t.id)).toEqual(['morgen']);
+  });
+
+  it('zeigt Aufgaben OHNE Fälligkeit nur am heutigen Tag (nicht bei Do Morrow)', () => {
+    const tasks = [task('ohne')];
+    expect(tasksDueOn(tasks, '2026-06-12', '2026-06-12').map((t) => t.id)).toEqual(['ohne']);
+    expect(tasksDueOn(tasks, '2026-06-13', '2026-06-12')).toEqual([]);
   });
 });
 
@@ -35,6 +41,14 @@ describe('eventsOn', () => {
       event('früh', '2026-06-12T09:00:00', '2026-06-12T09:15:00'),
     ];
     expect(eventsOn(events, '2026-06-12').map((e) => e.id)).toEqual(['früh', 'spät']);
+  });
+
+  it('ordnet UTC-Termine (CalDAV) ihrem LOKALEN Tag zu', async () => {
+    const { isoDate } = await import('../utils/dates');
+    const startUtc = '2026-06-12T22:30:00Z';
+    const localDay = isoDate(new Date(startUtc));
+    const events = [event('abends', startUtc, '2026-06-12T23:00:00Z')];
+    expect(eventsOn(events, localDay).map((e) => e.id)).toEqual(['abends']);
   });
 });
 
