@@ -1,6 +1,6 @@
 // Tages-Auswahl: filtert die Gesamtdaten auf einen konkreten Tag.
 // "Do Day" und "Do Morrow" sind damit dieselbe Ansicht – nur mit anderem Datum.
-import type { CalendarEvent, ISODate, Task } from '../models/types';
+import type { CalendarEvent, Habit, ISODate, Task } from '../models/types';
 import { isoDate, localDateOf, shiftDays, startOfWeek } from '../utils/dates';
 
 /**
@@ -91,4 +91,11 @@ export function weeksInRange(range: DateRange): number {
     datesInRange(range).map((day) => isoDate(startOfWeek(new Date(`${day}T12:00:00`)))),
   );
   return mondays.size;
+}
+
+/** Erledigte Tage einer Gewohnheit im Zeitraum – ohne Duplikate, sortiert */
+export function habitDoneInRange(habit: Habit, range: DateRange): ISODate[] {
+  return [...new Set(habit.log)]
+    .filter((day) => day >= range.start && day <= range.end)
+    .sort();
 }

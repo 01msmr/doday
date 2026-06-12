@@ -10,8 +10,9 @@ import {
   monthRange,
   datesInRange,
   weeksInRange,
+  habitDoneInRange,
 } from './selectors';
-import type { CalendarEvent, Task } from '../models/types';
+import type { CalendarEvent, Habit, Task } from '../models/types';
 
 function task(id: string, due?: string): Task {
   return { id, rawText: id, title: id, tags: [], completed: false, due };
@@ -19,6 +20,10 @@ function task(id: string, due?: string): Task {
 
 function event(id: string, start: string, end: string): CalendarEvent {
   return { id, rawText: id, title: id, tags: [], start, end };
+}
+
+function habit(log: string[]): Habit {
+  return { id: 'h1', title: 'Journal', schedule: 'daily', log };
 }
 
 describe('tasksDueOn', () => {
@@ -157,5 +162,17 @@ describe('weeksInRange', () => {
     expect(weeksInRange({ start: '2026-06-01', end: '2026-06-30' })).toBe(5);
     // eine einzelne Woche
     expect(weeksInRange({ start: '2026-06-08', end: '2026-06-14' })).toBe(1);
+  });
+});
+
+describe('habitDoneInRange', () => {
+  it('liefert nur die erledigten Tage im Zeitraum, sortiert und ohne Duplikate', () => {
+    const range = { start: '2026-06-08', end: '2026-06-14' };
+    const h = habit(['2026-06-10', '2026-06-09', '2026-06-10', '2026-06-01', '2026-06-15']);
+    expect(habitDoneInRange(h, range)).toEqual(['2026-06-09', '2026-06-10']);
+  });
+
+  it('liefert ein leeres Array, wenn nichts im Zeitraum liegt', () => {
+    expect(habitDoneInRange(habit([]), { start: '2026-06-08', end: '2026-06-14' })).toEqual([]);
   });
 });
