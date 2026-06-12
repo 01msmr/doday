@@ -1,6 +1,6 @@
 // Tests zuerst (TDD): Datums-Helfer.
 import { describe, it, expect } from 'vitest';
-import { isoDate, timeOf, shiftDays } from './dates';
+import { isoDate, timeOf, shiftDays, startOfWeek } from './dates';
 
 describe('isoDate', () => {
   it('formatiert ein Datum als YYYY-MM-DD mit führenden Nullen', () => {
@@ -31,5 +31,19 @@ describe('shiftDays', () => {
     const original = new Date(2026, 5, 12);
     shiftDays(original, 5);
     expect(isoDate(original)).toBe('2026-06-12');
+  });
+});
+
+describe('startOfWeek', () => {
+  it('liefert den Montag der Woche (Freitag → Montag davor)', () => {
+    expect(isoDate(startOfWeek(new Date(2026, 5, 12)))).toBe('2026-06-08'); // Fr 12.6.
+  });
+
+  it('zählt den Sonntag zur laufenden Woche (deutsche Wochenlogik)', () => {
+    expect(isoDate(startOfWeek(new Date(2026, 5, 14)))).toBe('2026-06-08'); // So 14.6.
+  });
+
+  it('lässt einen Montag unverändert', () => {
+    expect(isoDate(startOfWeek(new Date(2026, 5, 8)))).toBe('2026-06-08');
   });
 });

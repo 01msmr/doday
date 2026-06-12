@@ -50,7 +50,7 @@ html {
 body {
   margin: 0;
   font-family: var(--sans);
-  font-size: 16px;
+  font-size: 17px; /* Lesetexte bewusst eine Spur größer */
   line-height: 1.5;
   color: var(--ink);
   /* Sanfter Lichtschein oben – wie eine Lampe über der Planerseite */
@@ -89,8 +89,16 @@ body {
   margin: 0.15rem 0 0;
   font-family: var(--serif);
   font-weight: 500;
-  font-size: clamp(2.4rem, 8vw, 3.2rem);
+  font-size: clamp(1.9rem, 6vw, 2.5rem);
   line-height: 1.1;
+}
+
+/* Das Jahr läuft mit, hält sich aber visuell zurück */
+.day-year {
+  font-size: 0.45em;
+  font-weight: 400;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
 }
 
 /* ---------- Spalten-Layout ----------
@@ -121,7 +129,8 @@ body {
   min-width: 0;
 }
 
-@media (min-width: 50rem) {
+/* Ab 41rem (~660px, auch iPhone quer) passen beide Spalten nebeneinander */
+@media (min-width: 41rem) {
   .page {
     max-width: 66rem;
   }
@@ -132,8 +141,79 @@ body {
     grid-template-areas:
       'main schedule'
       'main extras';
-    column-gap: clamp(2.5rem, 6vw, 4.5rem);
+    column-gap: clamp(2rem, 5vw, 4.5rem);
     align-items: start;
+  }
+}
+
+/* Hochformat/schmal: nur EINE Spalte sichtbar, der Rand-Umschalter wechselt */
+@media (max-width: 40.999rem) {
+  .columns[data-mobile='main'] .col-schedule,
+  .columns[data-mobile='main'] .col-extras {
+    display: none;
+  }
+
+  .columns[data-mobile='side'] .col-main {
+    display: none;
+  }
+}
+
+/* Der Umschalter: schwebt mittig am Bildschirmrand, Beschriftung senkrecht */
+.col-switch {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.85rem 0.4rem;
+  background: var(--nav-bg);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--hairline);
+  border-right: none;
+  border-radius: 0.7rem 0 0 0.7rem;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: color 0.2s ease;
+}
+
+/* Auf der rechten Spalte wandert er an den linken Rand ("und umgekehrt") */
+.col-switch--left {
+  right: auto;
+  left: 0;
+  border-right: 1px solid var(--hairline);
+  border-left: none;
+  border-radius: 0 0.7rem 0.7rem 0;
+}
+
+.col-switch:hover {
+  color: var(--accent);
+}
+
+.col-switch-label {
+  writing-mode: vertical-rl;
+}
+
+.col-switch-arrow {
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--accent);
+}
+
+/* Passen beide Spalten nebeneinander, gibt es nichts umzuschalten.
+   (Steht bewusst NACH der .col-switch-Definition – gleiche Spezifität,
+   die spätere Regel gewinnt.) */
+@media (min-width: 41rem) {
+  .col-switch {
+    display: none;
   }
 }
 
@@ -402,6 +482,13 @@ details[open] > summary .chevron {
   padding: 0;
 }
 
+/* Erledigte Aufgaben: als Block nach rechts gerückt,
+   in sich aber linksbündig (gemeinsame linke Kante) */
+.task-list--done {
+  width: fit-content;
+  margin-left: auto;
+}
+
 .task {
   display: flex;
   align-items: center;
@@ -418,6 +505,9 @@ details[open] > summary .chevron {
 }
 
 .check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 1.15rem;
   height: 1.15rem;
   flex: none;
@@ -426,6 +516,18 @@ details[open] > summary .chevron {
   transition:
     background 0.2s ease,
     border-color 0.2s ease;
+}
+
+/* Haken im Aufgabenkreis – wie bei den Gewohnheiten */
+.check::after {
+  content: '✓';
+  font-size: 0.78rem;
+  color: var(--bg);
+  opacity: 0;
+  transform: scale(0.5);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 
 .task:hover .check {
@@ -437,14 +539,18 @@ details[open] > summary .chevron {
   border-color: var(--accent);
 }
 
+.task.done .check::after {
+  opacity: 1;
+  transform: scale(1);
+}
+
 .task-title {
   transition: color 0.2s ease;
 }
 
+/* Erledigt: lesbar, aber mit weniger Kontrast – keine Durchstreichung */
 .task.done .task-title {
-  color: var(--ink-faint);
-  text-decoration: line-through;
-  text-decoration-color: var(--strike);
+  color: var(--ink-soft);
 }
 
 /* ---------- Gewohnheiten ---------- */
@@ -606,11 +712,22 @@ details[open] > summary .chevron {
   gap: 1.2rem;
 }
 
+/* Achievement-Zeile = Messbecher: Farbfläche füllt die volle Zeilenhöhe,
+   die Schrift liegt darüber */
+.goal {
+  position: relative;
+  padding: 0.55rem 0.85rem;
+  border-radius: 0.55rem;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--ink) 6%, transparent); /* leise Laufbahn */
+}
+
 .goal-head {
+  position: relative; /* über der Farbfläche */
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 0.5rem;
+  margin: 0;
 }
 
 .goal-title {
@@ -628,17 +745,42 @@ details[open] > summary .chevron {
   color: var(--ink-faint);
 }
 
-.goal-bar {
-  height: 2px;
-  border-radius: 1px;
-  background: var(--hairline);
-  overflow: hidden;
+.goal-fill {
+  position: absolute;
+  inset: 0 auto 0 0; /* volle Zeilenhöhe, wächst von links */
+  background: color-mix(in srgb, var(--gc, var(--accent)) 30%, transparent);
+  transition: width 0.3s ease;
 }
 
-.goal-fill {
-  height: 100%;
-  border-radius: 1px;
-  background: var(--accent);
+/* Tages-Fortschritt der Aufgaben: letzter Balken, bewusst in Tinte (schwarz) */
+.task-progress {
+  --gc: var(--ink);
+  margin-top: 0.4rem;
+}
+
+/* "Erledigt"-Zeile unter dem Datum: heute geschaffte Aufgaben + vergangene Termine */
+.done-line {
+  margin: 1rem 0 0;
+  font-size: 0.85rem;
+  color: var(--ink-faint);
+}
+
+.done-label {
+  margin-right: 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.done-item {
+  text-decoration: line-through;
+  text-decoration-color: var(--strike);
+}
+
+.done-sep {
+  color: var(--ink-faint);
 }
 
 /* ---------- Untere Navigation ---------- */
@@ -657,20 +799,40 @@ details[open] > summary .chevron {
   border-top: 1px solid var(--hairline);
 }
 
+/* Jede Ansicht als eigene "Taste" (Keycap): Rahmen, Fläche, untere Kante */
 .nav-item {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.1rem;
   min-width: 4.25rem;
-  padding: 0.35rem 0.75rem;
-  background: none;
-  border: none;
+  padding: 0.4rem 0.75rem 0.45rem;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  border: 1px solid var(--hairline);
   border-radius: 0.6rem;
+  box-shadow: 0 2px 0 var(--hairline); /* Tastenkante unten */
   color: var(--ink-faint);
   font: inherit;
   cursor: pointer;
-  transition: color 0.2s ease;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.nav-item:hover {
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+}
+
+/* Die aktive Taste ist "gedrückt": Akzentfarbe, abgesenkt, Kante eingefedert */
+.nav-item.active {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--accent) 45%, transparent);
+  transform: translateY(1px);
 }
 
 /* "Do" über jedem Ziel: Do Day · Do Morrow · Do Week · Do Month
@@ -686,10 +848,6 @@ details[open] > summary .chevron {
 .nav-label {
   font-size: 0.85rem;
   letter-spacing: 0.04em;
-}
-
-.nav-item:hover {
-  color: var(--ink-soft);
 }
 
 .nav-item.active {

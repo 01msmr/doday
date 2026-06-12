@@ -20,6 +20,7 @@ const state: AppState = {
   filterArea: null,
   editing: null,
   editingHabits: false,
+  mobileColumn: 'main',
   collapsed: new Set(),
   firstRender: true,
 };
@@ -119,6 +120,11 @@ root.addEventListener('click', (event) => {
     rerender();
   }
 
+  if (action === 'switch-column') {
+    state.mobileColumn = state.mobileColumn === 'main' ? 'side' : 'main';
+    rerender();
+  }
+
   if (action === 'toggle-task') {
     const task = state.data.tasks.find((t) => t.id === id);
     if (task) {
@@ -131,10 +137,21 @@ root.addEventListener('click', (event) => {
     const habit = state.data.habits.find((h) => h.id === id);
     if (habit) {
       const today = isoDate();
+      const wasDone = habit.log.includes(today);
       // Heute abhaken bzw. das Abhaken zurücknehmen
-      habit.log = habit.log.includes(today)
+      habit.log = wasDone
         ? habit.log.filter((day) => day !== today)
         : [...habit.log, today];
+      // Verknüpfte Fortschrittsbalken reagieren mit: Zahl und Füllstand
+      for (const achievement of state.data.achievements) {
+        if (achievement.habitId === habit.id) {
+          const delta = wasDone ? -1 : 1;
+          achievement.progress = Math.min(
+            achievement.target,
+            Math.max(0, achievement.progress + delta),
+          );
+        }
+      }
       rerender();
     }
   }

@@ -103,8 +103,26 @@ export function loadMockData(): DayData {
     ],
 
     achievements: [
-      { id: 'a1', title: '30 Tage Journal', target: 30, progress: 17, completedAt: null },
-      { id: 'a2', title: '100 km gehen', target: 100, progress: 64, completedAt: null },
+      // Farbe UND Fortschritt hängen an der zugehörigen Gewohnheit:
+      // Habit abhaken → Balken und Zahl bewegen sich mit
+      {
+        id: 'a1',
+        title: '30 Tage Journal',
+        target: 30,
+        progress: 17,
+        completedAt: null,
+        color: '#b8a37f',
+        habitId: 'h2',
+      },
+      {
+        id: 'a2',
+        title: '100 km gehen',
+        target: 100,
+        progress: 64,
+        completedAt: null,
+        color: '#7fa3b8',
+        habitId: 'h1',
+      },
     ],
   };
 }
