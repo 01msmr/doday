@@ -1102,3 +1102,147 @@ details[open] > summary .chevron {
   outline-offset: 3px;
   border-radius: 4px;
 }
+
+/* ---------- Cockpit (Do Week / Do Month) ---------- */
+
+.masthead-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.period-nav {
+  display: flex;
+  gap: 0.4rem;
+  padding-bottom: 1rem;
+}
+
+.period-btn {
+  width: 2.2rem;
+  height: 2.2rem;
+  border: 1px solid var(--hairline);
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-soft);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.period-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.day-group {
+  margin: 0.9rem 0;
+}
+
+.day-group-label {
+  margin: 0 0 0.35rem;
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.day-group--overdue .day-group-label {
+  color: #b3543e;
+}
+
+.cockpit-habits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.cockpit-habit {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.35rem 0.1rem;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+  text-align: left;
+}
+
+.cockpit-habit:disabled {
+  cursor: default;
+}
+
+.week-dots {
+  display: flex;
+  gap: 0.3rem;
+  margin-left: auto;
+}
+
+.week-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--hc, var(--accent));
+}
+
+.week-dot.filled {
+  background: var(--hc, var(--accent));
+}
+
+.week-dot.today {
+  box-shadow: 0 0 0 2px var(--halo);
+}
+
+.habit-count {
+  min-width: 2.4rem;
+  text-align: right;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+/* Monats-Habit-Balken haben keinen Kreisring rechts – Platz dafür entfällt */
+.goal--bare {
+  padding-right: 1.1rem;
+}
+
+.day-events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.day-events-row {
+  display: flex;
+  gap: 0.7rem;
+  align-items: baseline;
+}
+
+.day-events-row.today .day-events-date {
+  color: var(--accent);
+}
+
+.day-events-date {
+  flex: 0 0 3.4rem;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.day-event {
+  white-space: nowrap;
+}
+
+.day-event .area-dot {
+  margin-right: 0.25rem;
+}
