@@ -80,17 +80,28 @@ async function boot(showLoading = true): Promise<void> {
 }
 
 async function persistAchievements(): Promise<void> {
+  // Stand zum Zeitpunkt des Klicks festhalten – das ist die Absicht des Nutzers
+  const payload = { habits: state.data.habits, achievements: state.data.achievements };
   try {
-    achievementsEtag = await saveAchievements(
-      { habits: state.data.habits, achievements: state.data.achievements },
-      achievementsEtag ?? undefined,
-    );
+    achievementsEtag = await saveAchievements(payload, achievementsEtag ?? undefined);
     if (state.syncError) {
       state.syncError = null;
       rerender();
     }
   } catch (error) {
     if (error instanceof ApiConflictError) {
+      // Konzept: frisches ETag holen und die EIGENE Änderung erneut anwenden
+      try {
+        const fresh = await loadAchievements();
+        achievementsEtag = await saveAchievements(payload, fresh.etag ?? undefined);
+        if (state.syncError) {
+          state.syncError = null;
+          rerender();
+        }
+        return;
+      } catch {
+        // zweiter Konflikt in Folge → ehrlich neu laden
+      }
       await boot(false);
       state.syncError = 'In der Nextcloud extern geändert – Daten wurden neu geladen.';
     } else {
@@ -101,10 +112,19 @@ async function persistAchievements(): Promise<void> {
 }
 
 async function persistTags(): Promise<void> {
+  const payload = state.registry.toJSON();
   try {
-    tagsEtag = await saveTagRegistry(state.registry.toJSON(), tagsEtag ?? undefined);
+    tagsEtag = await saveTagRegistry(payload, tagsEtag ?? undefined);
   } catch (error) {
     if (error instanceof ApiConflictError) {
+      // frisches ETag holen, eigene Änderung erneut anwenden
+      try {
+        const fresh = await loadTagRegistry();
+        tagsEtag = await saveTagRegistry(payload, fresh.etag ?? undefined);
+        return;
+      } catch {
+        // zweiter Konflikt in Folge → ehrlich neu laden
+      }
       await boot(false);
       state.syncError = 'Bereiche wurden extern geändert – Daten wurden neu geladen.';
     } else {
