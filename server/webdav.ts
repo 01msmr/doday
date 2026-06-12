@@ -11,6 +11,18 @@
 /** Die Datei wurde extern geändert (ETag passt nicht mehr) */
 export class WebDavConflictError extends Error {}
 
+/**
+ * ETags säubern: Apache hängt bei komprimierter Auslieferung "-gzip" an,
+ * und schwache ETags tragen ein W/-Präfix. Beides würde beim nächsten
+ * If-Match fälschlich als "extern geändert" durchfallen.
+ */
+function normalizeEtag(etag: string | null): string | null {
+  if (!etag) {
+    return null;
+  }
+  return etag.replace(/^W\//, '').replace(/-gzip"$/, '"');
+}
+
 export class WebDavClient {
   constructor(
     private baseUrl: string,
@@ -26,7 +38,13 @@ export class WebDavClient {
 
   private headers(extra: Record<string, string> = {}): Record<string, string> {
     const token = Buffer.from(`${this.user}:${this.appPassword}`).toString('base64');
-    return { Authorization: `Basic ${token}`, ...extra };
+    return {
+      Authorization: `Basic ${token}`,
+      // Keine Kompression: kleine JSON-Dateien, und Apache würde sonst
+      // die ETags mit "-gzip" verfälschen
+      'Accept-Encoding': 'identity',
+      ...extra,
+    };
   }
 
   /** JSON-Datei lesen; null = Datei existiert (noch) nicht */
@@ -39,7 +57,7 @@ export class WebDavClient {
       throw new Error(`WebDAV GET ${path} fehlgeschlagen: ${res.status}`);
     }
     const text = await res.text();
-    return { data: JSON.parse(text) as T, etag: res.headers.get('etag') };
+    return { data: JSON.parse(text) as T, etag: normalizeEtag(res.headers.get('etag')) };
   }
 
   /** JSON-Datei schreiben; mit etag = If-Match (Konflikt → WebDavConflictError) */
@@ -59,7 +77,7 @@ export class WebDavClient {
     if (!res.ok) {
       throw new Error(`WebDAV PUT ${path} fehlgeschlagen: ${res.status}`);
     }
-    return res.headers.get('etag');
+    return normalizeEtag(res.headers.get('etag'));
   }
 
   /** Ordnerkette anlegen (MKCOL je Ebene); "existiert schon" (405) ist okay */

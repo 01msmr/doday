@@ -34,6 +34,24 @@ describe('getJson', () => {
     expect(result).toEqual({ data: { version: 1 }, etag: '"abc"' });
   });
 
+  it('verzichtet auf Kompression (Accept-Encoding: identity) – Apache verfälscht sonst ETags', async () => {
+    fetchMock.mockResolvedValue(response(200, '{}'));
+    await client().getJson('/x.json');
+    expect(fetchMock.mock.calls[0][1].headers['Accept-Encoding']).toBe('identity');
+  });
+
+  it('normalisiert Apache-gzip-ETags ("abc-gzip" → "abc") für sauberes If-Match', async () => {
+    fetchMock.mockResolvedValue(response(200, '{}', { etag: '"abc-gzip"' }));
+    const result = await client().getJson('/x.json');
+    expect(result?.etag).toBe('"abc"');
+  });
+
+  it('entfernt das W/-Präfix schwacher ETags', async () => {
+    fetchMock.mockResolvedValue(response(200, '{}', { etag: 'W/"abc"' }));
+    const result = await client().getJson('/x.json');
+    expect(result?.etag).toBe('"abc"');
+  });
+
   it('kodiert Sonderzeichen im Pfad (Umlaute, Leerzeichen)', async () => {
     fetchMock.mockResolvedValue(response(200, '{}'));
     await client().getJson('/Notes/Do Day/tags.json');
