@@ -15,6 +15,7 @@ import { eventsOn, filterByArea, tasksDueOn, withCanonicalTags } from '../servic
 import { groupByArea, type AreaGroup, type GroupedDay } from './grouping';
 import { isoDate, shiftDays, startOfWeek, timeOf } from '../utils/dates';
 import { safeColor } from '../utils/colors';
+import { renderCockpit } from './cockpitView';
 
 /** Die vier Ansichten der unteren Navigation */
 export type ViewId = 'day' | 'morrow' | 'week' | 'month';
@@ -48,7 +49,7 @@ export interface AppState {
 }
 
 /** Bereiche ohne eigene Farbe erben unten die Farbe ihres Eltern-Bereichs */
-const FALLBACK_COLOR = '#70757f';
+export const FALLBACK_COLOR = '#70757f';
 
 /** Schlüssel für die "Ohne Bereich"-Gruppe im collapsed-Set */
 const UNTAGGED_KEY = '__ohne-bereich__';
@@ -57,7 +58,7 @@ const UNTAGGED_KEY = '__ohne-bereich__';
  * HTML-Sonderzeichen entschärfen – Pflicht für ALLE dynamischen Texte,
  * sonst könnte ein Aufgabentitel wie "<script>" eigenen Code einschleusen.
  */
-function escapeHtml(text: string): string {
+export function escapeHtml(text: string): string {
   return text
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
@@ -67,7 +68,7 @@ function escapeHtml(text: string): string {
 
 /** Bereichsfarbe: eigener Registry-Eintrag oder die des nächsten Vorfahren.
     safeColor lässt nur echte Hex-Farben ins HTML (tags.json ist Fremddaten). */
-function areaColor(registry: InMemoryTagRegistry, path: string): string {
+export function areaColor(registry: InMemoryTagRegistry, path: string): string {
   const segments = path.split('.');
   while (segments.length > 0) {
     const color = safeColor(registry.resolve(segments.join('.'))?.color);
@@ -81,25 +82,25 @@ function areaColor(registry: InMemoryTagRegistry, path: string): string {
 
 /* ---------- Datums-Formatierung (deutsch) ---------- */
 
-function weekdayOf(date: Date): string {
+export function weekdayOf(date: Date): string {
   return new Intl.DateTimeFormat('de-DE', { weekday: 'long' }).format(date);
 }
 
-function dayMonthOf(date: Date): string {
+export function dayMonthOf(date: Date): string {
   return new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'long' }).format(date);
 }
 
-function monthOf(date: Date): string {
+export function monthOf(date: Date): string {
   return new Intl.DateTimeFormat('de-DE', { month: 'long' }).format(date);
 }
 
-function yearOf(date: Date): string {
+export function yearOf(date: Date): string {
   return new Intl.DateTimeFormat('de-DE', { year: 'numeric' }).format(date);
 }
 
 /** Kopf der Seite: kleine Zeile in Akzentfarbe, darunter das Datum groß in Serife.
     Das Jahr läuft mit, aber visuell zurückgenommen. */
-function renderMasthead(small: string, big: string, year: string): string {
+export function renderMasthead(small: string, big: string, year: string): string {
   return `
     <header class="masthead">
       <p class="weekday">${small}</p>
@@ -111,7 +112,7 @@ function renderMasthead(small: string, big: string, year: string): string {
 
 /** Formular: Termin mit #Tags anlegen → direkt in den Nextcloud-Kalender
     (synct von dort auf alle Geräte); alternativ als .ics an den Geräte-Kalender */
-function renderEventForm(dateIso: string): string {
+export function renderEventForm(dateIso: string): string {
   return `
     <form class="event-form" data-event-form>
       <input type="text" data-field="title" placeholder="Titel #Tag"
@@ -131,7 +132,7 @@ function renderEventForm(dateIso: string): string {
 }
 
 /** Formular: Aufgabe mit #Tags anlegen → Nextcloud Tasks (VTODO) */
-function renderTaskForm(dateIso: string): string {
+export function renderTaskForm(dateIso: string): string {
   return `
     <form class="event-form" data-task-form>
       <input type="text" data-field="title" placeholder="Aufgabe #Bereich"
@@ -178,7 +179,7 @@ function renderSchedule(
 /* ---------- Aufgaben & Bereiche ---------- */
 
 /** Eine abhakbare Aufgabenzeile (Button statt Checkbox: größere Tippfläche, frei stylebar) */
-function renderTask(task: Task): string {
+export function renderTask(task: Task): string {
   return `
     <li>
       <button type="button" class="task${task.completed ? ' done' : ''}"
@@ -456,7 +457,7 @@ function emphasizeAction(title: string): string {
  * - "Regelmäßig":  zyklische Ziele, die sich pro Tag/Woche zurücksetzen
  *                  (Habits ohne Meilenstein + der Aufgaben-Fortschritt)
  */
-function renderAchievements(
+export function renderAchievements(
   achievements: Achievement[],
   habits: Habit[],
   taskStats: { done: number; total: number },
@@ -561,15 +562,6 @@ function renderFilterChip(state: AppState): string {
 
 /* ---------- Zusammenbau der Ansichten ---------- */
 
-/** Platzhalter für Ansichten, die in späteren Phasen entstehen */
-function renderPlaceholder(label: string): string {
-  return `
-    <section class="panel">
-      <h2 class="section-label">${label}</h2>
-      <p class="empty">Diese Ansicht entsteht in einer späteren Phase.</p>
-    </section>`;
-}
-
 /** Komplette App rendern */
 export function renderApp(root: HTMLElement, state: AppState): void {
   const orderOf = (path: string): number | undefined => state.registry.resolve(path)?.order;
@@ -642,16 +634,8 @@ export function renderApp(root: HTMLElement, state: AppState): void {
         ${extras}
       </div>
       ${switcher}`;
-  } else if (state.view === 'week') {
-    content = `
-      ${renderMasthead('Diese Woche', dayMonthOf(today), yearOf(today))}
-      ${syncNote}
-      ${renderPlaceholder('Wochenansicht')}`;
   } else {
-    content = `
-      ${renderMasthead('Dieser Monat', monthOf(today), yearOf(today))}
-      ${syncNote}
-      ${renderPlaceholder('Monatsansicht')}`;
+    content = renderCockpit(state, syncNote);
   }
 
   root.innerHTML = `<main class="page">${content}</main>${renderNav(state.view)}`;
