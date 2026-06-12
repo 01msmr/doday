@@ -307,6 +307,9 @@ async function submitTaskEditForm(form: HTMLElement): Promise<void> {
   try {
     const result = await updateTask(task.href, title, due || undefined);
     Object.assign(task, result.task);
+    // Gelöschtes Datum kommt in der Antwort als FEHLENDES Feld an –
+    // Object.assign würde das alte stehen lassen, deshalb explizit setzen
+    task.due = result.task.due;
     state.editingTask = null;
     state.syncError = null;
   } catch (error) {
