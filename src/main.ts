@@ -82,18 +82,36 @@ function agendaRange(): { start: Date; end: Date } {
 
 async function reloadAgenda(): Promise<void> {
   const range = agendaRange();
+  const requested = `${state.view}:${state.periodOffset}`;
   const agenda = await loadAgenda(range.start, range.end);
+  // Verspätete Antwort eines anderen Zeitraums? Dann nicht übernehmen.
+  if (`${state.view}:${state.periodOffset}` !== requested) {
+    return;
+  }
   state.data.events = agenda.events;
   state.data.tasks = agenda.tasks;
 }
 
-/** Agenda im Hintergrund neu laden – nach Tab- oder Zeitraumwechsel */
+/**
+ * Agenda im Hintergrund neu laden – nach Tab- oder Zeitraumwechsel.
+ * Wächter gegen Überholer: Klickt man schnell mehrfach ‹/›, laufen mehrere
+ * Anfragen parallel – nur die Antwort zum NOCH aktuellen Zeitraum zählt,
+ * verspätete Antworten älterer Zeiträume werden verworfen.
+ */
 function refreshAgenda(): void {
+  const requested = `${state.view}:${state.periodOffset}`;
+  const stillCurrent = (): boolean => `${state.view}:${state.periodOffset}` === requested;
   void reloadAgenda()
-    .then(() => rerender())
+    .then(() => {
+      if (stillCurrent()) {
+        rerender();
+      }
+    })
     .catch(() => {
-      state.syncError = 'Kalender/Aufgaben konnten nicht geladen werden.';
-      rerender();
+      if (stillCurrent()) {
+        state.syncError = 'Kalender/Aufgaben konnten nicht geladen werden.';
+        rerender();
+      }
     });
 }
 
