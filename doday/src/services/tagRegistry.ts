@@ -9,6 +9,11 @@
 // in Phase 2 wird dasselbe Objekt per WebDAV aus tags.json geladen/geschrieben.
 import type { TagEntry, TagRegistryData } from '../models/types';
 
+/** Vergleichsschlüssel: NFC-normalisiert + kleingeschrieben */
+function normalizeKey(text: string): string {
+  return text.normalize('NFC').toLowerCase();
+}
+
 export class InMemoryTagRegistry {
   private data: TagRegistryData;
 
@@ -33,11 +38,12 @@ export class InMemoryTagRegistry {
    * bewusst mitgefunden: Objekte können den Tag ja weiterhin tragen.
    */
   resolve(tagText: string): TagEntry | undefined {
-    const needle = tagText.toLowerCase();
+    // NFC + Kleinschreibung: findet "Aufräumen" auch als zerlegtes "Aufräumen" oder "aufräumen"
+    const needle = normalizeKey(tagText);
     return this.data.tags.find(
       (entry) =>
-        entry.path.toLowerCase() === needle ||
-        entry.aliases.some((alias) => alias.toLowerCase() === needle),
+        normalizeKey(entry.path) === needle ||
+        entry.aliases.some((alias) => normalizeKey(alias) === needle),
     );
   }
 
@@ -52,7 +58,7 @@ export class InMemoryTagRegistry {
     }
     const entry: TagEntry = {
       uid: `t-${crypto.randomUUID()}`,
-      path,
+      path: path.normalize('NFC'), // immer die zusammengesetzte Unicode-Form speichern
       aliases: [],
       order: this.nextOrder(),
       archived: false,
@@ -72,20 +78,58 @@ export class InMemoryTagRegistry {
     if (!entry) {
       throw new Error(`Tag mit UID "${uid}" existiert nicht`);
     }
-    const conflict = this.resolve(newPath);
+    const target = newPath.normalize('NFC');
+    const conflict = this.resolve(target);
     if (conflict && conflict.uid !== uid) {
-      throw new Error(`Der Pfad "${newPath}" ist bereits vergeben`);
+      throw new Error(`Der Pfad "${target}" ist bereits vergeben`);
     }
+    this.applyRename(entry, target);
+    this.touch();
+    return entry;
+  }
+
+  /**
+   * Bereich SAMT Unterbereichen umbenennen – atomar: Erst werden alle
+   * Zielpfade auf Konflikte geprüft, dann wird angewendet. Schlägt die
+   * Prüfung fehl, bleibt die Registry komplett unverändert.
+   */
+  renameSubtree(uid: string, newPath: string): TagEntry {
+    const entry = this.data.tags.find((tag) => tag.uid === uid);
+    if (!entry) {
+      throw new Error(`Tag mit UID "${uid}" existiert nicht`);
+    }
+    const target = newPath.normalize('NFC');
+    const oldPath = entry.path;
+    const affected = [
+      { entry, target },
+      ...this.data.tags
+        .filter((tag) => tag !== entry && tag.path.startsWith(`${oldPath}.`))
+        .map((tag) => ({ entry: tag, target: target + tag.path.slice(oldPath.length) })),
+    ];
+    const movingUids = new Set(affected.map((move) => move.entry.uid));
+
+    // Konfliktprüfung KOMPLETT vor der ersten Änderung
+    for (const move of affected) {
+      const conflict = this.resolve(move.target);
+      if (conflict && !movingUids.has(conflict.uid)) {
+        throw new Error(`Der Pfad "${move.target}" ist bereits vergeben`);
+      }
+    }
+    for (const move of affected) {
+      this.applyRename(move.entry, move.target);
+    }
+    this.touch();
+    return entry;
+  }
+
+  /** Gemeinsame Umbenennen-Mechanik: alter Pfad wird Alias, neuer Pfad gesetzt */
+  private applyRename(entry: TagEntry, newPath: string): void {
     if (!entry.aliases.includes(entry.path)) {
       entry.aliases.push(entry.path);
     }
     // Falls der neue Name vorher ein Alias dieses Eintrags war: aus den Aliasen entfernen
-    entry.aliases = entry.aliases.filter(
-      (alias) => alias.toLowerCase() !== newPath.toLowerCase(),
-    );
+    entry.aliases = entry.aliases.filter((alias) => normalizeKey(alias) !== normalizeKey(newPath));
     entry.path = newPath;
-    this.touch();
-    return entry;
   }
 
   /** Blendet einen Bereich aus der UI aus – Historie und Zuordnung bleiben erhalten. */

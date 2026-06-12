@@ -1,0 +1,24 @@
+# Vorlage für den Docker-Rechner (cd.msmr.co) – an dein Traefik-Setup anpassen
+# (Netzwerk-Name, certresolver und entrypoint wie bei deinen anderen Diensten).
+#
+# Wichtig: Der /dav-Rewrite aus dem ursprünglichen Konzept entfällt!
+# Das Backend spricht serverseitig mit der Nextcloud – der Browser nur mit /api.
+services:
+  doday:
+    # Variante A: lokal bauen     → docker compose up -d --build
+    build: ..
+    # Variante B: später via GHCR → image: ghcr.io/<github-user>/doday:latest
+    restart: unless-stopped
+    env_file: .env # NEXTCLOUD_URL, NEXTCLOUD_USER, NEXTCLOUD_APP_PASSWORD, …
+    networks:
+      - web
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.doday.rule=Host(`do.msmr.co`)
+      - traefik.http.routers.doday.entrypoints=websecure
+      - traefik.http.routers.doday.tls.certresolver=letsencrypt
+      - traefik.http.services.doday.loadbalancer.server.port=3000
+
+networks:
+  web:
+    external: true # Name deines bestehenden Traefik-Netzwerks

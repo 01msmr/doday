@@ -9,20 +9,24 @@
 // Layout: Aufgaben links, Termine + Gewohnheiten + Achievements rechts –
 // auf schmalen Bildschirmen (iPhone) stapelt sich alles untereinander,
 // mit den Terminen oben.
-import type { Achievement, CalendarEvent, Habit, Task } from '../models/types';
-import type { DayData } from '../services/mockData';
+import type { Achievement, AppData, CalendarEvent, Habit, Task } from '../models/types';
 import type { InMemoryTagRegistry } from '../services/tagRegistry';
 import { eventsOn, filterByArea, tasksDueOn, withCanonicalTags } from '../services/selectors';
 import { groupByArea, type AreaGroup, type GroupedDay } from './grouping';
 import { isoDate, shiftDays, startOfWeek, timeOf } from '../utils/dates';
+import { safeColor } from '../utils/colors';
 
 /** Die vier Ansichten der unteren Navigation */
 export type ViewId = 'day' | 'morrow' | 'week' | 'month';
 
 /** Gesamter Zustand der App – eine einzige Quelle der Wahrheit */
 export interface AppState {
-  data: DayData;
+  data: AppData;
   registry: InMemoryTagRegistry;
+  /** Erste Daten werden noch aus der Nextcloud geladen */
+  loading: boolean;
+  /** Letzter Lade-/Speicherfehler – null = alles in Ordnung */
+  syncError: string | null;
   /** Aktive Ansicht der unteren Navigation */
   view: ViewId;
   /** "Sprung in den Bereich": nur dieser Bereich (inkl. Unterbereiche) – null = alles */
@@ -31,12 +35,12 @@ export interface AppState {
   editing: string | null;
   /** Zahnrad-Panel zum Bearbeiten der Gewohnheiten offen? */
   editingHabits: boolean;
+  /** Formular "Termin in den Geräte-Kalender" offen? */
+  creatingEvent: boolean;
   /** Schmale Bildschirme (Hochformat): welche Spalte ist sichtbar? */
   mobileColumn: 'main' | 'side';
   /** Vom Nutzer zugeklappte Bereiche (alles andere ist offen) */
   collapsed: Set<string>;
-  /** Einblende-Animation nur beim allerersten Rendern – Re-Renders bleiben ruhig */
-  firstRender: boolean;
 }
 
 /** Bereiche ohne eigene Farbe erben unten die Farbe ihres Eltern-Bereichs */
@@ -57,11 +61,12 @@ function escapeHtml(text: string): string {
     .replaceAll('"', '&quot;');
 }
 
-/** Bereichsfarbe: eigener Registry-Eintrag oder die des nächsten Vorfahren */
+/** Bereichsfarbe: eigener Registry-Eintrag oder die des nächsten Vorfahren.
+    safeColor lässt nur echte Hex-Farben ins HTML (tags.json ist Fremddaten). */
 function areaColor(registry: InMemoryTagRegistry, path: string): string {
   const segments = path.split('.');
   while (segments.length > 0) {
-    const color = registry.resolve(segments.join('.'))?.color;
+    const color = safeColor(registry.resolve(segments.join('.'))?.color);
     if (color) {
       return color;
     }
@@ -100,8 +105,32 @@ function renderMasthead(small: string, big: string, year: string): string {
 
 /* ---------- Termine ---------- */
 
-/** Kompakte Termin-Liste – chronologisch, mit Bereichsfarbe als Punkt */
-function renderSchedule(events: CalendarEvent[], registry: InMemoryTagRegistry): string {
+/** Formular: Termin mit #Tags anlegen → als .ics in den Geräte-Kalender */
+function renderEventForm(dateIso: string): string {
+  return `
+    <form class="event-form" data-event-form>
+      <input type="text" data-field="title" placeholder="Titel #Tag"
+        aria-label="Termintitel, #Tags erlaubt" required />
+      <div class="event-form-row">
+        <input type="date" data-field="date" value="${dateIso}" aria-label="Datum" required />
+        <input type="time" data-field="start" value="09:00" aria-label="Beginn" required />
+        <span class="event-form-sep">&ndash;</span>
+        <input type="time" data-field="end" value="10:00" aria-label="Ende" required />
+      </div>
+      <div class="event-form-actions">
+        <button type="submit" class="btn-primary">In den Kalender</button>
+        <button type="button" class="btn-quiet" data-action="toggle-event-form">Abbrechen</button>
+      </div>
+    </form>`;
+}
+
+/** Kompakte Termin-Liste – chronologisch, mit Bereichsfarbe als Punkt.
+    Der ＋-Kreis rechts neben der Überschrift öffnet das Termin-Formular. */
+function renderSchedule(
+  events: CalendarEvent[],
+  registry: InMemoryTagRegistry,
+  opts: { creating: boolean; dateIso: string },
+): string {
   const rows = events
     .map(
       (event) => `
@@ -115,7 +144,11 @@ function renderSchedule(events: CalendarEvent[], registry: InMemoryTagRegistry):
     .join('');
   return `
     <section class="panel">
-      <h2 class="section-label">Termine</h2>
+      <h2 class="section-label">Termine
+        <button type="button" class="add-event" data-action="toggle-event-form"
+          aria-expanded="${opts.creating}" aria-label="Termin im Geräte-Kalender anlegen">+</button>
+      </h2>
+      ${opts.creating ? renderEventForm(opts.dateIso) : ''}
       ${events.length > 0 ? `<ol class="timeline">${rows}</ol>` : '<p class="empty">Keine Termine.</p>'}
     </section>`;
 }
@@ -264,7 +297,7 @@ function renderTaskProgress(stats: { done: number; total: number }): string {
         aria-valuemin="0" aria-valuemax="${stats.total}" aria-label="Heute erledigte Aufgaben">
         <div class="goal-fill" style="width:${percent}%"></div>
         <div class="goal-head">
-          <span class="goal-title">Aufgaben</span>
+          <span class="goal-title"><strong>Aufgaben</strong></span>
         </div>
         ${renderRing(stats.done, stats.total)}
       </li>`;
@@ -276,8 +309,9 @@ function renderHabits(habits: Habit[], editing: boolean): string {
   const items = habits
     .map((habit) => {
       const done = habit.log.includes(today);
-      // Die eigene Farbe wandert als CSS-Variable an den Button
-      const colorStyle = habit.color ? ` style="--hc:${escapeHtml(habit.color)}"` : '';
+      // Die eigene Farbe wandert als CSS-Variable an den Button (nur echte Hex-Farben)
+      const color = safeColor(habit.color);
+      const colorStyle = color ? ` style="--hc:${color}"` : '';
       return `
       <button type="button" class="habit${done ? ' done' : ''}"${colorStyle}
         data-action="toggle-habit" data-id="${habit.id}" aria-pressed="${done}">
@@ -286,20 +320,29 @@ function renderHabits(habits: Habit[], editing: boolean): string {
       </button>`;
     })
     .join('');
-  // Zahnrad am Ende der Reihe öffnet den Editor (Name, Farbe, Zeitraum, Ziel)
+  // Zahnrad am Ende der Reihe öffnet den Editor (Name, Farbe, Zeitraum, Ziel).
+  // Font-Awesome-Icon, per Schriftgröße auf 65 % der Kreishöhe skaliert.
   const gear = `
       <button type="button" class="habit-gear${editing ? ' active' : ''}"
         data-action="toggle-habit-editor" aria-expanded="${editing}"
-        aria-label="Gewohnheiten bearbeiten">&#9881;</button>`;
+        aria-label="Gewohnheiten bearbeiten">
+        <i class="fa-solid fa-gear" aria-hidden="true"></i>
+      </button>`;
+  // Ohne Gewohnheiten: leiser Hinweis auf das Zahnrad
+  const emptyHint =
+    habits.length === 0 && !editing
+      ? '<p class="empty">Noch keine Gewohnheiten – über das Zahnrad anlegen.</p>'
+      : '';
   return `
     <section class="panel">
       <h2 class="section-label">Gewohnheiten</h2>
       <div class="habit-row">${items}${gear}</div>
+      ${emptyHint}
       ${editing ? renderHabitEditor(habits) : ''}
     </section>`;
 }
 
-/** Editor-Panel: pro Gewohnheit Farbe, Name, Zeitraum und optionales Ziel */
+/** Editor-Panel: pro Gewohnheit Farbe, Name, Zeitraum, Ziel – plus Anlegen/Löschen */
 function renderHabitEditor(habits: Habit[]): string {
   const rows = habits
     .map(
@@ -316,12 +359,17 @@ function renderHabitEditor(habits: Habit[]): string {
         </select>
         <input type="number" min="1" max="99" value="${habit.target ?? ''}" placeholder="Ziel"
           data-edit="target" data-id="${habit.id}" aria-label="Ziel: Wiederholungen pro Zeitraum" />
+        <button type="button" class="habit-delete" data-action="delete-habit" data-id="${habit.id}"
+          aria-label="${escapeHtml(habit.title)} löschen">&times;</button>
       </div>`,
     )
     .join('');
   return `
     <div class="habit-editor">
       ${rows}
+      <button type="button" class="btn-quiet habit-add" data-action="add-habit">
+        + Gewohnheit hinzufügen
+      </button>
       <p class="habit-editor-hint">Ziel = Wiederholungen pro Zeitraum (optional)</p>
     </div>`;
 }
@@ -345,17 +393,31 @@ function renderHabitBar(habit: Habit): string {
   }
   const total = habit.target ?? 1;
   const percent = Math.min(100, Math.round((done / total) * 100));
-  const colorStyle = habit.color ? ` style="--gc:${escapeHtml(habit.color)}"` : '';
+  const color = safeColor(habit.color);
+  const colorStyle = color ? ` style="--gc:${color}"` : '';
   return `
       <li class="goal"${colorStyle} role="progressbar" aria-valuenow="${done}"
         aria-valuemin="0" aria-valuemax="${total}" aria-label="${escapeHtml(habit.title)}">
         <div class="goal-fill" style="width:${percent}%"></div>
         <div class="goal-head">
-          <span class="goal-title"><span class="goal-recur" aria-hidden="true">&#8634;</span>${escapeHtml(habit.title)}</span>
+          <span class="goal-title"><span class="goal-recur" aria-hidden="true">&#8634;</span>${emphasizeAction(habit.title)}</span>
           <span class="goal-period">${periodLabel}</span>
         </div>
         ${renderRing(done, total)}
       </li>`;
+}
+
+/**
+ * Hebt die Aktion eines Ziel-Titels hervor: das letzte Wort ist die Tätigkeit
+ * ("30 Tage Journal", "100 km Gehen", "Lesen") und wird fett gesetzt.
+ */
+function emphasizeAction(title: string): string {
+  const words = title.trim().split(' ');
+  const action = words.pop() ?? '';
+  if (words.length === 0) {
+    return `<strong>${escapeHtml(action)}</strong>`;
+  }
+  return `${escapeHtml(words.join(' '))} <strong>${escapeHtml(action)}</strong>`;
 }
 
 /**
@@ -376,14 +438,15 @@ function renderAchievements(
   const items = achievements
     .map((achievement) => {
       const percent = Math.min(100, Math.round((achievement.progress / achievement.target) * 100));
-      const colorStyle = achievement.color ? ` style="--gc:${escapeHtml(achievement.color)}"` : '';
+      const color = safeColor(achievement.color);
+      const colorStyle = color ? ` style="--gc:${color}"` : '';
       return `
       <li class="goal"${colorStyle} role="progressbar" aria-valuenow="${achievement.progress}"
         aria-valuemin="0" aria-valuemax="${achievement.target}"
         aria-label="${escapeHtml(achievement.title)}">
         <div class="goal-fill" style="width:${percent}%"></div>
         <div class="goal-head">
-          <span class="goal-title">${escapeHtml(achievement.title)}</span>
+          <span class="goal-title">${emphasizeAction(achievement.title)}</span>
         </div>
         ${renderRing(achievement.progress, achievement.target)}
       </li>`;
@@ -479,15 +542,23 @@ function renderPlaceholder(label: string): string {
 
 /** Komplette App rendern */
 export function renderApp(root: HTMLElement, state: AppState): void {
-  // Beim ersten Rendern blenden die Blöcke sanft gestaffelt ein
-  let revealIndex = 0;
-  const reveal = (html: string): string =>
-    state.firstRender
-      ? `<div data-reveal style="--d:${revealIndex++ * 90}ms">${html}</div>`
-      : `<div>${html}</div>`;
-
   const orderOf = (path: string): number | undefined => state.registry.resolve(path)?.order;
   const today = new Date();
+
+  // Beim Start: erst die Nextcloud-Daten abwarten
+  if (state.loading) {
+    root.innerHTML = `
+      <main class="page">
+        ${renderMasthead(weekdayOf(today), dayMonthOf(today), yearOf(today))}
+        <p class="empty">Lade deine Daten aus der Nextcloud &hellip;</p>
+      </main>
+      ${renderNav(state.view)}`;
+    return;
+  }
+
+  const syncNote = state.syncError
+    ? `<p class="sync-note">&#9888; ${escapeHtml(state.syncError)}</p>`
+    : '';
   let content: string;
 
   if (state.view === 'day' || state.view === 'morrow') {
@@ -514,7 +585,7 @@ export function renderApp(root: HTMLElement, state: AppState): void {
     };
     const extras =
       state.view === 'day'
-        ? `<div class="col-extras">${reveal(renderHabits(state.data.habits, state.editingHabits))}${reveal(renderAchievements(state.data.achievements, state.data.habits, taskStats))}</div>`
+        ? `<div class="col-extras">${renderHabits(state.data.habits, state.editingHabits)}${renderAchievements(state.data.achievements, state.data.habits, taskStats)}</div>`
         : '';
 
     // Hochformat: Umschalter am Bildschirmrand wechselt zwischen den Spalten
@@ -528,23 +599,26 @@ export function renderApp(root: HTMLElement, state: AppState): void {
       </button>`;
 
     content = `
-      ${reveal(renderMasthead(small, dayMonthOf(date), yearOf(date)))}
+      ${renderMasthead(small, dayMonthOf(date), yearOf(date))}
+      ${syncNote}
       ${state.view === 'day' ? renderDoneLine(dayTasks, dayEvents) : ''}
       ${renderFilterChip(state)}
       <div class="columns" data-mobile="${state.mobileColumn}">
-        <div class="col-schedule">${reveal(renderSchedule(events, state.registry))}</div>
-        <div class="col-main">${reveal(renderAreas(grouped, state))}</div>
+        <div class="col-schedule">${renderSchedule(events, state.registry, { creating: state.creatingEvent, dateIso })}</div>
+        <div class="col-main">${renderAreas(grouped, state)}</div>
         ${extras}
       </div>
       ${switcher}`;
   } else if (state.view === 'week') {
     content = `
-      ${reveal(renderMasthead('Diese Woche', dayMonthOf(today), yearOf(today)))}
-      ${reveal(renderPlaceholder('Wochenansicht'))}`;
+      ${renderMasthead('Diese Woche', dayMonthOf(today), yearOf(today))}
+      ${syncNote}
+      ${renderPlaceholder('Wochenansicht')}`;
   } else {
     content = `
-      ${reveal(renderMasthead('Dieser Monat', monthOf(today), yearOf(today)))}
-      ${reveal(renderPlaceholder('Monatsansicht'))}`;
+      ${renderMasthead('Dieser Monat', monthOf(today), yearOf(today))}
+      ${syncNote}
+      ${renderPlaceholder('Monatsansicht')}`;
   }
 
   root.innerHTML = `<main class="page">${content}</main>${renderNav(state.view)}`;

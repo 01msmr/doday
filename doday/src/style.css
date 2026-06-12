@@ -250,6 +250,110 @@ body {
   color: var(--ink-faint);
 }
 
+/* ＋-Kreis am ENDE der Überschriftszeile (nach der Haarlinie) */
+.add-event {
+  order: 1; /* hinter die ::after-Haarlinie schieben */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: none;
+  padding: 0;
+  background: none;
+  border: 1.5px solid var(--ink-faint);
+  border-radius: 50%;
+  color: var(--ink-soft);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.add-event:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Offenes Formular: das Plus wird zum Schließen-Kreuz gedreht */
+.add-event[aria-expanded='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+  transform: rotate(45deg);
+}
+
+/* Formular "Termin in den Geräte-Kalender" */
+.event-form {
+  display: grid;
+  gap: 0.7rem;
+  margin-bottom: 1.2rem;
+}
+
+.event-form input {
+  padding: 0.3rem 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--hairline);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.95rem;
+}
+
+.event-form input:focus-visible {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+
+.event-form-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.event-form-sep {
+  color: var(--ink-faint);
+}
+
+.event-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Primär-Taste im Keycap-Stil */
+.btn-primary {
+  padding: 0.45rem 1rem;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 999px;
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+.btn-quiet {
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--ink-faint);
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.btn-quiet:hover {
+  color: var(--ink-soft);
+}
+
 /* ---------- Termine (Zeitleiste) ---------- */
 
 .timeline {
@@ -640,9 +744,13 @@ details[open] > summary .chevron {
   border: none;
   border-radius: 50%;
   color: var(--ink-faint);
-  font-size: 1.56rem; /* 60 % der Kreishöhe (2.6rem) */
   cursor: pointer;
   transition: color 0.2s ease;
+}
+
+/* Font-Awesome-Zahnrad: 65 % der Habit-Kreishöhe (2.6rem) */
+.habit-gear i {
+  font-size: 1.69rem;
 }
 
 .habit-gear:hover,
@@ -659,9 +767,35 @@ details[open] > summary .chevron {
 
 .habit-editor-row {
   display: grid;
-  grid-template-columns: 2rem minmax(0, 1fr) auto 4.5rem;
+  grid-template-columns: 2rem minmax(0, 1fr) auto 4rem auto;
   gap: 0.7rem;
   align-items: center;
+}
+
+/* Gewohnheit löschen: dezentes ×, warnfarben beim Überfahren */
+.habit-delete {
+  padding: 0 0.2rem;
+  background: none;
+  border: none;
+  color: var(--ink-faint);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.habit-delete:hover {
+  color: #c47a6d;
+}
+
+.habit-add {
+  justify-self: start;
+}
+
+/* Lade-/Speicherprobleme: leiser Hinweis unterm Datum */
+.sync-note {
+  margin: 0.9rem 0 0;
+  font-size: 0.85rem;
+  color: #c4936d;
 }
 
 .habit-editor input[type='text'],
@@ -767,6 +901,11 @@ details[open] > summary .chevron {
 
 .goal-title {
   font-size: 0.95rem;
+}
+
+/* Die Aktion (letztes Wort des Meilenstein-Titels) ist fett */
+.goal-title strong {
+  font-weight: 650;
 }
 
 .goal-num {
@@ -955,24 +1094,6 @@ details[open] > summary .chevron {
 
 .nav-item.active .nav-do {
   opacity: 1;
-}
-
-/* ---------- Einblenden beim ersten Laden ---------- */
-
-@media (prefers-reduced-motion: no-preference) {
-  [data-reveal] {
-    opacity: 0;
-    transform: translateY(0.6rem);
-    animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-    animation-delay: var(--d, 0ms);
-  }
-
-  @keyframes rise {
-    to {
-      opacity: 1;
-      transform: none;
-    }
-  }
 }
 
 /* Tastatur-Fokus sichtbar halten (Barrierefreiheit) */

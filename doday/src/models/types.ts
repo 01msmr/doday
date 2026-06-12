@@ -89,6 +89,20 @@ export interface TagEntry {
   archived: boolean;
 }
 
+/** Inhalt der Datei achievements.json (WebDAV) – Habits + Ziele zusammen */
+export interface AchievementsFile {
+  habits: Habit[];
+  achievements: Achievement[];
+}
+
+/** Alle Daten der App – Aufgaben/Termine kommen ab Phase 3 aus CalDAV */
+export interface AppData {
+  events: CalendarEvent[];
+  tasks: Task[];
+  habits: Habit[];
+  achievements: Achievement[];
+}
+
 /** Gesamtinhalt der Registry-Datei tags.json. */
 export interface TagRegistryData {
   /** Wird bei jeder Änderung erhöht – Basis für Konflikt-Erkennung */

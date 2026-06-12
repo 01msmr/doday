@@ -109,6 +109,61 @@ describe('rename', () => {
   });
 });
 
+describe('Unicode-Normalisierung (NFC)', () => {
+  it('findet Einträge auch mit zerlegten Umlauten (NFD aus macOS/iOS)', () => {
+    const registry = new InMemoryTagRegistry();
+    registry.register('Aufr\u00e4umen'); // NFC
+    // dieselbe Zeichenfolge mit zerlegtem ae (a + U+0308, NFD)
+    expect(registry.resolve('Aufra\u0308umen')?.path).toBe('Aufr\u00e4umen');
+  });
+
+  it('speichert neue Pfade immer in NFC-Form', () => {
+    const registry = new InMemoryTagRegistry();
+    const entry = registry.register('Aufra\u0308umen'); // NFD herein, NFC heraus
+    expect(entry.path).toBe('Aufr\u00e4umen');
+    expect(registry.all()).toHaveLength(1);
+  });
+});
+
+describe('renameSubtree', () => {
+  function registryWithSubtree(): InMemoryTagRegistry {
+    const registry = new InMemoryTagRegistry();
+    registry.register('Zuhause');
+    registry.register('Zuhause.Aufräumen');
+    registry.register('Zuhause.Garten');
+    return registry;
+  }
+
+  it('benennt den Bereich samt aller Unterbereiche um (Aliase bleiben)', () => {
+    const registry = registryWithSubtree();
+    const uid = registry.resolve('Zuhause')!.uid;
+    registry.renameSubtree(uid, 'Home');
+    expect(registry.resolve('Home')?.uid).toBe(uid);
+    expect(registry.resolve('Home.Aufräumen')).toBeDefined();
+    expect(registry.resolve('Home.Garten')).toBeDefined();
+    // alte Namen lösen weiter auf (Alias-Mechanik)
+    expect(registry.resolve('Zuhause.Aufräumen')?.path).toBe('Home.Aufräumen');
+  });
+
+  it('ist atomar: bei einem Konflikt ändert sich GAR nichts', () => {
+    const registry = registryWithSubtree();
+    registry.register('Home.Garten'); // blockiert das Kaskaden-Ziel
+    const uid = registry.resolve('Zuhause')!.uid;
+    const versionBefore = registry.toJSON().version;
+
+    expect(() => registry.renameSubtree(uid, 'Home')).toThrow();
+    // kompletter Rollback: Eltern UND Kinder unverändert
+    expect(registry.resolve('Zuhause')?.path).toBe('Zuhause');
+    expect(registry.resolve('Zuhause.Aufräumen')?.path).toBe('Zuhause.Aufräumen');
+    expect(registry.toJSON().version).toBe(versionBefore);
+  });
+
+  it('wirft bei unbekannter UID', () => {
+    const registry = registryWithSubtree();
+    expect(() => registry.renameSubtree('t-gibtsnicht', 'Egal')).toThrow();
+  });
+});
+
 describe('archive und all', () => {
   it('blendet archivierte Einträge aus all() aus', () => {
     const registry = seededRegistry();
