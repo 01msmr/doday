@@ -49,3 +49,14 @@ export function startOfWeek(date: Date): Date {
   const offset = (date.getDay() + 6) % 7;
   return shiftDays(date, -offset);
 }
+
+/**
+ * ISO-Kalenderwoche (KW). Regel: Der DONNERSTAG einer Woche bestimmt,
+ * zu welchem Jahr und welcher Nummer sie gehört (der 4. Januar liegt
+ * dadurch immer in KW 1).
+ */
+export function isoWeek(date: Date): number {
+  const thursday = shiftDays(startOfWeek(date), 3);
+  const firstThursday = shiftDays(startOfWeek(new Date(thursday.getFullYear(), 0, 4)), 3);
+  return 1 + Math.round((thursday.getTime() - firstThursday.getTime()) / (7 * 86_400_000));
+}

@@ -1,6 +1,6 @@
 // Tests zuerst (TDD): Datums-Helfer.
 import { describe, it, expect } from 'vitest';
-import { isoDate, timeOf, shiftDays, startOfWeek, localDateOf } from './dates';
+import { isoDate, timeOf, shiftDays, startOfWeek, localDateOf, isoWeek } from './dates';
 
 describe('isoDate', () => {
   it('formatiert ein Datum als YYYY-MM-DD mit führenden Nullen', () => {
@@ -66,5 +66,20 @@ describe('startOfWeek', () => {
 
   it('lässt einen Montag unverändert', () => {
     expect(isoDate(startOfWeek(new Date(2026, 5, 8)))).toBe('2026-06-08');
+  });
+});
+
+describe('isoWeek', () => {
+  it('liefert die ISO-Kalenderwoche (Donnerstag bestimmt die Woche)', () => {
+    // 2026 beginnt an einem Donnerstag → 1. Januar liegt in KW 1
+    expect(isoWeek(new Date('2026-01-01T12:00:00'))).toBe(1);
+    expect(isoWeek(new Date('2026-06-12T12:00:00'))).toBe(24);
+  });
+
+  it('ordnet Jahreswechsel-Tage der richtigen Woche zu', () => {
+    // Mo 29.12.2025 gehört schon zur KW 1 des Jahres 2026
+    expect(isoWeek(new Date('2025-12-29T12:00:00'))).toBe(1);
+    // Fr 1.1.2027 gehört noch zur KW 53 des Jahres 2026
+    expect(isoWeek(new Date('2027-01-01T12:00:00'))).toBe(53);
   });
 });
