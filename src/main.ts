@@ -21,6 +21,7 @@ import {
   toggleTask,
 } from './services/api';
 import { normalizeText, parseTags, replaceTagPrefix } from './services/tagService';
+import { monthRange, weekRange } from './services/selectors';
 import { InMemoryTagRegistry } from './services/tagRegistry';
 import { buildEventIcs } from './services/ics';
 import { renderApp, type AppState, type ViewId } from './ui/dayView';
@@ -38,6 +39,7 @@ const state: AppState = {
   loading: true,
   syncError: null,
   view: 'day',
+  periodOffset: 0,
   filterArea: null,
   editing: null,
   editingHabits: false,
@@ -62,8 +64,17 @@ function queue(task: () => Promise<void>): void {
   saveChain = saveChain.then(task).catch(() => {});
 }
 
-/** Zeitfenster der Agenda: heute 0 Uhr bis übermorgen 24 Uhr (lokal) */
+/** Zeitfenster der Agenda – Day/Morrow: heute + 2 Tage, Cockpits: ganze Woche/Monat */
 function agendaRange(): { start: Date; end: Date } {
+  if (state.view === 'week' || state.view === 'month') {
+    const range =
+      state.view === 'week' ? weekRange(state.periodOffset) : monthRange(state.periodOffset);
+    return {
+      start: new Date(`${range.start}T00:00:00`),
+      // der letzte Tag zählt ganz mit – also bis 24 Uhr laden
+      end: shiftDays(new Date(`${range.end}T00:00:00`), 1),
+    };
+  }
   const start = new Date();
   start.setHours(0, 0, 0, 0);
   return { start, end: shiftDays(start, 3) };
@@ -74,6 +85,16 @@ async function reloadAgenda(): Promise<void> {
   const agenda = await loadAgenda(range.start, range.end);
   state.data.events = agenda.events;
   state.data.tasks = agenda.tasks;
+}
+
+/** Agenda im Hintergrund neu laden – nach Tab- oder Zeitraumwechsel */
+function refreshAgenda(): void {
+  void reloadAgenda()
+    .then(() => rerender())
+    .catch(() => {
+      state.syncError = 'Kalender/Aufgaben konnten nicht geladen werden.';
+      rerender();
+    });
 }
 
 async function boot(showLoading = true): Promise<void> {
@@ -288,7 +309,19 @@ root.addEventListener('click', (event) => {
 
   if (action === 'switch-view' && view && view !== state.view) {
     state.view = view as ViewId;
-    rerender();
+    state.periodOffset = 0; // Tab-Wechsel landet immer im Jetzt
+    rerender(); // sofort zeigen – die frischen Daten folgen gleich
+    refreshAgenda(); // Zeitfenster hat sich geändert → passende Daten holen
+  }
+
+  if (action === 'switch-period' && trigger.dataset.dir) {
+    // ‹ = -1 (zurück), › = +1 (Richtung heute) – nie über das Jetzt hinaus
+    const next = Math.min(0, state.periodOffset + Number(trigger.dataset.dir));
+    if (next !== state.periodOffset) {
+      state.periodOffset = next;
+      rerender();
+      refreshAgenda();
+    }
   }
 
   if (action === 'filter-area' && path) {
