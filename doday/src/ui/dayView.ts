@@ -14,7 +14,7 @@ import type { DayData } from '../services/mockData';
 import type { InMemoryTagRegistry } from '../services/tagRegistry';
 import { eventsOn, filterByArea, tasksDueOn, withCanonicalTags } from '../services/selectors';
 import { groupByArea, type AreaGroup, type GroupedDay } from './grouping';
-import { isoDate, shiftDays, timeOf } from '../utils/dates';
+import { isoDate, shiftDays, startOfWeek, timeOf } from '../utils/dates';
 
 /** Die vier Ansichten der unteren Navigation */
 export type ViewId = 'day' | 'morrow' | 'week' | 'month';
@@ -31,6 +31,8 @@ export interface AppState {
   editing: string | null;
   /** Zahnrad-Panel zum Bearbeiten der Gewohnheiten offen? */
   editingHabits: boolean;
+  /** Schmale Bildschirme (Hochformat): welche Spalte ist sichtbar? */
+  mobileColumn: 'main' | 'side';
   /** Vom Nutzer zugeklappte Bereiche (alles andere ist offen) */
   collapsed: Set<string>;
   /** Einblende-Animation nur beim allerersten Rendern – Re-Renders bleiben ruhig */
@@ -78,16 +80,21 @@ function dayMonthOf(date: Date): string {
   return new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'long' }).format(date);
 }
 
-function monthYearOf(date: Date): string {
-  return new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' }).format(date);
+function monthOf(date: Date): string {
+  return new Intl.DateTimeFormat('de-DE', { month: 'long' }).format(date);
 }
 
-/** Kopf der Seite: kleine Zeile in Akzentfarbe, darunter das Datum groß in Serife */
-function renderMasthead(small: string, big: string): string {
+function yearOf(date: Date): string {
+  return new Intl.DateTimeFormat('de-DE', { year: 'numeric' }).format(date);
+}
+
+/** Kopf der Seite: kleine Zeile in Akzentfarbe, darunter das Datum groß in Serife.
+    Das Jahr läuft mit, aber visuell zurückgenommen. */
+function renderMasthead(small: string, big: string, year: string): string {
   return `
     <header class="masthead">
       <p class="weekday">${small}</p>
-      <h1 class="day-date">${big}</h1>
+      <h1 class="day-date">${big} <span class="day-year">${year}</span></h1>
     </header>`;
 }
 
@@ -161,10 +168,22 @@ function renderArea(group: AreaGroup, state: AppState): string {
       </summary>
       <div class="area-body">
         ${group.events.length > 0 ? `<ol class="group-events">${group.events.map(renderGroupEvent).join('')}</ol>` : ''}
-        ${group.tasks.length > 0 ? `<ul class="task-list">${group.tasks.map(renderTask).join('')}</ul>` : ''}
+        ${renderTaskLists(group.tasks)}
         ${group.children.map((child) => renderArea(child, state)).join('')}
       </div>
     </details>`;
+}
+
+/**
+ * Offene Aufgaben links; erledigte darunter als Block nach rechts gerückt –
+ * der Block selbst ist in sich linksbündig (gemeinsame linke Kante).
+ */
+function renderTaskLists(tasks: Task[]): string {
+  const open = tasks.filter((task) => !task.completed);
+  const done = tasks.filter((task) => task.completed);
+  return `
+    ${open.length > 0 ? `<ul class="task-list">${open.map(renderTask).join('')}</ul>` : ''}
+    ${done.length > 0 ? `<ul class="task-list task-list--done">${done.map(renderTask).join('')}</ul>` : ''}`;
 }
 
 /** Objekte ohne Tag – bewusst ganz unten und zurückhaltend gestaltet */
@@ -183,7 +202,7 @@ function renderUntagged(grouped: GroupedDay, state: AppState): string {
       </summary>
       <div class="area-body">
         ${events.length > 0 ? `<ol class="group-events">${events.map(renderGroupEvent).join('')}</ol>` : ''}
-        ${tasks.length > 0 ? `<ul class="task-list">${tasks.map(renderTask).join('')}</ul>` : ''}
+        ${renderTaskLists(tasks)}
       </div>
     </details>`;
 }
@@ -207,6 +226,23 @@ function renderAreas(grouped: GroupedDay, state: AppState): string {
 }
 
 /* ---------- Gewohnheiten & Achievements ---------- */
+
+/** Tages-Fortschritt der Aufgaben – "Aufgaben erledigen ist ein guter Habit" */
+function renderTaskProgress(stats: { done: number; total: number }): string {
+  if (stats.total === 0) {
+    return '';
+  }
+  const percent = Math.round((stats.done / stats.total) * 100);
+  return `
+      <li class="goal task-progress" role="progressbar" aria-valuenow="${stats.done}"
+        aria-valuemin="0" aria-valuemax="${stats.total}" aria-label="Heute erledigte Aufgaben">
+        <div class="goal-fill" style="width:${percent}%"></div>
+        <div class="goal-head">
+          <span class="goal-title">Aufgaben erledigt</span>
+          <span class="goal-num">${stats.done}<span class="goal-sep">/</span>${stats.total} &middot; ${percent}&thinsp;%</span>
+        </div>
+      </li>`;
+}
 
 /** Gewohnheiten als schlichte Kreise – erledigt = gefüllt mit Haken, jede in eigener Farbe */
 function renderHabits(habits: Habit[], editing: boolean): string {
@@ -264,21 +300,63 @@ function renderHabitEditor(habits: Habit[]): string {
     </div>`;
 }
 
-/** Achievements mit dezentem Fortschritt – eine Haarlinie, keine Konfetti */
-function renderAchievements(achievements: Achievement[]): string {
+/**
+ * Eigener Balken für Gewohnheiten OHNE verknüpftes Achievement (z. B. "Lesen"):
+ * täglich = heute 0/1, wöchentlich = Stand dieser Woche gegen das Ziel.
+ * Klick auf den Habit-Kreis bewegt Zahl und Füllstand sofort mit.
+ */
+function renderHabitBar(habit: Habit): string {
+  const today = isoDate();
+  let done: number;
+  let periodLabel: string;
+  if (habit.schedule === 'weekly') {
+    const monday = isoDate(startOfWeek(new Date()));
+    done = habit.log.filter((day) => day >= monday && day <= today).length;
+    periodLabel = 'Woche';
+  } else {
+    done = habit.log.includes(today) ? 1 : 0;
+    periodLabel = 'heute';
+  }
+  const total = habit.target ?? 1;
+  const percent = Math.min(100, Math.round((done / total) * 100));
+  const colorStyle = habit.color ? ` style="--gc:${escapeHtml(habit.color)}"` : '';
+  return `
+      <li class="goal"${colorStyle} role="progressbar" aria-valuenow="${done}"
+        aria-valuemin="0" aria-valuemax="${total}" aria-label="${escapeHtml(habit.title)}">
+        <div class="goal-fill" style="width:${percent}%"></div>
+        <div class="goal-head">
+          <span class="goal-title">${escapeHtml(habit.title)}</span>
+          <span class="goal-num">${done}<span class="goal-sep">/</span>${total} &middot; ${periodLabel}</span>
+        </div>
+      </li>`;
+}
+
+/**
+ * Achievements als zeilenhohe Farbflächen: Der Fortschritt füllt die ganze
+ * Zeile von links in der Habit-Farbe (transluzent), die Schrift liegt darüber.
+ * Danach: Balken für Habits ohne Achievement, zuletzt der Aufgaben-Fortschritt.
+ */
+function renderAchievements(
+  achievements: Achievement[],
+  habits: Habit[],
+  taskStats: { done: number; total: number },
+): string {
+  // Habits, deren Fortschritt nicht schon über ein Achievement abgebildet ist
+  const unlinkedHabits = habits.filter(
+    (habit) => !achievements.some((achievement) => achievement.habitId === habit.id),
+  );
   const items = achievements
     .map((achievement) => {
       const percent = Math.min(100, Math.round((achievement.progress / achievement.target) * 100));
+      const colorStyle = achievement.color ? ` style="--gc:${escapeHtml(achievement.color)}"` : '';
       return `
-      <li class="goal">
+      <li class="goal"${colorStyle} role="progressbar" aria-valuenow="${achievement.progress}"
+        aria-valuemin="0" aria-valuemax="${achievement.target}"
+        aria-label="${escapeHtml(achievement.title)}">
+        <div class="goal-fill" style="width:${percent}%"></div>
         <div class="goal-head">
           <span class="goal-title">${escapeHtml(achievement.title)}</span>
           <span class="goal-num">${achievement.progress}<span class="goal-sep">/</span>${achievement.target}</span>
-        </div>
-        <div class="goal-bar" role="progressbar" aria-valuenow="${achievement.progress}"
-          aria-valuemin="0" aria-valuemax="${achievement.target}"
-          aria-label="${escapeHtml(achievement.title)}">
-          <div class="goal-fill" style="width:${percent}%"></div>
         </div>
       </li>`;
     })
@@ -286,8 +364,27 @@ function renderAchievements(achievements: Achievement[]): string {
   return `
     <section class="panel">
       <h2 class="section-label">Achievements</h2>
-      <ul class="goal-list">${items}</ul>
+      <ul class="goal-list">${items}${unlinkedHabits.map(renderHabitBar).join('')}${renderTaskProgress(taskStats)}</ul>
     </section>`;
+}
+
+/** Eine Zeile mit allem, was heute schon geschafft ist: Aufgaben + vergangene Termine */
+function renderDoneLine(tasks: Task[], events: CalendarEvent[]): string {
+  const now = new Date();
+  const nowIso = `${isoDate(now)}T${String(now.getHours()).padStart(2, '0')}:${String(
+    now.getMinutes(),
+  ).padStart(2, '0')}:00`;
+  const doneTitles = [
+    ...tasks.filter((task) => task.completed).map((task) => task.title),
+    ...events.filter((event) => event.end <= nowIso).map((event) => event.title),
+  ];
+  if (doneTitles.length === 0) {
+    return '';
+  }
+  const items = doneTitles
+    .map((title) => `<span class="done-item">${escapeHtml(title)}</span>`)
+    .join('<span class="done-sep"> · </span>');
+  return `<p class="done-line"><span class="done-label">Erledigt</span> ${items}</p>`;
 }
 
 /* ---------- Untere Navigation ---------- */
@@ -359,39 +456,52 @@ export function renderApp(root: HTMLElement, state: AppState): void {
     // 1. Tag filtern  2. Tags kanonisieren (Alias → aktueller Registry-Name)
     // 3. ggf. Bereichs-Filter ("Sprung") anwenden
     const canonical = (tag: string): string | undefined => state.registry.resolve(tag)?.path;
-    const tasks = filterByArea(
-      withCanonicalTags(tasksDueOn(state.data.tasks, dateIso), canonical),
-      state.filterArea,
-    );
-    const events = filterByArea(
-      withCanonicalTags(eventsOn(state.data.events, dateIso), canonical),
-      state.filterArea,
-    );
+    const dayTasks = withCanonicalTags(tasksDueOn(state.data.tasks, dateIso), canonical);
+    const dayEvents = withCanonicalTags(eventsOn(state.data.events, dateIso), canonical);
+    // Der Bereichs-Filter ("Sprung") wirkt auf die Listen – nicht auf die Erledigt-Zeile
+    const tasks = filterByArea(dayTasks, state.filterArea);
+    const events = filterByArea(dayEvents, state.filterArea);
     const grouped = groupByArea(tasks, events, orderOf);
 
     const small =
       state.view === 'day' ? weekdayOf(date) : `Morgen · ${weekdayOf(date)}`;
     // Gewohnheiten/Achievements gehören zum Heute – morgen gibt es nichts abzuhaken
+    const taskStats = {
+      done: dayTasks.filter((task) => task.completed).length,
+      total: dayTasks.length,
+    };
     const extras =
       state.view === 'day'
-        ? `<div class="col-extras">${reveal(renderHabits(state.data.habits, state.editingHabits))}${reveal(renderAchievements(state.data.achievements))}</div>`
+        ? `<div class="col-extras">${reveal(renderHabits(state.data.habits, state.editingHabits))}${reveal(renderAchievements(state.data.achievements, state.data.habits, taskStats))}</div>`
         : '';
 
+    // Hochformat: Umschalter am Bildschirmrand wechselt zwischen den Spalten
+    const onMain = state.mobileColumn === 'main';
+    const switcher = `
+      <button type="button" class="col-switch ${onMain ? 'col-switch--right' : 'col-switch--left'}"
+        data-action="switch-column"
+        aria-label="${onMain ? 'Termine und Gewohnheiten zeigen' : 'Aufgaben zeigen'}">
+        <span class="col-switch-label">${onMain ? 'Termine' : 'Aufgaben'}</span>
+        <span class="col-switch-arrow" aria-hidden="true">${onMain ? '&rsaquo;' : '&lsaquo;'}</span>
+      </button>`;
+
     content = `
-      ${reveal(renderMasthead(small, dayMonthOf(date)))}
+      ${reveal(renderMasthead(small, dayMonthOf(date), yearOf(date)))}
+      ${state.view === 'day' ? renderDoneLine(dayTasks, dayEvents) : ''}
       ${renderFilterChip(state)}
-      <div class="columns">
+      <div class="columns" data-mobile="${state.mobileColumn}">
         <div class="col-schedule">${reveal(renderSchedule(events, state.registry))}</div>
         <div class="col-main">${reveal(renderAreas(grouped, state))}</div>
         ${extras}
-      </div>`;
+      </div>
+      ${switcher}`;
   } else if (state.view === 'week') {
     content = `
-      ${reveal(renderMasthead('Diese Woche', dayMonthOf(today)))}
+      ${reveal(renderMasthead('Diese Woche', dayMonthOf(today), yearOf(today)))}
       ${reveal(renderPlaceholder('Wochenansicht'))}`;
   } else {
     content = `
-      ${reveal(renderMasthead('Dieser Monat', monthYearOf(today)))}
+      ${reveal(renderMasthead('Dieser Monat', monthOf(today), yearOf(today)))}
       ${reveal(renderPlaceholder('Monatsansicht'))}`;
   }
 

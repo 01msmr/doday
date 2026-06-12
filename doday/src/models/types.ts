@@ -32,6 +32,10 @@ export interface Achievement {
   progress: number;
   /** Zeitpunkt des Abschlusses – null solange offen */
   completedAt: ISODateTime | null;
+  /** Balkenfarbe – sinnvollerweise die Farbe der zugehörigen Gewohnheit */
+  color?: string;
+  /** Verknüpfte Gewohnheit: ihr Abhaken bewegt diesen Fortschritt mit */
+  habitId?: string;
 }
 
 /** Aufgabe (später: Nextcloud Tasks / VTODO). */

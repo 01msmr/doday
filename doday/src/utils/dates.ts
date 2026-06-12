@@ -21,3 +21,10 @@ export function shiftDays(base: Date, days: number): Date {
   result.setDate(result.getDate() + days);
   return result;
 }
+
+/** Montag der Woche, in der das Datum liegt (deutsche Wochenlogik: Mo–So) */
+export function startOfWeek(date: Date): Date {
+  // getDay(): So=0, Mo=1 … – wir rechnen um auf Mo=0 … So=6
+  const offset = (date.getDay() + 6) % 7;
+  return shiftDays(date, -offset);
+}
