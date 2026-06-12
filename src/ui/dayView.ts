@@ -35,8 +35,10 @@ export interface AppState {
   editing: string | null;
   /** Zahnrad-Panel zum Bearbeiten der Gewohnheiten offen? */
   editingHabits: boolean;
-  /** Formular "Termin in den Geräte-Kalender" offen? */
+  /** Formular "Termin anlegen" offen? */
   creatingEvent: boolean;
+  /** Formular "Aufgabe anlegen" offen? */
+  creatingTask: boolean;
   /** Schmale Bildschirme (Hochformat): welche Spalte ist sichtbar? */
   mobileColumn: 'main' | 'side';
   /** Vom Nutzer zugeklappte Bereiche (alles andere ist offen) */
@@ -105,7 +107,8 @@ function renderMasthead(small: string, big: string, year: string): string {
 
 /* ---------- Termine ---------- */
 
-/** Formular: Termin mit #Tags anlegen → als .ics in den Geräte-Kalender */
+/** Formular: Termin mit #Tags anlegen → direkt in den Nextcloud-Kalender
+    (synct von dort auf alle Geräte); alternativ als .ics an den Geräte-Kalender */
 function renderEventForm(dateIso: string): string {
   return `
     <form class="event-form" data-event-form>
@@ -118,8 +121,25 @@ function renderEventForm(dateIso: string): string {
         <input type="time" data-field="end" value="10:00" aria-label="Ende" required />
       </div>
       <div class="event-form-actions">
-        <button type="submit" class="btn-primary">In den Kalender</button>
+        <button type="submit" class="btn-primary">Speichern</button>
+        <button type="button" class="btn-quiet" data-action="event-ics">als .ics</button>
         <button type="button" class="btn-quiet" data-action="toggle-event-form">Abbrechen</button>
+      </div>
+    </form>`;
+}
+
+/** Formular: Aufgabe mit #Tags anlegen → Nextcloud Tasks (VTODO) */
+function renderTaskForm(dateIso: string): string {
+  return `
+    <form class="event-form" data-task-form>
+      <input type="text" data-field="title" placeholder="Aufgabe #Bereich"
+        aria-label="Aufgabentitel, #Tags erlaubt" required />
+      <div class="event-form-row">
+        <input type="date" data-field="due" value="${dateIso}" aria-label="Fällig am" />
+      </div>
+      <div class="event-form-actions">
+        <button type="submit" class="btn-primary">Anlegen</button>
+        <button type="button" class="btn-quiet" data-action="toggle-task-form">Abbrechen</button>
       </div>
     </form>`;
 }
@@ -135,10 +155,10 @@ function renderSchedule(
     .map(
       (event) => `
       <li class="timeline-row">
-        <span class="time">${timeOf(event.start)}</span>
+        <span class="time">${event.allDay ? 'Tag' : timeOf(event.start)}</span>
         <span class="area-dot" style="--c:${event.tags[0] ? areaColor(registry, event.tags[0]) : FALLBACK_COLOR}"></span>
         <span class="row-title">${escapeHtml(event.title)}</span>
-        <span class="time-soft">bis ${timeOf(event.end)}</span>
+        <span class="time-soft">${event.allDay ? 'ganztägig' : `bis ${timeOf(event.end)}`}</span>
       </li>`,
     )
     .join('');
@@ -146,7 +166,7 @@ function renderSchedule(
     <section class="panel">
       <h2 class="section-label">Termine
         <button type="button" class="add-event" data-action="toggle-event-form"
-          aria-expanded="${opts.creating}" aria-label="Termin im Geräte-Kalender anlegen">+</button>
+          aria-expanded="${opts.creating}" aria-label="Termin anlegen">+</button>
       </h2>
       ${opts.creating ? renderEventForm(opts.dateIso) : ''}
       ${events.length > 0 ? `<ol class="timeline">${rows}</ol>` : '<p class="empty">Keine Termine.</p>'}
@@ -240,15 +260,23 @@ function renderUntagged(grouped: GroupedDay, state: AppState): string {
     </details>`;
 }
 
-/** Aufgaben-Sektion: alle Bereiche + "Ohne Bereich" */
-function renderAreas(grouped: GroupedDay, state: AppState): string {
+/** Aufgaben-Sektion: alle Bereiche + "Ohne Bereich"; ＋ legt eine neue Aufgabe an */
+function renderAreas(
+  grouped: GroupedDay,
+  state: AppState,
+  opts: { creating: boolean; dateIso: string },
+): string {
   const isEmpty =
     grouped.groups.length === 0 &&
     grouped.untagged.tasks.length === 0 &&
     grouped.untagged.events.length === 0;
   return `
     <section class="panel">
-      <h2 class="section-label">Aufgaben</h2>
+      <h2 class="section-label">Aufgaben
+        <button type="button" class="add-event" data-action="toggle-task-form"
+          aria-expanded="${opts.creating}" aria-label="Aufgabe anlegen">+</button>
+      </h2>
+      ${opts.creating ? renderTaskForm(opts.dateIso) : ''}
       ${
         isEmpty
           ? '<p class="empty">Keine Aufgaben für diesen Tag.</p>'
@@ -476,12 +504,12 @@ function renderAchievements(
 /** Eine Zeile mit allem, was heute schon geschafft ist: Aufgaben + vergangene Termine */
 function renderDoneLine(tasks: Task[], events: CalendarEvent[]): string {
   const now = new Date();
-  const nowIso = `${isoDate(now)}T${String(now.getHours()).padStart(2, '0')}:${String(
-    now.getMinutes(),
-  ).padStart(2, '0')}:00`;
   const doneTitles = [
     ...tasks.filter((task) => task.completed).map((task) => task.title),
-    ...events.filter((event) => event.end <= nowIso).map((event) => event.title),
+    // Vergangene Termine: Date-Vergleich versteht UTC (CalDAV) wie lokale Stempel
+    ...events
+      .filter((event) => !event.allDay && new Date(event.end) <= now)
+      .map((event) => event.title),
   ];
   if (doneTitles.length === 0) {
     return '';
@@ -569,7 +597,10 @@ export function renderApp(root: HTMLElement, state: AppState): void {
     // 1. Tag filtern  2. Tags kanonisieren (Alias → aktueller Registry-Name)
     // 3. ggf. Bereichs-Filter ("Sprung") anwenden
     const canonical = (tag: string): string | undefined => state.registry.resolve(tag)?.path;
-    const dayTasks = withCanonicalTags(tasksDueOn(state.data.tasks, dateIso), canonical);
+    const dayTasks = withCanonicalTags(
+      tasksDueOn(state.data.tasks, dateIso, isoDate(today)),
+      canonical,
+    );
     const dayEvents = withCanonicalTags(eventsOn(state.data.events, dateIso), canonical);
     // Der Bereichs-Filter ("Sprung") wirkt auf die Listen – nicht auf die Erledigt-Zeile
     const tasks = filterByArea(dayTasks, state.filterArea);
@@ -605,7 +636,7 @@ export function renderApp(root: HTMLElement, state: AppState): void {
       ${renderFilterChip(state)}
       <div class="columns" data-mobile="${state.mobileColumn}">
         <div class="col-schedule">${renderSchedule(events, state.registry, { creating: state.creatingEvent, dateIso })}</div>
-        <div class="col-main">${renderAreas(grouped, state)}</div>
+        <div class="col-main">${renderAreas(grouped, state, { creating: state.creatingTask, dateIso })}</div>
         ${extras}
       </div>
       ${switcher}`;

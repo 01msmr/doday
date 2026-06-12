@@ -10,9 +10,30 @@ export function isoDate(date: Date = new Date()): ISODate {
   return `${year}-${month}-${day}`;
 }
 
-/** Uhrzeit "HH:MM" aus einem ISO-Zeitstempel wie "2026-06-12T09:30:00" */
+/** Trägt der Zeitstempel eine Zeitzone (Z oder ±hh:mm)? Dann via Date umrechnen. */
+function hasZone(isoDateTime: string): boolean {
+  return /Z$|[+-]\d{2}:?\d{2}$/.test(isoDateTime);
+}
+
+/**
+ * Uhrzeit "HH:MM" – lokale Zeitstempel werden geschnitten,
+ * UTC-Zeitstempel aus CalDAV in die lokale Uhrzeit umgerechnet.
+ */
 export function timeOf(isoDateTime: string): string {
+  if (hasZone(isoDateTime)) {
+    return new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' }).format(
+      new Date(isoDateTime),
+    );
+  }
   return isoDateTime.slice(11, 16);
+}
+
+/** Lokales Datum ("YYYY-MM-DD") eines Zeitstempels – UTC wird umgerechnet */
+export function localDateOf(isoDateTime: string): ISODate {
+  if (hasZone(isoDateTime)) {
+    return isoDate(new Date(isoDateTime));
+  }
+  return isoDateTime.slice(0, 10);
 }
 
 /** Neues Datum, um n Tage verschoben (negativ = zurück). Das Original bleibt unverändert. */

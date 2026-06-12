@@ -4,23 +4,27 @@
 //   Klick → Zustand sofort ändern + neu rendern → Speichern läuft im Hintergrund.
 // Die Speicher-Warteschlange (queue) sorgt dafür, dass sich schnelle Klicks
 // nicht gegenseitig überholen. Bei einem ETag-Konflikt (extern geändert)
-// wird neu geladen.
+// wird die eigene Änderung einmal erneut angewendet, danach ehrlich neu geladen.
 import './style.css';
 // Font Awesome (lokal gebündelt, kein CDN): liefert u. a. das Zahnrad
 import '@fortawesome/fontawesome-free/css/fontawesome.css';
 import '@fortawesome/fontawesome-free/css/solid.css';
 import {
   ApiConflictError,
+  createEvent,
+  createTask,
   loadAchievements,
+  loadAgenda,
   loadTagRegistry,
   saveAchievements,
   saveTagRegistry,
+  toggleTask,
 } from './services/api';
 import { normalizeText, parseTags, replaceTagPrefix } from './services/tagService';
 import { InMemoryTagRegistry } from './services/tagRegistry';
 import { buildEventIcs } from './services/ics';
 import { renderApp, type AppState, type ViewId } from './ui/dayView';
-import { isoDate } from './utils/dates';
+import { isoDate, shiftDays } from './utils/dates';
 import type { Habit } from './models/types';
 
 const root = document.querySelector<HTMLDivElement>('#app');
@@ -29,7 +33,6 @@ if (!root) {
 }
 
 const state: AppState = {
-  // Aufgaben/Termine bleiben leer, bis Phase 3 sie aus CalDAV holt
   data: { events: [], tasks: [], habits: [], achievements: [] },
   registry: new InMemoryTagRegistry(),
   loading: true,
@@ -39,6 +42,7 @@ const state: AppState = {
   editing: null,
   editingHabits: false,
   creatingEvent: false,
+  creatingTask: false,
   mobileColumn: 'main',
   collapsed: new Set(),
 };
@@ -58,6 +62,20 @@ function queue(task: () => Promise<void>): void {
   saveChain = saveChain.then(task).catch(() => {});
 }
 
+/** Zeitfenster der Agenda: heute 0 Uhr bis übermorgen 24 Uhr (lokal) */
+function agendaRange(): { start: Date; end: Date } {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  return { start, end: shiftDays(start, 3) };
+}
+
+async function reloadAgenda(): Promise<void> {
+  const range = agendaRange();
+  const agenda = await loadAgenda(range.start, range.end);
+  state.data.events = agenda.events;
+  state.data.tasks = agenda.tasks;
+}
+
 async function boot(showLoading = true): Promise<void> {
   if (showLoading) {
     state.loading = true;
@@ -74,6 +92,12 @@ async function boot(showLoading = true): Promise<void> {
   } catch {
     state.syncError =
       'Daten konnten nicht geladen werden – läuft das Backend? (npm run dev:server)';
+  }
+  // Kalender getrennt laden: Fehler hier sollen Habits/Ziele nicht blockieren
+  try {
+    await reloadAgenda();
+  } catch {
+    state.syncError = 'Kalender/Aufgaben konnten nicht geladen werden.';
   }
   state.loading = false;
   rerender();
@@ -94,10 +118,6 @@ async function persistAchievements(): Promise<void> {
       try {
         const fresh = await loadAchievements();
         achievementsEtag = await saveAchievements(payload, fresh.etag ?? undefined);
-        if (state.syncError) {
-          state.syncError = null;
-          rerender();
-        }
         return;
       } catch {
         // zweiter Konflikt in Folge → ehrlich neu laden
@@ -117,7 +137,6 @@ async function persistTags(): Promise<void> {
     tagsEtag = await saveTagRegistry(payload, tagsEtag ?? undefined);
   } catch (error) {
     if (error instanceof ApiConflictError) {
-      // frisches ETag holen, eigene Änderung erneut anwenden
       try {
         const fresh = await loadTagRegistry();
         tagsEtag = await saveTagRegistry(payload, fresh.etag ?? undefined);
@@ -188,6 +207,70 @@ function downloadIcs(content: string, filename: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
+/** Tags eines Titels in die Registry aufnehmen (Auto-Aufnahme) + speichern */
+function registerTitleTags(title: string): void {
+  const tags = parseTags(title).tags;
+  for (const tag of tags) {
+    state.registry.register(tag);
+  }
+  if (tags.length > 0) {
+    queue(persistTags);
+  }
+}
+
+/** Felder des Termin-Formulars auslesen */
+function readForm(form: HTMLElement, names: string[]): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const name of names) {
+    values[name] =
+      form.querySelector<HTMLInputElement>(`[data-field="${name}"]`)?.value.trim() ?? '';
+  }
+  return values;
+}
+
+/** Termin in den Nextcloud-Kalender schreiben */
+async function submitEventForm(form: HTMLElement): Promise<void> {
+  const { date, start, end } = readForm(form, ['date', 'start', 'end']);
+  const title = normalizeText(readForm(form, ['title']).title);
+  if (!title || !date || !start || !end) {
+    return;
+  }
+  registerTitleTags(title);
+  try {
+    const result = await createEvent(
+      title,
+      new Date(`${date}T${start}:00`).getTime(),
+      new Date(`${date}T${end}:00`).getTime(),
+    );
+    state.data.events.push(result.event);
+    state.data.events.sort((a, b) => a.start.localeCompare(b.start));
+    state.creatingEvent = false;
+    state.syncError = null;
+  } catch {
+    state.syncError = 'Termin konnte nicht angelegt werden.';
+  }
+  rerender();
+}
+
+/** Aufgabe in Nextcloud Tasks anlegen */
+async function submitTaskForm(form: HTMLElement): Promise<void> {
+  const { due } = readForm(form, ['due']);
+  const title = normalizeText(readForm(form, ['title']).title);
+  if (!title) {
+    return;
+  }
+  registerTitleTags(title);
+  try {
+    const result = await createTask(title, due || undefined);
+    state.data.tasks.push(result.task);
+    state.creatingTask = false;
+    state.syncError = null;
+  } catch {
+    state.syncError = 'Aufgabe konnte nicht angelegt werden.';
+  }
+  rerender();
+}
+
 root.addEventListener('click', (event) => {
   const target = event.target as HTMLElement;
 
@@ -238,7 +321,28 @@ root.addEventListener('click', (event) => {
   if (action === 'toggle-event-form') {
     state.creatingEvent = !state.creatingEvent;
     rerender();
-    root!.querySelector<HTMLInputElement>('.event-form [data-field="title"]')?.focus();
+    root!.querySelector<HTMLInputElement>('[data-event-form] [data-field="title"]')?.focus();
+  }
+
+  if (action === 'toggle-task-form') {
+    state.creatingTask = !state.creatingTask;
+    rerender();
+    root!.querySelector<HTMLInputElement>('[data-task-form] [data-field="title"]')?.focus();
+  }
+
+  if (action === 'event-ics') {
+    // Alternative zum NC-Speichern: .ics herunterladen → Geräte-Kalender importiert
+    const form = trigger.closest<HTMLElement>('[data-event-form]');
+    if (form) {
+      const { date, start, end } = readForm(form, ['date', 'start', 'end']);
+      const title = normalizeText(readForm(form, ['title']).title);
+      if (title && date && start && end) {
+        registerTitleTags(title);
+        downloadIcs(buildEventIcs({ title, date, start, end }), `termin-${date}.ics`);
+        state.creatingEvent = false;
+        rerender();
+      }
+    }
   }
 
   if (action === 'switch-column') {
@@ -280,7 +384,25 @@ root.addEventListener('click', (event) => {
     if (task) {
       task.completed = !task.completed;
       rerender();
-      // Persistenz folgt in Phase 3 (CalDAV)
+      // In Nextcloud Tasks zurückschreiben (VTODO via CalDAV)
+      const href = task.href;
+      const desired = task.completed;
+      if (href) {
+        queue(async () => {
+          try {
+            await toggleTask(href, desired);
+          } catch {
+            // Konflikt oder Fehler: ehrlichen Stand aus der Nextcloud holen
+            try {
+              await reloadAgenda();
+            } catch {
+              /* Agenda nicht erreichbar – Hinweis reicht */
+            }
+            state.syncError = 'Abhaken konnte nicht gespeichert werden.';
+            rerender();
+          }
+        });
+      }
     }
   }
 
@@ -309,37 +431,17 @@ root.addEventListener('click', (event) => {
   }
 });
 
-// Termin-Formular: abschicken erzeugt die .ics für den Geräte-Kalender
+// Formulare: Termin → Nextcloud-Kalender, Aufgabe → Nextcloud Tasks
 root.addEventListener('submit', (event) => {
   const form = event.target as HTMLElement;
-  if (!form.matches('[data-event-form]')) {
-    return;
+  if (form.matches('[data-event-form]')) {
+    event.preventDefault();
+    void submitEventForm(form);
   }
-  event.preventDefault();
-  const field = (name: string): string =>
-    form.querySelector<HTMLInputElement>(`[data-field="${name}"]`)?.value.trim() ?? '';
-
-  // Kanonische Form: Tags wandern ans Ende
-  const title = normalizeText(field('title'));
-  const date = field('date');
-  const start = field('start');
-  const end = field('end');
-  if (!title || !date || !start || !end) {
-    return;
+  if (form.matches('[data-task-form]')) {
+    event.preventDefault();
+    void submitTaskForm(form);
   }
-
-  // Unbekannte Tags automatisch in die Registry aufnehmen (Konzept: Auto-Aufnahme)
-  const tags = parseTags(title).tags;
-  for (const tag of tags) {
-    state.registry.register(tag);
-  }
-  if (tags.length > 0) {
-    queue(persistTags);
-  }
-
-  downloadIcs(buildEventIcs({ title, date, start, end }), `termin-${date}.ics`);
-  state.creatingEvent = false;
-  rerender();
 });
 
 // Habit-Editor: Änderungen an Farbe/Name/Zeitraum/Ziel übernehmen.

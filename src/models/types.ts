@@ -53,6 +53,8 @@ export interface Task {
   completed: boolean;
   /** Fälligkeitsdatum, falls gesetzt */
   due?: ISODate;
+  /** CalDAV-Pfad der Aufgabe in der Nextcloud – nötig zum Abhaken */
+  href?: string;
 }
 
 /** Termin (später: Nextcloud Kalender / VEVENT, erstmal nur lesend). */

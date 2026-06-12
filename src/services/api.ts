@@ -6,7 +6,12 @@
 // Dateistands) und schicken es beim Speichern als If-Match mit. Wurde die
 // Datei zwischenzeitlich extern geändert, antwortet das Backend mit 409 →
 // ApiConflictError → der Aufrufer lädt neu.
-import type { AchievementsFile, TagRegistryData } from '../models/types';
+import type {
+  AchievementsFile,
+  CalendarEvent,
+  Task,
+  TagRegistryData,
+} from '../models/types';
 
 /** Die Datei wurde extern geändert – neu laden und erneut anwenden */
 export class ApiConflictError extends Error {}
@@ -53,4 +58,52 @@ export function loadTagRegistry(): Promise<{ data: TagRegistryData; etag: string
 
 export function saveTagRegistry(data: TagRegistryData, etag?: string): Promise<string | null> {
   return saveJson('tags', data, etag);
+}
+
+/* ---------- CalDAV (Phase 3): Termine + Aufgaben ---------- */
+
+async function postJson<T>(route: string, body: unknown): Promise<T> {
+  const res = await fetch(`/api/v1/${route}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 409) {
+    throw new ApiConflictError(`${route}: wurde extern geändert`);
+  }
+  if (!res.ok) {
+    throw new Error(`${route} fehlgeschlagen (${res.status})`);
+  }
+  return (await res.json()) as T;
+}
+
+/** Termine + Aufgaben des Zeitfensters aus allen Nextcloud-Kalendern */
+export async function loadAgenda(
+  start: Date,
+  end: Date,
+): Promise<{ events: CalendarEvent[]; tasks: Task[] }> {
+  const res = await fetch(`/api/v1/agenda?start=${start.getTime()}&end=${end.getTime()}`);
+  if (!res.ok) {
+    throw new Error(`Agenda laden fehlgeschlagen (${res.status})`);
+  }
+  return (await res.json()) as { events: CalendarEvent[]; tasks: Task[] };
+}
+
+/** Aufgabe in Nextcloud Tasks anlegen */
+export function createTask(title: string, due?: string): Promise<{ task: Task }> {
+  return postJson('tasks', { title, due });
+}
+
+/** Aufgabe abhaken / wieder öffnen (per CalDAV-Pfad) */
+export function toggleTask(href: string, completed: boolean): Promise<{ ok: boolean }> {
+  return postJson('tasks/toggle', { href, completed });
+}
+
+/** Termin direkt im Nextcloud-Kalender anlegen (Zeiten als Epoch-Millisekunden) */
+export function createEvent(
+  title: string,
+  start: number,
+  end: number,
+): Promise<{ event: CalendarEvent }> {
+  return postJson('events', { title, start, end });
 }
