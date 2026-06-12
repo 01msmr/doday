@@ -30,7 +30,8 @@ Sektionen, von oben nach unten:
      gefüllt = Tag steht im `log`), rechts Zähler „erledigt/Ziel" (`target`).
    - Monat: Balken mit Zahl – täglich: „12 von 30 Tagen";
      wöchentlich: „Ziel 3×/Woche: 11 von 12" (Soll = target × Kalenderwochen im Monat).
-   - Abhaken für **heute** direkt am Habit, nur im aktuellen Zeitraum.
+   - Abhaken für **heute** direkt am Habit, nur im aktuellen Zeitraum
+     und nur in der Wochen-Ansicht (die Monats-Balken sind reine Bilanz).
      In Vorzeiträumen kein Habit-Abhaken (Vergangenheit bleibt unverändert).
 2. **Ziele**: vorhandene Pillen-Balken-Sektion wiederverwendet.
    Ziele haben keine Historie → immer aktueller Stand, auch in Vorzeiträumen.
