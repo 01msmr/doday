@@ -6,6 +6,8 @@ import {
   setTodoCompleted,
   buildTodoIcs,
   parseMultistatus,
+  updateTodoIcs,
+  updateEventIcs,
 } from './ical';
 
 const EVENT_ICS = [
@@ -135,6 +137,59 @@ describe('buildEventIcsUtc', () => {
     expect(ics).toContain('DTSTART:20260613T073000Z');
     expect(ics).toContain('DTEND:20260613T081500Z');
     expect(ics).toContain('SUMMARY:Zahnarzt #Gesundheit');
+  });
+});
+
+describe('updateTodoIcs', () => {
+  it('ersetzt SUMMARY und DUE, alle anderen Zeilen bleiben unangetastet', () => {
+    const updated = updateTodoIcs(TODO_ICS, { title: 'Keller fegen #Zuhause', due: '2026-06-20' });
+    expect(updated).toContain('SUMMARY:Keller fegen #Zuhause');
+    expect(updated).toContain('DUE;VALUE=DATE:20260620');
+    expect(updated).not.toContain('Keller entrümpeln');
+    expect(updated).toContain('UID:todo-1'); // unangetastet
+    expect(updated).toContain('DTSTAMP:20260601T080000Z'); // unangetastet
+  });
+
+  it('entfernt DUE, wenn kein Datum mehr gesetzt ist', () => {
+    const updated = updateTodoIcs(TODO_ICS, { title: 'Keller entrümpeln #Zuhause.Aufräumen' });
+    expect(updated).not.toContain('DUE');
+  });
+
+  it('fügt DUE hinzu, wenn die Aufgabe vorher keines hatte', () => {
+    const ohneDue = TODO_ICS.replace('DUE;VALUE=DATE:20260613\r\n', '');
+    const updated = updateTodoIcs(ohneDue, { title: 'Neu #X', due: '2026-07-01' });
+    expect(updated).toContain('DUE;VALUE=DATE:20260701');
+  });
+
+  it('escapet Sonderzeichen im neuen Titel', () => {
+    const updated = updateTodoIcs(TODO_ICS, { title: 'a, b; c' });
+    expect(updated).toContain('SUMMARY:a\\, b\\; c');
+  });
+});
+
+describe('updateEventIcs', () => {
+  it('ersetzt SUMMARY, DTSTART und DTEND (UTC) bei getimten Terminen', () => {
+    const updated = updateEventIcs(EVENT_ICS, {
+      title: 'Daily #Arbeit',
+      startUtc: new Date(Date.UTC(2026, 5, 13, 8, 0)),
+      endUtc: new Date(Date.UTC(2026, 5, 13, 8, 30)),
+    });
+    expect(updated).toContain('SUMMARY:Daily #Arbeit');
+    expect(updated).toContain('DTSTART:20260613T080000Z');
+    expect(updated).toContain('DTEND:20260613T083000Z');
+    expect(updated).toContain('UID:abc-123'); // unangetastet
+    expect(updated).not.toContain('Standup');
+  });
+
+  it('hält ganztägige Termine ganztägig (VALUE=DATE, DTEND = Folgetag)', () => {
+    const allDay = EVENT_ICS.replace(
+      'DTSTART:20260612T070000Z',
+      'DTSTART;VALUE=DATE:20260613',
+    ).replace('DTEND:20260612T071500Z', 'DTEND;VALUE=DATE:20260614');
+    const updated = updateEventIcs(allDay, { title: 'Brückentag', date: '2026-06-19' });
+    expect(updated).toContain('SUMMARY:Brückentag');
+    expect(updated).toContain('DTSTART;VALUE=DATE:20260619');
+    expect(updated).toContain('DTEND;VALUE=DATE:20260620'); // exklusives Ende = Folgetag
   });
 });
 

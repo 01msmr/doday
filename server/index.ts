@@ -18,6 +18,8 @@ import {
   parseEvents,
   parseTodo,
   setTodoCompleted,
+  updateEventIcs,
+  updateTodoIcs,
 } from './ical';
 // Dieselbe Tag-Logik wie im Frontend – ein Repo, eine Wahrheit
 import { parseTags } from '../src/services/tagService';
@@ -101,16 +103,23 @@ app.get('/api/v1/agenda', async (c) => {
   for (const calendar of await calendars()) {
     if (calendar.components.includes('VEVENT')) {
       for (const object of await caldav.reportEvents(calendar.href, start, end)) {
-        for (const event of parseEvents(object.data)) {
+        const instances = parseEvents(object.data);
+        // Serie? Mehrere expandierte Instanzen ODER Serien-Marker in der Datei.
+        // Serien sind im Frontend nicht editierbar (kein Stift).
+        const recurring =
+          instances.length > 1 || /^(RRULE|RECURRENCE-ID)[;:]/m.test(object.data);
+        for (const event of instances) {
           const { cleanText, tags } = parseTags(event.summary);
           events.push({
             id: `${object.href}#${event.start}`,
+            href: object.href,
             rawText: event.summary,
             title: cleanText,
             tags,
             start: event.start,
             end: event.end,
             allDay: event.allDay,
+            recurring,
           });
         }
       }
@@ -174,6 +183,41 @@ app.post('/api/v1/tasks/toggle', async (c) => {
   }
 });
 
+/** Aufgabe bearbeiten: Titel (inkl. #Tags) und Fälligkeit umschreiben */
+app.post('/api/v1/tasks/update', async (c) => {
+  const { href, title, due } = (await c.req.json()) as {
+    href?: string;
+    title?: string;
+    due?: string;
+  };
+  if (!href || !title?.trim()) {
+    return c.json({ error: 'href und Titel werden benötigt' }, 400);
+  }
+  try {
+    const current = await caldav.getObject(href);
+    const updated = updateTodoIcs(current.data, { title, due });
+    await caldav.putObject(href, updated, current.etag ?? undefined);
+    const todo = parseTodo(updated);
+    const { cleanText, tags } = parseTags(title);
+    return c.json({
+      task: {
+        id: href,
+        href,
+        rawText: title,
+        title: cleanText,
+        tags,
+        completed: todo?.completed ?? false,
+        due,
+      },
+    });
+  } catch (error) {
+    if (error instanceof WebDavConflictError) {
+      return c.json({ error: 'Konflikt – Aufgabe wurde extern geändert' }, 409);
+    }
+    throw error;
+  }
+});
+
 /** Neuer Termin direkt im Nextcloud-Kalender (synct von dort auf alle Geräte) */
 app.post('/api/v1/events', async (c) => {
   const { title, start, end } = (await c.req.json()) as {
@@ -206,6 +250,51 @@ app.post('/api/v1/events', async (c) => {
       allDay: false,
     },
   });
+});
+
+/** Einzeltermin bearbeiten – Serien lehnt der Server ab (Schutz vor Massenänderung) */
+app.post('/api/v1/events/update', async (c) => {
+  const { href, title, start, end, date } = (await c.req.json()) as {
+    href?: string;
+    title?: string;
+    start?: number;
+    end?: number;
+    date?: string;
+  };
+  if (!href || !title?.trim() || (!date && (!start || !end))) {
+    return c.json({ error: 'href, Titel und Zeitangaben werden benötigt' }, 400);
+  }
+  try {
+    const current = await caldav.getObject(href);
+    if (/^(RRULE|RECURRENCE-ID)[;:]/m.test(current.data)) {
+      return c.json({ error: 'Serientermine bitte direkt in der Nextcloud ändern' }, 400);
+    }
+    const startUtc = start ? new Date(start) : undefined;
+    const endUtc = end ? new Date(end) : undefined;
+    const updated = updateEventIcs(current.data, { title, startUtc, endUtc, date });
+    await caldav.putObject(href, updated, current.etag ?? undefined);
+
+    const event = parseEvents(updated)[0];
+    const { cleanText, tags } = parseTags(title);
+    return c.json({
+      event: {
+        id: `${href}#${event.start}`,
+        href,
+        rawText: title,
+        title: cleanText,
+        tags,
+        start: event.start,
+        end: event.end,
+        allDay: event.allDay,
+        recurring: false,
+      },
+    });
+  } catch (error) {
+    if (error instanceof WebDavConflictError) {
+      return c.json({ error: 'Konflikt – Termin wurde extern geändert' }, 409);
+    }
+    throw error;
+  }
 });
 
 /** Unerwartete Fehler (z. B. Nextcloud nicht erreichbar) → 502 mit Klartext */
