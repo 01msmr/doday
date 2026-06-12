@@ -137,6 +137,80 @@ export function setTodoCompleted(ics: string, completed: boolean, now: Date): st
   return result.join('\r\n');
 }
 
+/**
+ * Aufgabe umschreiben (Titel + Fälligkeit) – gleiche Zeilen-Chirurgie wie beim
+ * Abhaken: nur SUMMARY/DUE werden ersetzt, alles andere bleibt unangetastet.
+ */
+export function updateTodoIcs(ics: string, fields: { title: string; due?: string }): string {
+  const lines = unfold(ics).split(/\r?\n/);
+  const result: string[] = [];
+  let inTodo = false;
+  for (const line of lines) {
+    if (line === 'BEGIN:VTODO') {
+      inTodo = true;
+    }
+    // Alte SUMMARY-/DUE-Zeilen im VTODO entfernen – sie werden neu gesetzt
+    if (inTodo && /^(SUMMARY|DUE)[;:]/.test(line)) {
+      continue;
+    }
+    if (inTodo && line === 'END:VTODO') {
+      result.push(`SUMMARY:${escapeText(fields.title)}`);
+      if (fields.due) {
+        result.push(`DUE;VALUE=DATE:${fields.due.replaceAll('-', '')}`);
+      }
+      inTodo = false;
+    }
+    result.push(line);
+  }
+  return result.join('\r\n');
+}
+
+/** Folgetag eines ISO-Datums – DTEND ganztägiger Termine ist EXKLUSIV */
+function nextDayStamp(isoDate: string): string {
+  const date = new Date(`${isoDate}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10).replaceAll('-', '');
+}
+
+/**
+ * Termin umschreiben (Titel + Zeiten). Getimte Termine bekommen UTC-Stempel,
+ * ganztägige bleiben ganztägig (VALUE=DATE, exklusives Ende = Folgetag).
+ * Nur für Einzeltermine gedacht – Serien (RRULE) prüft der Aufrufer vorher.
+ */
+export function updateEventIcs(
+  ics: string,
+  fields: { title: string; startUtc?: Date; endUtc?: Date; date?: string },
+): string {
+  const lines = unfold(ics).split(/\r?\n/);
+  const result: string[] = [];
+  let inEvent = false;
+  for (const line of lines) {
+    if (line === 'BEGIN:VEVENT') {
+      inEvent = true;
+    }
+    if (inEvent && /^(SUMMARY|DTSTART|DTEND)[;:]/.test(line)) {
+      continue;
+    }
+    if (inEvent && line === 'END:VEVENT') {
+      result.push(`SUMMARY:${escapeText(fields.title)}`);
+      if (fields.date) {
+        result.push(
+          `DTSTART;VALUE=DATE:${fields.date.replaceAll('-', '')}`,
+          `DTEND;VALUE=DATE:${nextDayStamp(fields.date)}`,
+        );
+      } else if (fields.startUtc && fields.endUtc) {
+        result.push(
+          `DTSTART:${dateToUtcStamp(fields.startUtc)}`,
+          `DTEND:${dateToUtcStamp(fields.endUtc)}`,
+        );
+      }
+      inEvent = false;
+    }
+    result.push(line);
+  }
+  return result.join('\r\n');
+}
+
 /** Text für SUMMARY escapen */
 function escapeText(text: string): string {
   return text
