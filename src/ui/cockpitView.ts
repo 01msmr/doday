@@ -25,9 +25,11 @@ import {
   areaColor,
   dayMonthOf,
   escapeHtml,
+  eventPen,
   FALLBACK_COLOR,
   monthOf,
   renderAchievements,
+  renderEventEditForm,
   renderEventForm,
   renderMasthead,
   renderTask,
@@ -75,11 +77,16 @@ function renderPeriodMasthead(
 }
 
 /** Eine Tagesgruppe der Aufgaben-Sektion */
-function renderTaskGroup(label: string, tasks: Task[], variant = ''): string {
+function renderTaskGroup(
+  label: string,
+  tasks: Task[],
+  editingId: string | null,
+  variant = '',
+): string {
   return `
     <div class="day-group${variant ? ` day-group--${variant}` : ''}">
       <h3 class="day-group-label">${label}</h3>
-      <ul class="task-list">${tasks.map(renderTask).join('')}</ul>
+      <ul class="task-list">${tasks.map((task) => renderTask(task, editingId)).join('')}</ul>
     </div>`;
 }
 
@@ -87,11 +94,11 @@ function renderTaskGroup(label: string, tasks: Task[], variant = ''): string {
 function renderRangeTasks(
   rangeTasks: RangeTasks,
   today: string,
-  opts: { creating: boolean },
+  opts: { creating: boolean; editing: string | null },
 ): string {
   const groups: string[] = [];
   if (rangeTasks.overdue.length > 0) {
-    groups.push(renderTaskGroup('Überfällig', rangeTasks.overdue, 'overdue'));
+    groups.push(renderTaskGroup('Überfällig', rangeTasks.overdue, opts.editing, 'overdue'));
   }
   for (const day of rangeTasks.days) {
     const date = dateAt(day.date);
@@ -99,7 +106,7 @@ function renderRangeTasks(
       day.date === today
         ? `Heute &middot; ${weekdayOf(date)}`
         : `${weekdayOf(date)}, ${dayMonthOf(date)}`;
-    groups.push(renderTaskGroup(label, day.tasks));
+    groups.push(renderTaskGroup(label, day.tasks, opts.editing));
   }
   return `
     <section class="panel">
@@ -201,23 +208,24 @@ function renderRangeEvents(
   days: DayEvents[],
   registry: InMemoryTagRegistry,
   today: string,
-  opts: { creating: boolean },
+  opts: { creating: boolean; editing: string | null },
 ): string {
   const rows = days
     .map((day) => {
       const date = dateAt(day.date);
       const entries = day.events
-        .map(
-          (event) =>
-            `<span class="day-event"><span class="area-dot" style="--c:${
-              event.tags[0] ? areaColor(registry, event.tags[0]) : FALLBACK_COLOR
-            }"></span>${event.allDay ? '' : `${timeOf(event.start)}&nbsp;`}${escapeHtml(event.title)}</span>`,
+        .map((event) =>
+          event.id === opts.editing
+            ? renderEventEditForm(event)
+            : `<span class="day-event"><span class="area-dot" style="--c:${
+                event.tags[0] ? areaColor(registry, event.tags[0]) : FALLBACK_COLOR
+              }"></span>${event.allDay ? '' : `${timeOf(event.start)}&nbsp;`}${escapeHtml(event.title)}${eventPen(event)}</span>`,
         )
         .join('<span class="done-sep"> &middot; </span>');
       return `
       <li class="day-events-row${day.date === today ? ' today' : ''}">
         <span class="day-events-date">${weekdayShortOf(date)}&nbsp;${date.getDate()}.</span>
-        <span class="day-events-list">${entries}</span>
+        <div class="day-events-list">${entries}</div>
       </li>`;
     })
     .join('');
@@ -259,6 +267,6 @@ export function renderCockpit(state: AppState, syncNote: string): string {
     ${syncNote}
     ${renderCockpitHabits(state.data.habits, range, kind, today, isCurrent)}
     ${renderAchievements(state.data.achievements, state.data.habits, taskStats)}
-    ${renderRangeTasks(rangeTasks, today, { creating: state.creatingTask })}
-    ${renderRangeEvents(rangeEvents, state.registry, today, { creating: state.creatingEvent })}`;
+    ${renderRangeTasks(rangeTasks, today, { creating: state.creatingTask, editing: state.editingTask })}
+    ${renderRangeEvents(rangeEvents, state.registry, today, { creating: state.creatingEvent, editing: state.editingEvent })}`;
 }

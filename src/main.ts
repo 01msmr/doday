@@ -19,6 +19,8 @@ import {
   saveAchievements,
   saveTagRegistry,
   toggleTask,
+  updateEvent,
+  updateTask,
 } from './services/api';
 import { normalizeText, parseTags, replaceTagPrefix } from './services/tagService';
 import { monthRange, weekRange } from './services/selectors';
@@ -45,6 +47,8 @@ const state: AppState = {
   editingHabits: false,
   creatingEvent: false,
   creatingTask: false,
+  editingTask: null,
+  editingEvent: null,
   mobileColumn: 'main',
   collapsed: new Set(),
 };
@@ -291,6 +295,61 @@ async function submitEventForm(form: HTMLElement): Promise<void> {
   rerender();
 }
 
+/** Bearbeitete Aufgabe in die Nextcloud zurückschreiben (Titel + Fälligkeit) */
+async function submitTaskEditForm(form: HTMLElement): Promise<void> {
+  const task = state.data.tasks.find((t) => t.id === form.dataset.id);
+  const title = normalizeText(readForm(form, ['title']).title);
+  if (!task?.href || !title) {
+    return;
+  }
+  const { due } = readForm(form, ['due']);
+  registerTitleTags(title);
+  try {
+    const result = await updateTask(task.href, title, due || undefined);
+    Object.assign(task, result.task);
+    state.editingTask = null;
+    state.syncError = null;
+  } catch (error) {
+    state.syncError =
+      error instanceof ApiConflictError
+        ? 'Aufgabe wurde extern geändert – bitte neu laden und erneut bearbeiten.'
+        : 'Aufgabe konnte nicht gespeichert werden.';
+  }
+  rerender();
+}
+
+/** Bearbeiteten Einzeltermin zurückschreiben (Titel + Datum/Zeiten) */
+async function submitEventEditForm(form: HTMLElement): Promise<void> {
+  const index = state.data.events.findIndex((e) => e.id === form.dataset.id);
+  const event = state.data.events[index];
+  const title = normalizeText(readForm(form, ['title']).title);
+  const { date, start, end } = readForm(form, ['date', 'start', 'end']);
+  if (!event?.href || !title || !date || (!event.allDay && (!start || !end))) {
+    return;
+  }
+  registerTitleTags(title);
+  try {
+    // Ganztägige bleiben ganztägig (nur Datum), getimte bekommen neue Zeiten
+    const times = event.allDay
+      ? { date }
+      : {
+          start: new Date(`${date}T${start}:00`).getTime(),
+          end: new Date(`${date}T${end}:00`).getTime(),
+        };
+    const result = await updateEvent(event.href, title, times);
+    state.data.events[index] = result.event;
+    state.data.events.sort((a, b) => a.start.localeCompare(b.start));
+    state.editingEvent = null;
+    state.syncError = null;
+  } catch (error) {
+    state.syncError =
+      error instanceof ApiConflictError
+        ? 'Termin wurde extern geändert – bitte neu laden und erneut bearbeiten.'
+        : 'Termin konnte nicht gespeichert werden.';
+  }
+  rerender();
+}
+
 /** Aufgabe in Nextcloud Tasks anlegen */
 async function submitTaskForm(form: HTMLElement): Promise<void> {
   const { due } = readForm(form, ['due']);
@@ -379,6 +438,27 @@ root.addEventListener('click', (event) => {
     state.creatingTask = !state.creatingTask;
     rerender();
     root!.querySelector<HTMLInputElement>('[data-task-form] [data-field="title"]')?.focus();
+  }
+
+  if (action === 'edit-task' && id) {
+    // Stift öffnet das Inline-Formular – zweiter Klick schließt es wieder
+    state.editingTask = state.editingTask === id ? null : id;
+    state.editingEvent = null;
+    rerender();
+    root!.querySelector<HTMLInputElement>('[data-task-edit-form] [data-field="title"]')?.focus();
+  }
+
+  if (action === 'edit-event' && id) {
+    state.editingEvent = state.editingEvent === id ? null : id;
+    state.editingTask = null;
+    rerender();
+    root!.querySelector<HTMLInputElement>('[data-event-edit-form] [data-field="title"]')?.focus();
+  }
+
+  if (action === 'cancel-edit') {
+    state.editingTask = null;
+    state.editingEvent = null;
+    rerender();
   }
 
   if (action === 'event-ics') {
@@ -492,6 +572,14 @@ root.addEventListener('submit', (event) => {
   if (form.matches('[data-task-form]')) {
     event.preventDefault();
     void submitTaskForm(form);
+  }
+  if (form.matches('[data-task-edit-form]')) {
+    event.preventDefault();
+    void submitTaskEditForm(form);
+  }
+  if (form.matches('[data-event-edit-form]')) {
+    event.preventDefault();
+    void submitEventEditForm(form);
   }
 });
 

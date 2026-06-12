@@ -107,3 +107,20 @@ export function createEvent(
 ): Promise<{ event: CalendarEvent }> {
   return postJson('events', { title, start, end });
 }
+
+/** Aufgabe bearbeiten: Titel (inkl. #Tags) und Fälligkeit umschreiben */
+export function updateTask(href: string, title: string, due?: string): Promise<{ task: Task }> {
+  return postJson('tasks/update', { href, title, due });
+}
+
+/**
+ * Einzeltermin bearbeiten – getimt (start/end als Epoch-Millisekunden)
+ * oder ganztägig (date als ISO-Datum). Serien lehnt der Server ab.
+ */
+export function updateEvent(
+  href: string,
+  title: string,
+  times: { start: number; end: number } | { date: string },
+): Promise<{ event: CalendarEvent }> {
+  return postJson('events/update', { href, title, ...times });
+}
