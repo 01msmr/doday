@@ -13,7 +13,7 @@ import type { Achievement, AppData, CalendarEvent, Habit, Task } from '../models
 import type { InMemoryTagRegistry } from '../services/tagRegistry';
 import { eventsOn, filterByArea, tasksDueOn, withCanonicalTags } from '../services/selectors';
 import { groupByArea, type AreaGroup, type GroupedDay } from './grouping';
-import { isoDate, shiftDays, startOfWeek, timeOf } from '../utils/dates';
+import { isoDate, localDateOf, shiftDays, startOfWeek, timeOf } from '../utils/dates';
 import { safeColor } from '../utils/colors';
 import { renderCockpit } from './cockpitView';
 
@@ -42,6 +42,10 @@ export interface AppState {
   creatingEvent: boolean;
   /** Formular "Aufgabe anlegen" offen? */
   creatingTask: boolean;
+  /** Aufgabe, die gerade bearbeitet wird (id) – null = keine */
+  editingTask: string | null;
+  /** Termin, der gerade bearbeitet wird (id) – null = keiner */
+  editingEvent: string | null;
   /** Schmale Bildschirme (Hochformat): welche Spalte ist sichtbar? */
   mobileColumn: 'main' | 'side';
   /** Vom Nutzer zugeklappte Bereiche (alles andere ist offen) */
@@ -147,21 +151,74 @@ export function renderTaskForm(dateIso: string): string {
     </form>`;
 }
 
+/** Stift im kleinen Kreis: öffnet das Bearbeiten einer Aufgabe / eines Termins */
+export function renderEditPen(action: string, id: string): string {
+  return `
+      <button type="button" class="edit-pen" data-action="${action}"
+        data-id="${escapeHtml(id)}" aria-label="Bearbeiten">&#9998;</button>`;
+}
+
+/** Inline-Formular: Aufgabe bearbeiten – Titel (inkl. #Tags) und Fälligkeit */
+export function renderTaskEditForm(task: Task): string {
+  return `
+    <form class="event-form" data-task-edit-form data-id="${escapeHtml(task.id)}">
+      <input type="text" data-field="title" value="${escapeHtml(task.rawText)}"
+        aria-label="Aufgabentitel, #Tags erlaubt" required />
+      <div class="event-form-row">
+        <input type="date" data-field="due" value="${task.due ?? ''}" aria-label="Fällig am" />
+      </div>
+      <div class="event-form-actions">
+        <button type="submit" class="btn-primary">Speichern</button>
+        <button type="button" class="btn-quiet" data-action="cancel-edit">Abbrechen</button>
+      </div>
+    </form>`;
+}
+
+/** Inline-Formular: Einzeltermin bearbeiten – ganztägige nur mit Datum */
+export function renderEventEditForm(event: CalendarEvent): string {
+  const times = event.allDay
+    ? ''
+    : `<input type="time" data-field="start" value="${timeOf(event.start)}" aria-label="Beginn" required />
+        <span class="event-form-sep">&ndash;</span>
+        <input type="time" data-field="end" value="${timeOf(event.end)}" aria-label="Ende" required />`;
+  return `
+    <form class="event-form" data-event-edit-form data-id="${escapeHtml(event.id)}">
+      <input type="text" data-field="title" value="${escapeHtml(event.rawText)}"
+        aria-label="Termintitel, #Tags erlaubt" required />
+      <div class="event-form-row">
+        <input type="date" data-field="date" value="${localDateOf(event.start)}" aria-label="Datum" required />
+        ${times}
+      </div>
+      <div class="event-form-actions">
+        <button type="submit" class="btn-primary">Speichern</button>
+        <button type="button" class="btn-quiet" data-action="cancel-edit">Abbrechen</button>
+      </div>
+    </form>`;
+}
+
+/** Stift nur für bearbeitbare Termine: Einzeltermine mit CalDAV-Pfad (keine Serien) */
+export function eventPen(event: CalendarEvent): string {
+  return event.href && !event.recurring ? renderEditPen('edit-event', event.id) : '';
+}
+
 /** Kompakte Termin-Liste – chronologisch, mit Bereichsfarbe als Punkt.
     Der ＋-Kreis rechts neben der Überschrift öffnet das Termin-Formular. */
 function renderSchedule(
   events: CalendarEvent[],
   registry: InMemoryTagRegistry,
-  opts: { creating: boolean; dateIso: string },
+  opts: { creating: boolean; dateIso: string; editing: string | null },
 ): string {
   const rows = events
-    .map(
-      (event) => `
+    .map((event) =>
+      event.id === opts.editing
+        ? `<li>${renderEventEditForm(event)}</li>`
+        : `
       <li class="timeline-row">
         <span class="time">${event.allDay ? 'Tag' : timeOf(event.start)}</span>
         <span class="area-dot" style="--c:${event.tags[0] ? areaColor(registry, event.tags[0]) : FALLBACK_COLOR}"></span>
         <span class="row-title">${escapeHtml(event.title)}</span>
         <span class="time-soft">${event.allDay ? 'ganztägig' : `bis ${timeOf(event.end)}`}</span>
+        ${eventPen(event)}
       </li>`,
     )
     .join('');
@@ -178,15 +235,20 @@ function renderSchedule(
 
 /* ---------- Aufgaben & Bereiche ---------- */
 
-/** Eine abhakbare Aufgabenzeile (Button statt Checkbox: größere Tippfläche, frei stylebar) */
-export function renderTask(task: Task): string {
+/** Eine abhakbare Aufgabenzeile (Button statt Checkbox: größere Tippfläche, frei stylebar).
+    Während des Bearbeitens ersetzt das Inline-Formular die Zeile. */
+export function renderTask(task: Task, editingId: string | null = null): string {
+  if (task.id === editingId) {
+    return `<li>${renderTaskEditForm(task)}</li>`;
+  }
   return `
-    <li>
+    <li class="task-row">
       <button type="button" class="task${task.completed ? ' done' : ''}"
         data-action="toggle-task" data-id="${task.id}" aria-pressed="${task.completed}">
         <span class="check" aria-hidden="true"></span>
         <span class="task-title">${escapeHtml(task.title)}</span>
       </button>
+      ${task.href ? renderEditPen('edit-task', task.id) : ''}
     </li>`;
 }
 
@@ -224,7 +286,7 @@ function renderArea(group: AreaGroup, state: AppState): string {
       </summary>
       <div class="area-body">
         ${group.events.length > 0 ? `<ol class="group-events">${group.events.map(renderGroupEvent).join('')}</ol>` : ''}
-        ${renderTaskLists(group.tasks)}
+        ${renderTaskLists(group.tasks, state.editingTask)}
         ${group.children.map((child) => renderArea(child, state)).join('')}
       </div>
     </details>`;
@@ -234,12 +296,13 @@ function renderArea(group: AreaGroup, state: AppState): string {
  * Offene Aufgaben links; erledigte darunter als Block nach rechts gerückt –
  * der Block selbst ist in sich linksbündig (gemeinsame linke Kante).
  */
-function renderTaskLists(tasks: Task[]): string {
+function renderTaskLists(tasks: Task[], editingId: string | null): string {
   const open = tasks.filter((task) => !task.completed);
   const done = tasks.filter((task) => task.completed);
+  const row = (task: Task): string => renderTask(task, editingId);
   return `
-    ${open.length > 0 ? `<ul class="task-list">${open.map(renderTask).join('')}</ul>` : ''}
-    ${done.length > 0 ? `<ul class="task-list task-list--done">${done.map(renderTask).join('')}</ul>` : ''}`;
+    ${open.length > 0 ? `<ul class="task-list">${open.map(row).join('')}</ul>` : ''}
+    ${done.length > 0 ? `<ul class="task-list task-list--done">${done.map(row).join('')}</ul>` : ''}`;
 }
 
 /** Objekte ohne Tag – bewusst ganz unten und zurückhaltend gestaltet */
@@ -258,7 +321,7 @@ function renderUntagged(grouped: GroupedDay, state: AppState): string {
       </summary>
       <div class="area-body">
         ${events.length > 0 ? `<ol class="group-events">${events.map(renderGroupEvent).join('')}</ol>` : ''}
-        ${renderTaskLists(tasks)}
+        ${renderTaskLists(tasks, state.editingTask)}
       </div>
     </details>`;
 }
@@ -629,7 +692,7 @@ export function renderApp(root: HTMLElement, state: AppState): void {
       ${state.view === 'day' ? renderDoneLine(dayTasks, dayEvents) : ''}
       ${renderFilterChip(state)}
       <div class="columns" data-mobile="${state.mobileColumn}">
-        <div class="col-schedule">${renderSchedule(events, state.registry, { creating: state.creatingEvent, dateIso })}</div>
+        <div class="col-schedule">${renderSchedule(events, state.registry, { creating: state.creatingEvent, dateIso, editing: state.editingEvent })}</div>
         <div class="col-main">${renderAreas(grouped, state, { creating: state.creatingTask, dateIso })}</div>
         ${extras}
       </div>
