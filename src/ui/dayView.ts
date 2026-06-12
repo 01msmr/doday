@@ -29,6 +29,8 @@ export interface AppState {
   syncError: string | null;
   /** Aktive Ansicht der unteren Navigation */
   view: ViewId;
+  /** Cockpit-Zeitsprung: 0 = aktuelle Woche/Monat, -1 = davor … (nie > 0) */
+  periodOffset: number;
   /** "Sprung in den Bereich": nur dieser Bereich (inkl. Unterbereiche) – null = alles */
   filterArea: string | null;
   /** Bereich, dessen Name gerade umbenannt wird – null = keiner */
