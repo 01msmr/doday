@@ -1152,3 +1152,58 @@ details[open] > summary .chevron {
 .day-group--overdue .day-group-label {
   color: #b3543e;
 }
+
+.cockpit-habits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.cockpit-habit {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.35rem 0.1rem;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+  text-align: left;
+}
+
+.cockpit-habit:disabled {
+  cursor: default;
+}
+
+.week-dots {
+  display: flex;
+  gap: 0.3rem;
+  margin-left: auto;
+}
+
+.week-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--hc, var(--accent));
+}
+
+.week-dot.filled {
+  background: var(--hc, var(--accent));
+}
+
+.week-dot.today {
+  box-shadow: 0 0 0 2px var(--halo);
+}
+
+.habit-count {
+  min-width: 2.4rem;
+  text-align: right;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}

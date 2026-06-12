@@ -4,18 +4,23 @@
 //
 // Hinweis: Der Import aus dayView.ts ist ein (unkritischer) Ringimport –
 // beide Module rufen einander nur zur Laufzeit in Funktionen auf.
-import type { Task } from '../models/types';
+import type { Habit, Task } from '../models/types';
 import {
+  datesInRange,
+  habitDoneInRange,
   monthRange,
   tasksByDay,
   weekRange,
+  weeksInRange,
   withCanonicalTags,
   type DateRange,
   type RangeTasks,
 } from '../services/selectors';
 import { isoDate, isoWeek } from '../utils/dates';
+import { safeColor } from '../utils/colors';
 import {
   dayMonthOf,
+  escapeHtml,
   monthOf,
   renderMasthead,
   renderTask,
@@ -100,12 +105,93 @@ function renderRangeTasks(
     </section>`;
 }
 
+/** Wochen-Zeile: Name, 7 Punkte (Mo–So), Zähler. Klick hakt HEUTE ab. */
+function renderHabitWeekRow(
+  habit: Habit,
+  range: DateRange,
+  today: string,
+  isCurrent: boolean,
+): string {
+  const done = new Set(habitDoneInRange(habit, range));
+  const dots = datesInRange(range)
+    .map(
+      (day) =>
+        `<span class="week-dot${done.has(day) ? ' filled' : ''}${day === today ? ' today' : ''}" aria-hidden="true"></span>`,
+    )
+    .join('');
+  const goal = habit.schedule === 'weekly' ? (habit.target ?? 1) : 7;
+  const color = safeColor(habit.color);
+  // Nur im aktuellen Zeitraum klickbar – Vergangenheit bleibt, wie sie war
+  const attrs = isCurrent
+    ? ` data-action="toggle-habit" data-id="${habit.id}" aria-pressed="${done.has(today)}"`
+    : ' disabled';
+  return `
+    <li>
+      <button type="button" class="cockpit-habit"${color ? ` style="--hc:${color}"` : ''}${attrs}>
+        <span class="habit-name">${escapeHtml(habit.title)}</span>
+        <span class="week-dots">${dots}</span>
+        <span class="habit-count">${done.size}/${goal}</span>
+      </button>
+    </li>`;
+}
+
+/** Monats-Zeile: Pillen-Balken mit Bilanz-Text */
+function renderHabitMonthRow(habit: Habit, range: DateRange): string {
+  const done = habitDoneInRange(habit, range).length;
+  let goal: number;
+  let label: string;
+  if (habit.schedule === 'weekly') {
+    goal = (habit.target ?? 1) * weeksInRange(range);
+    label = `Ziel ${habit.target ?? 1}&times;/Woche: ${done} von ${goal}`;
+  } else {
+    goal = datesInRange(range).length;
+    label = `${done} von ${goal} Tagen`;
+  }
+  const percent = goal > 0 ? Math.min(100, Math.round((done / goal) * 100)) : 0;
+  const color = safeColor(habit.color);
+  return `
+    <li class="goal"${color ? ` style="--gc:${color}"` : ''} role="progressbar"
+      aria-valuenow="${done}" aria-valuemin="0" aria-valuemax="${goal}"
+      aria-label="${escapeHtml(habit.title)}">
+      <div class="goal-fill" style="width:${percent}%"></div>
+      <div class="goal-head">
+        <span class="goal-title"><strong>${escapeHtml(habit.title)}</strong></span>
+        <span class="goal-period">${label}</span>
+      </div>
+    </li>`;
+}
+
+/** Gewohnheiten-Sektion – Woche und Monat unterscheiden sich nur in der Zeile */
+function renderCockpitHabits(
+  habits: Habit[],
+  range: DateRange,
+  kind: 'week' | 'month',
+  today: string,
+  isCurrent: boolean,
+): string {
+  if (habits.length === 0) {
+    return '';
+  }
+  const list =
+    kind === 'week'
+      ? `<ul class="cockpit-habits">${habits
+          .map((habit) => renderHabitWeekRow(habit, range, today, isCurrent))
+          .join('')}</ul>`
+      : `<ul class="goal-list">${habits.map((habit) => renderHabitMonthRow(habit, range)).join('')}</ul>`;
+  return `
+    <section class="panel">
+      <h2 class="section-label">Gewohnheiten</h2>
+      ${list}
+    </section>`;
+}
+
 /** Komplette Cockpit-Ansicht (Inhalt der Seite, ohne untere Navigation) */
 export function renderCockpit(state: AppState, syncNote: string): string {
   const kind = state.view === 'week' ? 'week' : 'month';
   const today = isoDate();
   const range =
     kind === 'week' ? weekRange(state.periodOffset) : monthRange(state.periodOffset);
+  const isCurrent = state.periodOffset === 0;
 
   // Tags kanonisieren (Alias → aktueller Registry-Name) – wie in der Day-Ansicht
   const canonical = (tag: string): string | undefined => state.registry.resolve(tag)?.path;
@@ -115,5 +201,6 @@ export function renderCockpit(state: AppState, syncNote: string): string {
   return `
     ${renderPeriodMasthead(kind, range, state.periodOffset)}
     ${syncNote}
+    ${renderCockpitHabits(state.data.habits, range, kind, today, isCurrent)}
     ${renderRangeTasks(rangeTasks, today, { creating: state.creatingTask })}`;
 }
