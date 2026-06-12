@@ -5,8 +5,10 @@
 // Hinweis: Der Import aus dayView.ts ist ein (unkritischer) Ringimport –
 // beide Module rufen einander nur zur Laufzeit in Funktionen auf.
 import type { Habit, Task } from '../models/types';
+import type { InMemoryTagRegistry } from '../services/tagRegistry';
 import {
   datesInRange,
+  eventsByDay,
   habitDoneInRange,
   monthRange,
   tasksByDay,
@@ -14,14 +16,19 @@ import {
   weeksInRange,
   withCanonicalTags,
   type DateRange,
+  type DayEvents,
   type RangeTasks,
 } from '../services/selectors';
-import { isoDate, isoWeek } from '../utils/dates';
+import { isoDate, isoWeek, timeOf } from '../utils/dates';
 import { safeColor } from '../utils/colors';
 import {
+  areaColor,
   dayMonthOf,
   escapeHtml,
+  FALLBACK_COLOR,
   monthOf,
+  renderAchievements,
+  renderEventForm,
   renderMasthead,
   renderTask,
   renderTaskForm,
@@ -150,7 +157,7 @@ function renderHabitMonthRow(habit: Habit, range: DateRange): string {
   const percent = goal > 0 ? Math.min(100, Math.round((done / goal) * 100)) : 0;
   const color = safeColor(habit.color);
   return `
-    <li class="goal"${color ? ` style="--gc:${color}"` : ''} role="progressbar"
+    <li class="goal goal--bare"${color ? ` style="--gc:${color}"` : ''} role="progressbar"
       aria-valuenow="${done}" aria-valuemin="0" aria-valuemax="${goal}"
       aria-label="${escapeHtml(habit.title)}">
       <div class="goal-fill" style="width:${percent}%"></div>
@@ -185,6 +192,46 @@ function renderCockpitHabits(
     </section>`;
 }
 
+function weekdayShortOf(date: Date): string {
+  return new Intl.DateTimeFormat('de-DE', { weekday: 'short' }).format(date);
+}
+
+/** Termine: eine schmale Zeile pro Tag (nur Tage mit Terminen) */
+function renderRangeEvents(
+  days: DayEvents[],
+  registry: InMemoryTagRegistry,
+  today: string,
+  opts: { creating: boolean },
+): string {
+  const rows = days
+    .map((day) => {
+      const date = dateAt(day.date);
+      const entries = day.events
+        .map(
+          (event) =>
+            `<span class="day-event"><span class="area-dot" style="--c:${
+              event.tags[0] ? areaColor(registry, event.tags[0]) : FALLBACK_COLOR
+            }"></span>${event.allDay ? '' : `${timeOf(event.start)}&nbsp;`}${escapeHtml(event.title)}</span>`,
+        )
+        .join('<span class="done-sep"> &middot; </span>');
+      return `
+      <li class="day-events-row${day.date === today ? ' today' : ''}">
+        <span class="day-events-date">${weekdayShortOf(date)}&nbsp;${date.getDate()}.</span>
+        <span class="day-events-list">${entries}</span>
+      </li>`;
+    })
+    .join('');
+  return `
+    <section class="panel">
+      <h2 class="section-label">Termine
+        <button type="button" class="add-event" data-action="toggle-event-form"
+          aria-expanded="${opts.creating}" aria-label="Termin anlegen">+</button>
+      </h2>
+      ${opts.creating ? renderEventForm(today) : ''}
+      ${rows ? `<ol class="day-events">${rows}</ol>` : '<p class="empty">Keine Termine.</p>'}
+    </section>`;
+}
+
 /** Komplette Cockpit-Ansicht (Inhalt der Seite, ohne untere Navigation) */
 export function renderCockpit(state: AppState, syncNote: string): string {
   const kind = state.view === 'week' ? 'week' : 'month';
@@ -196,11 +243,22 @@ export function renderCockpit(state: AppState, syncNote: string): string {
   // Tags kanonisieren (Alias → aktueller Registry-Name) – wie in der Day-Ansicht
   const canonical = (tag: string): string | undefined => state.registry.resolve(tag)?.path;
   const tasks = withCanonicalTags(state.data.tasks, canonical);
+  const events = withCanonicalTags(state.data.events, canonical);
   const rangeTasks = tasksByDay(tasks, range, today);
+  const rangeEvents = eventsByDay(events, range);
+
+  // Aufgaben-Bilanz des Zeitraums für den Ziele-Block (Überfällige zählen nicht)
+  const periodTasks = rangeTasks.days.flatMap((day) => day.tasks);
+  const taskStats = {
+    done: periodTasks.filter((task) => task.completed).length,
+    total: periodTasks.length,
+  };
 
   return `
     ${renderPeriodMasthead(kind, range, state.periodOffset)}
     ${syncNote}
     ${renderCockpitHabits(state.data.habits, range, kind, today, isCurrent)}
-    ${renderRangeTasks(rangeTasks, today, { creating: state.creatingTask })}`;
+    ${renderAchievements(state.data.achievements, state.data.habits, taskStats)}
+    ${renderRangeTasks(rangeTasks, today, { creating: state.creatingTask })}
+    ${renderRangeEvents(rangeEvents, state.registry, today, { creating: state.creatingEvent })}`;
 }

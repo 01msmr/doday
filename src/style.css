@@ -1207,3 +1207,42 @@ details[open] > summary .chevron {
   font-size: 0.85rem;
   color: var(--ink-soft);
 }
+
+/* Monats-Habit-Balken haben keinen Kreisring rechts – Platz dafür entfällt */
+.goal--bare {
+  padding-right: 1.1rem;
+}
+
+.day-events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.day-events-row {
+  display: flex;
+  gap: 0.7rem;
+  align-items: baseline;
+}
+
+.day-events-row.today .day-events-date {
+  color: var(--accent);
+}
+
+.day-events-date {
+  flex: 0 0 3.4rem;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.day-event {
+  white-space: nowrap;
+}
+
+.day-event .area-dot {
+  margin-right: 0.25rem;
+}
