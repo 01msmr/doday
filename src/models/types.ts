@@ -57,7 +57,7 @@ export interface Task {
   href?: string;
 }
 
-/** Termin (später: Nextcloud Kalender / VEVENT, erstmal nur lesend). */
+/** Termin (Nextcloud Kalender / VEVENT). */
 export interface CalendarEvent {
   id: string;
   /** Originaltext inklusive #Tags, z. B. "Zahnarzt #Gesundheit" */
@@ -68,6 +68,10 @@ export interface CalendarEvent {
   start: ISODateTime;
   end: ISODateTime;
   allDay?: boolean;
+  /** CalDAV-Pfad des Termins – nötig zum Bearbeiten */
+  href?: string;
+  /** Teil einer Serie (RRULE)? Dann nicht in der App editierbar */
+  recurring?: boolean;
 }
 
 /**

@@ -1246,3 +1246,51 @@ details[open] > summary .chevron {
 .day-event .area-dot {
   margin-right: 0.25rem;
 }
+
+/* ---------- Bearbeiten-Stifte (Aufgaben & Termine) ---------- */
+
+/* Kleiner Kreis mit hellem, aber sichtbarem Hintergrund – in Hell- und
+   Dunkelmodus funktioniert --hairline als zarte, kontrastarme Fläche */
+.edit-pen {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  border: 0;
+  border-radius: 50%;
+  background: var(--hairline);
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.edit-pen:hover {
+  color: var(--ink);
+}
+
+/* Aufgabenzeile: Abhak-Button füllt die Breite, der Stift sitzt rechts daneben */
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.task-row .task {
+  flex: 1;
+  min-width: 0;
+}
+
+.timeline-row .edit-pen {
+  margin-left: 0.35rem;
+}
+
+.day-event .edit-pen {
+  margin-left: 0.3rem;
+  width: 1.4rem;
+  height: 1.4rem;
+  font-size: 0.7rem;
+  vertical-align: middle;
+}
