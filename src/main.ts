@@ -23,6 +23,7 @@ import {
   updateTask,
 } from './services/api';
 import { normalizeText, parseTags, replaceTagPrefix } from './services/tagService';
+import { applyTag, suggestTags, type TagSuggestion } from './services/tagSuggest';
 import { monthRange, weekRange } from './services/selectors';
 import { InMemoryTagRegistry } from './services/tagRegistry';
 import { buildEventIcs } from './services/ics';
@@ -54,7 +55,83 @@ const state: AppState = {
 };
 
 function rerender(): void {
+  closeSuggest(); // ein Neuaufbau des DOM würde das Dropdown sonst verwaisen lassen
   renderApp(root!, state);
+}
+
+/* ---------- Tag-Vorschläge: Dropdown unter Titel-Feldern ---------- */
+
+let suggestBox: HTMLUListElement | null = null;
+let suggestFor: HTMLInputElement | null = null;
+let suggestData: TagSuggestion | null = null;
+let suggestIndex = 0;
+
+function closeSuggest(): void {
+  suggestBox?.remove();
+  suggestBox = null;
+  suggestFor = null;
+  suggestData = null;
+  suggestIndex = 0;
+}
+
+/** Aktiven Eintrag (Pfeiltasten) optisch markieren */
+function markActiveSuggest(): void {
+  suggestBox
+    ?.querySelectorAll('.tag-suggest-item')
+    .forEach((el, i) => el.classList.toggle('active', i === suggestIndex));
+}
+
+/**
+ * Vorschlagsliste unter dem Eingabefeld auf- oder abbauen. Wird bei jedem
+ * Tastendruck aufgerufen – jedes weitere Zeichen filtert die Treffer.
+ * Die Knoten entstehen per createElement/textContent, nicht als HTML-String:
+ * so können Bereichsnamen nichts einschleusen.
+ */
+function renderSuggest(input: HTMLInputElement): void {
+  const caret = input.selectionStart ?? input.value.length;
+  const paths = state.registry.all().map((entry) => entry.path);
+  const suggestion = suggestTags(paths, input.value.slice(0, caret));
+  if (!suggestion) {
+    closeSuggest();
+    return;
+  }
+  if (!suggestBox || suggestFor !== input) {
+    closeSuggest();
+    suggestBox = document.createElement('ul');
+    suggestBox.className = 'tag-suggest';
+    input.insertAdjacentElement('afterend', suggestBox);
+    suggestFor = input;
+  }
+  suggestData = suggestion;
+  suggestIndex = 0;
+  suggestBox.replaceChildren(
+    ...suggestion.matches.map((match, i) => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = `tag-suggest-item${i === 0 ? ' active' : ''}`;
+      item.dataset.suggestIndex = String(i);
+      // "›" signalisiert: hier geht es eine Ebene tiefer (vervollständigt bis ".")
+      item.textContent = `#${match.value}${match.hasChildren ? ' ›' : ''}`;
+      const li = document.createElement('li');
+      li.append(item);
+      return li;
+    }),
+  );
+}
+
+/** Gewählten Vorschlag ins Feld übernehmen – bei "." gleich weiterfiltern */
+function pickSuggest(index: number): void {
+  const match = suggestData?.matches[index];
+  if (!suggestFor || !suggestData || !match) {
+    return;
+  }
+  const input = suggestFor;
+  const caret = input.selectionStart ?? input.value.length;
+  const next = applyTag(input.value, caret, suggestData.at, match.value, match.hasChildren);
+  input.value = next.text;
+  input.setSelectionRange(next.caret, next.caret);
+  input.focus();
+  renderSuggest(input); // Ebene mit Unterbereichen zeigt sofort die nächste Stufe
 }
 
 /* ---------- Laden & Speichern (Nextcloud via Backend) ---------- */
@@ -659,6 +736,54 @@ root.addEventListener(
       state.collapsed.delete(area);
     } else {
       state.collapsed.add(area);
+    }
+  },
+  true,
+);
+
+// Tag-Vorschläge: jedes Zeichen in einem Titel-Feld aktualisiert das Dropdown
+root.addEventListener('input', (event) => {
+  const input = event.target as HTMLElement;
+  if (input instanceof HTMLInputElement && input.dataset.field === 'title') {
+    renderSuggest(input);
+  }
+});
+
+// Tastatur im offenen Dropdown: ↑/↓ wählt, Enter übernimmt (statt Formular
+// abzuschicken!), Escape schließt nur die Liste
+root.addEventListener('keydown', (event) => {
+  if (!suggestData || event.target !== suggestFor) {
+    return;
+  }
+  const count = suggestData.matches.length;
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    suggestIndex = (suggestIndex + (event.key === 'ArrowDown' ? 1 : count - 1)) % count;
+    markActiveSuggest();
+  } else if (event.key === 'Enter') {
+    event.preventDefault();
+    pickSuggest(suggestIndex);
+  } else if (event.key === 'Escape') {
+    closeSuggest();
+  }
+});
+
+// Klick/Tipp auf einen Vorschlag – mousedown statt click, damit das
+// Eingabefeld den Fokus behält (blur würde die Liste vorher schließen)
+root.addEventListener('mousedown', (event) => {
+  const item = (event.target as HTMLElement).closest<HTMLElement>('[data-suggest-index]');
+  if (item) {
+    event.preventDefault();
+    pickSuggest(Number(item.dataset.suggestIndex));
+  }
+});
+
+// Feld verlassen = Liste schließen (Capture-Phase: blur blubbert nicht)
+root.addEventListener(
+  'focusout',
+  (event) => {
+    if (event.target === suggestFor) {
+      closeSuggest();
     }
   },
   true,
