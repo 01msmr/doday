@@ -227,7 +227,33 @@ function renderAreas(grouped: GroupedDay, state: AppState): string {
 
 /* ---------- Gewohnheiten & Achievements ---------- */
 
-/** Tages-Fortschritt der Aufgaben – "Aufgaben erledigen ist ein guter Habit" */
+/**
+ * Kreisring mit "X/Y" im Zentrum – sitzt rechts in jedem Balken.
+ * Der Ring übernimmt die Balkenfarbe (--gc) und schließt sich mit dem
+ * Fortschritt (Kreis voll = geschafft).
+ */
+function renderRing(done: number, total: number): string {
+  const radius = 19;
+  const circumference = 2 * Math.PI * radius;
+  const share = total > 0 ? Math.min(1, done / total) : 0;
+  // stroke-dashoffset steuert, wie viel vom Ring sichtbar ist
+  const offset = circumference * (1 - share);
+  return `
+        <span class="ring" aria-hidden="true">
+          <svg viewBox="0 0 44 44">
+            <circle class="ring-track" cx="22" cy="22" r="${radius}"></circle>
+            <circle class="ring-fill" cx="22" cy="22" r="${radius}"
+              stroke-dasharray="${circumference.toFixed(2)}"
+              stroke-dashoffset="${offset.toFixed(2)}"></circle>
+          </svg>
+          <span class="ring-num">
+            <span class="ring-top">${done}</span>
+            <span class="ring-bottom">${total}</span>
+          </span>
+        </span>`;
+}
+
+/** Tages-Fortschritt der Aufgaben: schwarzer Balken mit Kreisring rechts */
 function renderTaskProgress(stats: { done: number; total: number }): string {
   if (stats.total === 0) {
     return '';
@@ -238,9 +264,9 @@ function renderTaskProgress(stats: { done: number; total: number }): string {
         aria-valuemin="0" aria-valuemax="${stats.total}" aria-label="Heute erledigte Aufgaben">
         <div class="goal-fill" style="width:${percent}%"></div>
         <div class="goal-head">
-          <span class="goal-title">Aufgaben erledigt</span>
-          <span class="goal-num">${stats.done}<span class="goal-sep">/</span>${stats.total} &middot; ${percent}&thinsp;%</span>
+          <span class="goal-title">Aufgaben</span>
         </div>
+        ${renderRing(stats.done, stats.total)}
       </li>`;
 }
 
@@ -325,23 +351,25 @@ function renderHabitBar(habit: Habit): string {
         aria-valuemin="0" aria-valuemax="${total}" aria-label="${escapeHtml(habit.title)}">
         <div class="goal-fill" style="width:${percent}%"></div>
         <div class="goal-head">
-          <span class="goal-title">${escapeHtml(habit.title)}</span>
-          <span class="goal-num">${done}<span class="goal-sep">/</span>${total} &middot; ${periodLabel}</span>
+          <span class="goal-title"><span class="goal-recur" aria-hidden="true">&#8634;</span>${escapeHtml(habit.title)}</span>
+          <span class="goal-period">${periodLabel}</span>
         </div>
+        ${renderRing(done, total)}
       </li>`;
 }
 
 /**
- * Achievements als zeilenhohe Farbflächen: Der Fortschritt füllt die ganze
- * Zeile von links in der Habit-Farbe (transluzent), die Schrift liegt darüber.
- * Danach: Balken für Habits ohne Achievement, zuletzt der Aufgaben-Fortschritt.
+ * Ziele als zeilenhohe Farbflächen (Text IM Balken), in zwei Gruppen:
+ * - "Einmalig":    kumulative Meilensteine mit Ziellinie (z. B. 30 Tage Journal)
+ * - "Regelmäßig":  zyklische Ziele, die sich pro Tag/Woche zurücksetzen
+ *                  (Habits ohne Meilenstein + der Aufgaben-Fortschritt)
  */
 function renderAchievements(
   achievements: Achievement[],
   habits: Habit[],
   taskStats: { done: number; total: number },
 ): string {
-  // Habits, deren Fortschritt nicht schon über ein Achievement abgebildet ist
+  // Habits, deren Fortschritt nicht schon über ein einmaliges Ziel abgebildet ist
   const unlinkedHabits = habits.filter(
     (habit) => !achievements.some((achievement) => achievement.habitId === habit.id),
   );
@@ -356,15 +384,29 @@ function renderAchievements(
         <div class="goal-fill" style="width:${percent}%"></div>
         <div class="goal-head">
           <span class="goal-title">${escapeHtml(achievement.title)}</span>
-          <span class="goal-num">${achievement.progress}<span class="goal-sep">/</span>${achievement.target}</span>
         </div>
+        ${renderRing(achievement.progress, achievement.target)}
       </li>`;
     })
     .join('');
+  const recurring = unlinkedHabits.map(renderHabitBar).join('');
+  const taskBar = renderTaskProgress(taskStats);
   return `
     <section class="panel">
-      <h2 class="section-label">Achievements</h2>
-      <ul class="goal-list">${items}${unlinkedHabits.map(renderHabitBar).join('')}${renderTaskProgress(taskStats)}</ul>
+      <h2 class="section-label">Ziele</h2>
+      ${items ? `<ul class="goal-list" aria-label="Einmalige Ziele">${items}</ul>` : ''}
+      ${
+        recurring
+          ? `<p class="goal-group-label">Regelmäßig</p>
+             <ul class="goal-list" aria-label="Regelmäßige Ziele">${recurring}</ul>`
+          : ''
+      }
+      ${
+        taskBar
+          ? `<p class="goal-group-label">Aufgaben</p>
+             <ul class="goal-list" aria-label="Aufgaben-Fortschritt">${taskBar}</ul>`
+          : ''
+      }
     </section>`;
 }
 
