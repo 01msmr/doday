@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    // Zielumgebung: moderne Browser (ES2022 wird überall unterstützt)
+    "target": "ES2022",
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+
+    // Vite übernimmt das Bundling – TypeScript prüft nur Typen, erzeugt keine Dateien
+    "moduleResolution": "bundler",
+    "noEmit": true,
+
+    // Strenge Typprüfung: Fehler früh finden statt zur Laufzeit
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
+
+    "skipLibCheck": true,
+    "moduleDetection": "force",
+    "useDefineForClassFields": true
+  },
+  "include": ["src", "vite.config.ts"]
+}
