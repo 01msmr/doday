@@ -1,6 +1,6 @@
 // Tests zuerst (TDD): Sie beschreiben, wie sich der TagService verhalten SOLL.
 import { describe, it, expect } from 'vitest';
-import { parseTags, normalizeText, buildHierarchy } from './tagService';
+import { parseTags, normalizeText, buildHierarchy, replaceTagPrefix } from './tagService';
 
 describe('parseTags', () => {
   it('extrahiert einen Tag am Textende', () => {
@@ -41,6 +41,41 @@ describe('parseTags', () => {
     const result = parseTags('Preis in # angeben');
     expect(result.cleanText).toBe('Preis in # angeben');
     expect(result.tags).toEqual([]);
+  });
+
+  it('wertet # mitten im Wort nicht als Tag (Wortgrenze nötig)', () => {
+    const result = parseTags('C#Projekt fertigstellen');
+    expect(result.cleanText).toBe('C#Projekt fertigstellen');
+    expect(result.tags).toEqual([]);
+  });
+
+  it('wertet Ticket-Nummern wie ABC#123 nicht als Tag', () => {
+    const result = parseTags('Ticket ABC#123 prüfen');
+    expect(result.tags).toEqual([]);
+  });
+
+  it('normalisiert Umlaute auf NFC (macOS liefert oft zerlegte Zeichen)', () => {
+    // Eingabe mit zerlegtem ae (a + U+0308, NFD) muss als NFC-Tag ankommen
+    const result = parseTags('Keller #Aufra\u0308umen');
+    expect(result.tags).toEqual(['Aufr\u00e4umen']);
+  });
+});
+
+describe('replaceTagPrefix', () => {
+  it('ersetzt einen exakt passenden Pfad', () => {
+    expect(replaceTagPrefix('Zuhause', 'Zuhause', 'Home')).toBe('Home');
+  });
+
+  it('ersetzt den Präfix von Unterpfaden', () => {
+    expect(replaceTagPrefix('Zuhause.Aufräumen', 'Zuhause', 'Home')).toBe('Home.Aufräumen');
+  });
+
+  it('lässt fremde Pfade unverändert', () => {
+    expect(replaceTagPrefix('Arbeit', 'Zuhause', 'Home')).toBe('Arbeit');
+  });
+
+  it('verwechselt Präfixe nicht (Zuhause2 bleibt Zuhause2)', () => {
+    expect(replaceTagPrefix('Zuhause2', 'Zuhause', 'Home')).toBe('Zuhause2');
   });
 });
 

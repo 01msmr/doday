@@ -2,3 +2,5 @@ node_modules/
 dist/
 *.local
 .DS_Store
+# Zugangsdaten bleiben lokal – nie committen!
+.env

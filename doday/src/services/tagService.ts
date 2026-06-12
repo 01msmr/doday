@@ -2,8 +2,13 @@
 // Tags bleiben Klartext im Objekttext (Kompatibilität mit Nextcloud, iOS, Obsidian) –
 // dieser Service ist die einzige Stelle, die das Tag-Format kennt.
 
-/** Tag-Muster: #Wort, optional gefolgt von .Unterwort-Ketten (Umlaute erlaubt) */
-export const TAG_REGEX = /#[\p{L}\d_]+(?:\.[\p{L}\d_]+)*/gu;
+/**
+ * Tag-Muster: #Wort, optional gefolgt von .Unterwort-Ketten (Umlaute erlaubt).
+ * Der Lookbehind (?<=^|\s) verlangt eine Wortgrenze davor –
+ * "C#Projekt" oder "ABC#123" sind dadurch KEINE Tags.
+ */
+// \p{M} erlaubt Kombinationszeichen: macOS liefert "ä" oft als a + ̈ (NFD)
+export const TAG_REGEX = /(?<=^|\s)#[\p{L}\p{M}\d_]+(?:\.[\p{L}\p{M}\d_]+)*/gu;
 
 /** Ergebnis des Parsens: Text ohne Tags + die gefundenen Tag-Pfade */
 export interface ParsedText {
@@ -26,7 +31,9 @@ export function parseTags(text: string): ParsedText {
   const tags: string[] = [];
   // matchAll arbeitet auf einer Kopie des Regex – der globale TAG_REGEX bleibt zustandsfrei
   for (const match of text.matchAll(TAG_REGEX)) {
-    const tag = match[0].slice(1); // führendes "#" entfernen
+    // führendes "#" entfernen; NFC: macOS/iOS liefern Umlaute oft zerlegt (a + ̈),
+    // wir speichern immer die zusammengesetzte Form
+    const tag = match[0].slice(1).normalize('NFC');
     if (!tags.includes(tag)) {
       tags.push(tag);
     }
@@ -56,6 +63,21 @@ export function normalizeText(text: string): string {
  * Fehlende Eltern werden implizit angelegt: ["Arbeit.Projekte.NC"]
  * erzeugt Arbeit → Projekte → NC. Sortierung: alphabetisch (deutsch).
  */
+/**
+ * Pfad-Präfix sicher ersetzen: "Zuhause.Aufräumen" folgt der Umbenennung
+ * von "Zuhause" zu "Home". Der Punkt im Vergleich verhindert,
+ * dass "Zuhause2" fälschlich mitwandert.
+ */
+export function replaceTagPrefix(tag: string, oldPath: string, newPath: string): string {
+  if (tag === oldPath) {
+    return newPath;
+  }
+  if (tag.startsWith(`${oldPath}.`)) {
+    return newPath + tag.slice(oldPath.length);
+  }
+  return tag;
+}
+
 export function buildHierarchy(tagPaths: string[]): TagNode[] {
   const roots: TagNode[] = [];
   const nodesByPath = new Map<string, TagNode>();
