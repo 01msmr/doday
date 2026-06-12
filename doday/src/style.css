@@ -1,16 +1,40 @@
 /* Do Day – „stilles Journal":
-   warmes Dunkelgrau statt Schwarz, Serifen-Datum wie eine Planerseite,
-   Salbei-Akzente aus der Tag-Registry, Haarlinien statt Kästen. */
+   Helle Welt = warmes Papier, dunkle Welt = warmes Dunkelgrau.
+   Der Modus folgt automatisch der Geräte-Einstellung (prefers-color-scheme).
+   Alle Komponenten nutzen NUR die Token unten – dadurch funktioniert
+   jedes Bauteil in beiden Welten, ohne doppelt gepflegt zu werden. */
 
 :root {
-  --bg: #16171b;
-  --ink: #e8e5dd; /* warmes Off-White wie Papier */
-  --ink-soft: #a39f96;
-  --ink-faint: #6e6b64;
-  --hairline: rgb(232 229 221 / 0.1);
-  --accent: #8fae87; /* Salbei */
+  /* Helle Welt: Tinte auf Papier */
+  --bg: #f3f0e9;
+  --ink: #26251f;
+  --ink-soft: #6b675c;
+  --ink-faint: #8e897c;
+  --hairline: rgb(38 37 31 / 0.14);
+  --accent: #5d7a55; /* dunkleres Salbei – genug Kontrast auf Papier */
+  --glow: #fcfaf3; /* sanfter Lichtfleck oben */
+  --halo: rgb(93 122 85 / 0.28); /* Schein um erledigte Gewohnheiten */
+  --strike: rgb(38 37 31 / 0.3); /* Durchstreichung erledigter Aufgaben */
+  --nav-bg: rgb(243 240 233 / 0.82);
+
   --serif: 'Iowan Old Style', 'Palatino Nova', Palatino, Georgia, serif;
   --sans: 'Avenir Next', Avenir, 'Helvetica Neue', system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Dunkle Welt: Papier wird Lampenlicht */
+    --bg: #16171b;
+    --ink: #e8e5dd;
+    --ink-soft: #a39f96;
+    --ink-faint: #6e6b64;
+    --hairline: rgb(232 229 221 / 0.1);
+    --accent: #8fae87; /* helleres Salbei für dunklen Grund */
+    --glow: #232631;
+    --halo: rgb(143 174 135 / 0.22);
+    --strike: rgb(232 229 221 / 0.25);
+    --nav-bg: rgb(22 23 27 / 0.82);
+  }
 }
 
 * {
@@ -18,7 +42,9 @@
 }
 
 html {
-  color-scheme: dark;
+  /* Teilt dem Browser mit, dass wir beide Modi beherrschen
+     (Scrollbalken, Formularelemente usw. passen sich an) */
+  color-scheme: light dark;
 }
 
 body {
@@ -29,7 +55,7 @@ body {
   color: var(--ink);
   /* Sanfter Lichtschein oben – wie eine Lampe über der Planerseite */
   background:
-    radial-gradient(50rem 30rem at 50% -12rem, #232631 0%, transparent 70%),
+    radial-gradient(50rem 30rem at 50% -12rem, var(--glow) 0%, transparent 70%),
     var(--bg);
   min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
@@ -41,22 +67,14 @@ body {
   padding: clamp(1.25rem, 4vw, 2.5rem);
   /* safe-area: Inhalte nicht unter iPhone-Notch/Home-Indikator schieben */
   padding-top: max(clamp(2rem, 6vw, 3.25rem), env(safe-area-inset-top));
-  padding-bottom: max(3.5rem, env(safe-area-inset-bottom));
+  /* Platz für die feste Navigation am unteren Rand */
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
 }
 
 /* ---------- Kopf ---------- */
 
 .masthead {
   margin-bottom: 0.75rem;
-}
-
-.wordmark {
-  margin: 0 0 2.5rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.34em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
 }
 
 .weekday {
@@ -73,6 +91,50 @@ body {
   font-weight: 500;
   font-size: clamp(2.4rem, 8vw, 3.2rem);
   line-height: 1.1;
+}
+
+/* ---------- Spalten-Layout ----------
+   Schmal (iPhone): alles untereinander – Termine oben, dann Aufgaben,
+   dann Gewohnheiten/Achievements.
+   Breit (ab 50rem): Aufgaben links, Termine + Gewohnheiten rechts. */
+
+.columns {
+  display: grid;
+  grid-template-areas:
+    'schedule'
+    'main'
+    'extras';
+}
+
+.col-schedule {
+  grid-area: schedule;
+  min-width: 0;
+}
+
+.col-main {
+  grid-area: main;
+  min-width: 0;
+}
+
+.col-extras {
+  grid-area: extras;
+  min-width: 0;
+}
+
+@media (min-width: 50rem) {
+  .page {
+    max-width: 66rem;
+  }
+
+  .columns {
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      'main schedule'
+      'main extras';
+    column-gap: clamp(2.5rem, 6vw, 4.5rem);
+    align-items: start;
+  }
 }
 
 /* ---------- Sektionen ---------- */
@@ -99,6 +161,13 @@ body {
   flex: 1;
   height: 1px;
   background: var(--hairline);
+}
+
+/* Leere Zustände: leise, kein Drama */
+.empty {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--ink-faint);
 }
 
 /* ---------- Termine (Zeitleiste) ---------- */
@@ -147,6 +216,13 @@ body {
   background: var(--c, var(--ink-faint));
 }
 
+/* Vor Terminen: eckige Marker in Großbuchstaben-Höhe (Bereiche bleiben rund) */
+.timeline-row .area-dot {
+  width: 0.72em;
+  height: 0.72em;
+  border-radius: 1px;
+}
+
 /* ---------- Bereiche (auf-/zuklappbar) ---------- */
 
 details.area {
@@ -182,9 +258,100 @@ details[open] > summary .chevron {
   transform: rotate(45deg);
 }
 
+/* Bereichsname als Button: Klick = Sprung (Filter auf den Bereich) */
 .area-name {
+  padding: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
   font-size: 0.98rem;
   font-weight: 500;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.area-name:hover {
+  color: var(--accent);
+}
+
+/* ✎ zum Umbenennen – zurückhaltend, erscheint beim Überfahren */
+.area-edit {
+  padding: 0.15rem 0.3rem;
+  background: none;
+  border: none;
+  color: var(--ink-faint);
+  font-size: 0.85rem;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.2s ease,
+    color 0.2s ease;
+}
+
+.area-head:hover .area-edit,
+.area-edit:focus-visible {
+  opacity: 1;
+}
+
+.area-edit:hover {
+  color: var(--accent);
+}
+
+/* Ohne Maus (Touch) bleibt das ✎ leicht sichtbar */
+@media (hover: none) {
+  .area-edit {
+    opacity: 0.55;
+  }
+}
+
+/* Eingabefeld beim Umbenennen: nur eine Akzent-Linie, kein Kasten */
+.area-rename {
+  max-width: 11rem;
+  padding: 0 0 0.1rem;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--accent);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.98rem;
+  font-weight: 500;
+}
+
+.area-rename:focus {
+  outline: none;
+}
+
+/* Aktiver Bereichs-Filter als Chip unter dem Datum */
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 1.25rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.filter-chip strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.chip-clear {
+  padding: 0 0.1rem;
+  background: none;
+  border: none;
+  color: var(--ink-faint);
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.chip-clear:hover {
+  color: var(--accent);
 }
 
 .area-count {
@@ -277,7 +444,7 @@ details[open] > summary .chevron {
 .task.done .task-title {
   color: var(--ink-faint);
   text-decoration: line-through;
-  text-decoration-color: rgb(232 229 221 / 0.25);
+  text-decoration-color: var(--strike);
 }
 
 /* ---------- Gewohnheiten ---------- */
@@ -301,7 +468,11 @@ details[open] > summary .chevron {
   cursor: pointer;
 }
 
+/* Jede Gewohnheit bringt ihre eigene Farbe mit (--hc), sonst Salbei */
 .habit-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 2.6rem;
   height: 2.6rem;
   border: 1.5px solid var(--ink-faint);
@@ -312,14 +483,32 @@ details[open] > summary .chevron {
     box-shadow 0.25s ease;
 }
 
+/* Haken erscheint sanft, wenn die Gewohnheit erledigt ist */
+.habit-dot::after {
+  content: '✓';
+  font-size: 1.2rem;
+  color: var(--bg);
+  opacity: 0;
+  transform: scale(0.5);
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+}
+
 .habit:hover .habit-dot {
-  border-color: var(--accent);
+  border-color: var(--hc, var(--accent));
 }
 
 .habit.done .habit-dot {
-  background: var(--accent);
-  border-color: var(--accent);
-  box-shadow: 0 0 1.4rem rgb(143 174 135 / 0.22); /* leiser Schein statt Konfetti */
+  background: var(--hc, var(--accent));
+  border-color: var(--hc, var(--accent));
+  /* leiser Schein in der Habit-Farbe statt Konfetti */
+  box-shadow: 0 0 1.4rem color-mix(in srgb, var(--hc, var(--accent)) 30%, transparent);
+}
+
+.habit.done .habit-dot::after {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .habit-name {
@@ -329,6 +518,82 @@ details[open] > summary .chevron {
 
 .habit.done .habit-name {
   color: var(--ink);
+}
+
+/* Zahnrad am Ende der Reihe: öffnet den Gewohnheiten-Editor */
+.habit-gear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  width: 2.6rem;
+  height: 2.6rem;
+  margin-top: 0.25rem; /* auf Höhe der Kreise */
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  color: var(--ink-faint);
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.habit-gear:hover,
+.habit-gear.active {
+  color: var(--accent);
+}
+
+/* Editor-Panel: Farbe | Name | Zeitraum | Ziel */
+.habit-editor {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 1.4rem;
+}
+
+.habit-editor-row {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) auto 4.5rem;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.habit-editor input[type='text'],
+.habit-editor input[type='number'],
+.habit-editor select {
+  padding: 0.2rem 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--hairline);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.habit-editor input:focus-visible,
+.habit-editor select:focus-visible {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+
+.habit-editor select {
+  cursor: pointer;
+}
+
+.habit-editor input[type='color'] {
+  width: 1.7rem;
+  height: 1.7rem;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.habit-editor-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--ink-faint);
 }
 
 /* ---------- Achievements ---------- */
@@ -374,6 +639,65 @@ details[open] > summary .chevron {
   height: 100%;
   border-radius: 1px;
   background: var(--accent);
+}
+
+/* ---------- Untere Navigation ---------- */
+
+.bottom-nav {
+  position: fixed;
+  inset: auto 0 0 0; /* links/rechts/unten angedockt */
+  display: flex;
+  justify-content: center;
+  gap: clamp(0.25rem, 3vw, 1.5rem);
+  padding: 0.5rem 1rem max(0.6rem, env(safe-area-inset-bottom));
+  background: var(--nav-bg);
+  /* Inhalt schimmert beim Scrollen weich durch (iOS-Gefühl) */
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border-top: 1px solid var(--hairline);
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  min-width: 4.25rem;
+  padding: 0.35rem 0.75rem;
+  background: none;
+  border: none;
+  border-radius: 0.6rem;
+  color: var(--ink-faint);
+  font: inherit;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+/* "Do" über jedem Ziel: Do Day · Do Morrow · Do Week · Do Month
+   (auf 180 % vergrößert – das "Do" trägt die Marke) */
+.nav-do {
+  font-size: 0.99rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.nav-label {
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+}
+
+.nav-item:hover {
+  color: var(--ink-soft);
+}
+
+.nav-item.active {
+  color: var(--accent);
+}
+
+.nav-item.active .nav-do {
+  opacity: 1;
 }
 
 /* ---------- Einblenden beim ersten Laden ---------- */

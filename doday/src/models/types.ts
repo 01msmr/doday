@@ -12,9 +12,14 @@ export type ISODateTime = string;
 export interface Habit {
   id: string;
   title: string;
+  /** Zeitraum, in dem die Gewohnheit fällig ist */
   schedule: 'daily' | 'weekly';
   /** Liste der Tage, an denen die Gewohnheit erledigt wurde */
   log: ISODate[];
+  /** Eigene Anzeigefarbe des Habit-Kreises, z. B. "#7fa3b8" */
+  color?: string;
+  /** Optionales Ziel: Wiederholungen pro Zeitraum (z. B. 3× pro Woche) */
+  target?: number;
 }
 
 /** Ziel mit messbarem Fortschritt, z. B. "30 Tage Journal". */

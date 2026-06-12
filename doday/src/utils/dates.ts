@@ -14,3 +14,10 @@ export function isoDate(date: Date = new Date()): ISODate {
 export function timeOf(isoDateTime: string): string {
   return isoDateTime.slice(11, 16);
 }
+
+/** Neues Datum, um n Tage verschoben (negativ = zurück). Das Original bleibt unverändert. */
+export function shiftDays(base: Date, days: number): Date {
+  const result = new Date(base);
+  result.setDate(result.getDate() + days);
+  return result;
+}
