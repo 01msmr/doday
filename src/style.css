@@ -506,6 +506,9 @@ details[open] > summary .chevron {
   font: inherit;
   font-size: 0.98rem;
   font-weight: 500;
+  /* der Kopf erbt user-select:none – das Eingabefeld muss aber editierbar bleiben */
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .area-rename:focus {
@@ -1370,14 +1373,18 @@ details[open] > summary .chevron {
   flex: none;
   display: inline-flex;
   align-items: center;
-  padding: 0 0.15rem;
+  padding: 0 0.35rem;
   color: var(--ink-faint);
   font-size: 0.95rem;
   line-height: 1;
   cursor: grab;
+  /* touch-action:none + user-select:none + touch-callout:none MÜSSEN dauerhaft
+     gelten: sonst startet iOS beim Langdrücken Auswahl/Lupe statt unser Ziehen. */
   touch-action: none;
-  opacity: 0;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  opacity: 0;
   transition:
     opacity 0.2s ease,
     color 0.2s ease;
@@ -1391,17 +1398,21 @@ details[open] > summary .chevron {
   color: var(--accent);
 }
 
-/* Ohne Maus (Touch) bleibt der Greifer leicht sichtbar */
+/* Ohne Maus (Touch) ist der Greifer dauerhaft gut sichtbar – Hover gibt es nicht */
 @media (hover: none) {
   .drag-grip {
-    opacity: 0.45;
+    opacity: 0.6;
   }
 }
 
-/* Bereichsköpfe lassen sich auf oberster Ebene greifen */
+/* Bereichsköpfe lassen sich auf oberster Ebene greifen.
+   Auch hier Auswahl/Lupe unterbinden, damit der Long-Press zieht statt markiert. */
 .area-head[data-drag] {
   cursor: grab;
   touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 /* Der schwebende Klon, der dem Zeiger folgt – blockiert keine Treffererkennung */
