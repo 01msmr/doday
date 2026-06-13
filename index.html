@@ -11,6 +11,11 @@
          für Browser-Tabs – beide aus public/app-icon-1024.png verkleinert -->
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <!-- PWA: Vollbild-Start vom Homescreen. Das Manifest gilt für alle Browser,
+         die apple-* Meta-Tags sorgen auf iOS zuverlässig fürs Vollbild. -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Do Day</title>
   </head>
   <body>
