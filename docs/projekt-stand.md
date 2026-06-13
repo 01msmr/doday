@@ -68,7 +68,7 @@ Stand: 13. Juni 2026 · `main` = `05fb117` · 144 Tests grün · live auf https:
 
 | Thema | Status |
 |---|---|
-| PWA-Manifest (vite-plugin-pwa, Vollbild auf dem iPhone, orientation any) | geplant, nächster sinnvoller Schritt |
+| ~~PWA-Manifest (Vollbild auf dem iPhone)~~ | ✅ erledigt 13.06. – statisches `manifest.json` + apple-Meta-Tags, kein Service Worker (Nutzerwunsch) |
 | Verschieben per Drag & Drop | Konzept fertig: `docs/verschieben-konzept.md` (4 Stufen, Pointer Events) |
 | Serientermine bearbeiten | bewusst ausgeklammert – Änderung in der Nextcloud (RECURRENCE-ID wäre nötig) |
 | Blättern in die ZUKUNFT (Week/Month) | bewusst weggelassen (YAGNI) – Cockpits zeigen jetzt + Vergangenheit |
