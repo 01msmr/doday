@@ -1115,7 +1115,7 @@ details[open] > summary .chevron {
   top: 75%; /* mittig in der unteren Hälfte */
   transform: translateY(-50%);
   text-align: center;
-  font-size: 0.62rem; /* 2. Zeile vergrößert */
+  font-size: 0.78rem; /* 2. Zeile (Wort) nochmals +25% */
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.02em;
