@@ -50,6 +50,7 @@ export function initDragDrop(root: HTMLElement, onDrop: (info: DropInfo) => void
   let isTouch = false;
   let started = false; // läuft das Ziehen schon (nach Schwelle/Long-Press)?
   let longPressTimer = 0;
+  let kindClass = ''; // z. B. "drag-area" – steuert die Ziel-Optik im CSS
 
   /** Akzeptiert die aktuelle Greifer-Art dieses Ablageziel? (und ist es nicht der Ursprung) */
   function isValidTarget(el: Element | null): el is HTMLElement {
@@ -102,6 +103,12 @@ export function initDragDrop(root: HTMLElement, onDrop: (info: DropInfo) => void
 
     box.classList.add('drag-source');
     document.body.classList.add('dragging'); // sperrt Textauswahl global
+    // Zieh-Art an den Body: erlaubt unterschiedliche Ziel-Optik je Art
+    // (Aufgabe = Ziel hervorheben, Bereich = Einfügelinie darüber).
+    kindClass = handle.dataset.drag ? `drag-${handle.dataset.drag}` : '';
+    if (kindClass) {
+      document.body.classList.add(kindClass);
+    }
   }
 
   function moveGhost(x: number, y: number): void {
@@ -118,6 +125,10 @@ export function initDragDrop(root: HTMLElement, onDrop: (info: DropInfo) => void
     sourceBox?.classList.remove('drag-source');
     highlight(null);
     document.body.classList.remove('dragging');
+    if (kindClass) {
+      document.body.classList.remove(kindClass);
+      kindClass = '';
+    }
     window.removeEventListener('pointermove', onMove);
     window.removeEventListener('pointerup', onUp);
     window.removeEventListener('pointercancel', onCancel);
