@@ -1057,7 +1057,8 @@ details[open] > summary .chevron {
   position: relative; /* DO + Wort werden absolut platziert – Abstände wie im Icon */
   padding: 0;
   overflow: hidden;
-  background: var(--keycap);
+  /* Innen-Tönung: 50% Grau mit 15% Deckkraft über der Papierfarbe */
+  background: linear-gradient(rgb(128 128 128 / 0.15), rgb(128 128 128 / 0.15)), var(--keycap);
   border: 1px solid rgb(38 37 31 / 0.1);
   color: var(--keycap-ink);
   /* gerundete Schrift wie im Icon (SF Pro Rounded auf Apple-Geräten) */
