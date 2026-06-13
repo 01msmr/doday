@@ -1054,12 +1054,7 @@ details[open] > summary .chevron {
   width: var(--keycap-size);
   aspect-ratio: 1 / 1;
   border-radius: 18%; /* gerundete Ecken wie beim iOS-Icon */
-  display: flex;
-  flex-direction: column;
-  align-items: center; /* Text mittig (auch auf Mobile zentriert) */
-  justify-content: center;
-  text-align: center;
-  gap: calc(var(--keycap-size) * 0.02);
+  position: relative; /* DO + Wort werden absolut platziert – Abstände wie im Icon */
   padding: 0;
   overflow: hidden;
   background: var(--keycap);
@@ -1099,6 +1094,12 @@ details[open] > summary .chevron {
 
 /* "DO" groß und fett – trägt die Marke (wie im Icon) */
 .nav-do {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 37.5%; /* Mitte bei 3/4 der oberen Hälfte */
+  transform: translateY(-50%);
+  text-align: center;
   font-size: 1.1rem; /* 1. Zeile bewusst unverändert gelassen */
   font-weight: 800;
   line-height: 0.95;
@@ -1108,6 +1109,12 @@ details[open] > summary .chevron {
 
 /* Ziel-Wort darunter, kleiner und gesperrt: Day · Morrow · Week · Month */
 .nav-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 75%; /* mittig in der unteren Hälfte */
+  transform: translateY(-50%);
+  text-align: center;
   font-size: 0.62rem; /* 2. Zeile vergrößert */
   font-weight: 700;
   line-height: 1;
