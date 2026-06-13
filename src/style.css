@@ -1361,3 +1361,82 @@ details[open] > summary .chevron {
 .tag-suggest-item:hover {
   background: var(--hairline);
 }
+
+/* ---------- Drag & Drop ---------- */
+
+/* Greifer ⠿ links an jeder Aufgabe. touch-action:none = Browser scrollt nicht,
+   sobald hier gezogen wird; zurückhaltend, erscheint beim Überfahren. */
+.drag-grip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.15rem;
+  color: var(--ink-faint);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+  opacity: 0;
+  user-select: none;
+  transition:
+    opacity 0.2s ease,
+    color 0.2s ease;
+}
+
+.task-row:hover .drag-grip {
+  opacity: 0.6;
+}
+
+.drag-grip:hover {
+  color: var(--accent);
+}
+
+/* Ohne Maus (Touch) bleibt der Greifer leicht sichtbar */
+@media (hover: none) {
+  .drag-grip {
+    opacity: 0.45;
+  }
+}
+
+/* Bereichsköpfe lassen sich auf oberster Ebene greifen */
+.area-head[data-drag] {
+  cursor: grab;
+  touch-action: none;
+}
+
+/* Der schwebende Klon, der dem Zeiger folgt – blockiert keine Treffererkennung */
+.drag-ghost {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.3rem 0.6rem;
+  list-style: none;
+  pointer-events: none;
+  opacity: 0.92;
+  background: var(--glow);
+  border-radius: 0.6rem;
+  box-shadow: 0 8px 24px rgb(38 37 31 / 0.22);
+}
+
+/* Das Original bleibt an seinem Platz, nur gedimmt – "ich habe es in der Hand" */
+.drag-source {
+  opacity: 0.4;
+}
+
+/* Während eines Ziehens: keine Textauswahl, Greif-Cursor überall */
+body.dragging {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Gültiges Ziel unter dem Zeiger: Akzent-Umrandung + sanfte Tönung */
+.drop-target {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 0.4rem;
+  background: var(--halo);
+}

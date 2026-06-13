@@ -26,8 +26,10 @@ import { normalizeText, parseTags, replaceTagPrefix } from './services/tagServic
 import { applyTag, suggestTags, type TagSuggestion } from './services/tagSuggest';
 import { monthRange, weekRange } from './services/selectors';
 import { InMemoryTagRegistry } from './services/tagRegistry';
+import { retagTask, reorderTopAreas } from './services/dragMove';
 import { buildEventIcs } from './services/ics';
 import { renderApp, type AppState, type ViewId } from './ui/dayView';
+import { initDragDrop, type DropInfo } from './ui/dragDrop';
 import { isoDate, shiftDays } from './utils/dates';
 import type { Habit } from './models/types';
 
@@ -336,6 +338,87 @@ function registerTitleTags(title: string): void {
   if (tags.length > 0) {
     queue(persistTags);
   }
+}
+
+/* ---------- Drag & Drop (optimistisch, bestehende Muster) ---------- */
+
+/**
+ * Aufgabe per Ziehen in einen anderen Bereich: im rawText den Quell-Tag durch
+ * den Ziel-Tag ersetzen (retagTask). Sofort sichtbar, dann im Hintergrund nach
+ * Nextcloud. Der rawText bleibt die Wahrheit – title/tags leiten wir neu ab.
+ */
+function moveTaskToArea(info: DropInfo): void {
+  const task = state.data.tasks.find((t) => t.id === info.id);
+  if (!task || info.path === undefined) {
+    return;
+  }
+  const resolve = (tag: string): string | undefined => state.registry.resolve(tag)?.path;
+  const newRaw = retagTask(task.rawText, info.from ?? '', info.path, resolve);
+  if (newRaw === task.rawText) {
+    return; // No-Op: Drop auf denselben Bereich
+  }
+
+  // Optimistisch: Zustand + Anzeige sofort aktualisieren
+  const parsed = parseTags(newRaw);
+  task.rawText = newRaw;
+  task.title = parsed.cleanText;
+  task.tags = parsed.tags;
+  registerTitleTags(newRaw); // Ziel-Tag in die Registry aufnehmen (+ queue persistTags)
+  rerender();
+
+  // Aufgabe ohne href (sollte real nicht vorkommen): nur lokal, kein Schreiben
+  const href = task.href;
+  if (!href) {
+    return;
+  }
+  const due = task.due;
+  queue(async () => {
+    try {
+      await updateTask(href, newRaw, due || undefined);
+    } catch {
+      // Konflikt/Fehler: ehrlichen Stand aus der Nextcloud holen
+      try {
+        await reloadAgenda();
+      } catch {
+        /* Agenda nicht erreichbar – Hinweis reicht */
+      }
+      state.syncError = 'Verschieben konnte nicht gespeichert werden.';
+      rerender();
+    }
+  });
+}
+
+/**
+ * Top-Level-Bereiche umsortieren: gezogenen Bereich (info.from) vor das Ziel
+ * (info.path) einfügen, neue order-Werte vergeben (reorderTopAreas), in die
+ * Registry schreiben (setOrder) und persistieren.
+ */
+function moveArea(info: DropInfo): void {
+  const moved = info.from;
+  const target = info.path;
+  if (!moved || !target || moved === target) {
+    return;
+  }
+  // Nur oberste Ebene – ein Unterbereich als Quelle/Ziel löst kein Reorder aus
+  if (moved.includes('.') || target.includes('.')) {
+    return;
+  }
+  // Beide sicher in der Registry (setOrder braucht einen Eintrag)
+  state.registry.register(moved);
+  state.registry.register(target);
+  const orderedPaths = state.registry
+    .all()
+    .map((entry) => entry.path)
+    .filter((path) => !path.includes('.'));
+  const updates = reorderTopAreas(orderedPaths, moved, target);
+  if (updates.length === 0) {
+    return;
+  }
+  for (const update of updates) {
+    state.registry.setOrder(update.path, update.order);
+  }
+  rerender();
+  queue(persistTags);
 }
 
 /** Felder des Termin-Formulars auslesen */
@@ -788,6 +871,15 @@ root.addEventListener(
   },
   true,
 );
+
+// Drag & Drop: Greifer/Ziele erkennt die Engine selbst, wir verarbeiten nur das Ergebnis
+initDragDrop(root, (info) => {
+  if (info.dragKind === 'task') {
+    moveTaskToArea(info);
+  } else if (info.dragKind === 'area') {
+    moveArea(info);
+  }
+});
 
 rerender(); // Lade-Ansicht sofort zeigen …
 void boot(); // … und die echten Daten holen
