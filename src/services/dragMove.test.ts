@@ -2,7 +2,7 @@
 // Diese Funktionen kennen kein DOM und keine Pointer-Events – sie rechnen nur
 // auf Text und Reihenfolgen. Genau das macht sie testbar.
 import { describe, it, expect } from 'vitest';
-import { retagTask, reorderTopAreas } from './dragMove';
+import { retagTask, untagTask, reorderTopAreas } from './dragMove';
 
 /**
  * Fake-resolve wie es die Registry liefern würde: Tag-Text → kanonischer Pfad.
@@ -50,6 +50,26 @@ describe('retagTask', () => {
   });
 });
 
+describe('untagTask', () => {
+  it('entfernt den Quelltag – die Aufgabe wird tag-los', () => {
+    expect(untagTask('Keller entrümpeln #Zuhause', 'Zuhause', resolve)).toBe('Keller entrümpeln');
+  });
+
+  it('erkennt den Quelltag über einen Alias', () => {
+    expect(untagTask('Keller entrümpeln #Heim', 'Zuhause', resolve)).toBe('Keller entrümpeln');
+  });
+
+  it('entfernt nur den Quelltag und lässt andere stehen', () => {
+    expect(untagTask('Angebot schreiben #Arbeit #Wichtig', 'Arbeit', resolve)).toBe(
+      'Angebot schreiben #Wichtig',
+    );
+  });
+
+  it('ändert nichts, wenn kein passender Tag vorhanden ist', () => {
+    expect(untagTask('Einkaufen', 'Zuhause', resolve)).toBe('Einkaufen');
+  });
+});
+
 describe('reorderTopAreas', () => {
   const order = ['Arbeit', 'Zuhause', 'Garten', 'Büro'];
 
@@ -80,6 +100,16 @@ describe('reorderTopAreas', () => {
       { path: 'Arbeit', order: 10 },
       { path: 'Zuhause', order: 20 },
       { path: 'Büro', order: 30 },
+    ]);
+  });
+
+  it('verschiebt einen Bereich ans Ende (target null = anhängen)', () => {
+    const result = reorderTopAreas(order, 'Zuhause', null);
+    expect(result).toEqual([
+      { path: 'Arbeit', order: 0 },
+      { path: 'Garten', order: 10 },
+      { path: 'Büro', order: 20 },
+      { path: 'Zuhause', order: 30 },
     ]);
   });
 

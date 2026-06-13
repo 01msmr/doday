@@ -41,8 +41,26 @@ export function retagTask(
 }
 
 /**
+ * Entfernt den Bereich einer Aufgabe: löscht im `rawText` den Tag, dessen
+ * kanonischer Pfad `=== fromPath` ist (über Alias/Schreibweise via `resolve`).
+ * Andere Tags bleiben. Ohne passenden Tag bleibt der Text unverändert.
+ * Wird beim Ziehen in "Ohne Bereich" genutzt.
+ */
+export function untagTask(
+  rawText: string,
+  fromPath: string,
+  resolve: (tag: string) => string | undefined,
+): string {
+  const { cleanText, tags } = parseTags(rawText);
+  const kept = tags.filter((tag) => resolve(tag) !== fromPath);
+  const rebuilt = [cleanText, ...kept.map((tag) => `#${tag}`)].join(' ');
+  return normalizeText(rebuilt);
+}
+
+/**
  * Sortiert Top-Level-Bereiche um: `moved` aus der Reihenfolge nehmen und VOR
- * `target` wieder einfügen. Vergibt für alle neue order-Werte (`index * 10`),
+ * `target` wieder einfügen. `target = null` hängt `moved` ans Ende an (für das
+ * Verschieben nach ganz unten). Vergibt für alle neue order-Werte (`index * 10`),
  * damit später wieder Platz zum Einschieben bleibt.
  *
  * Ist `moved === target`, ändert sich nichts → leeres Ergebnis (No-Op).
@@ -50,13 +68,16 @@ export function retagTask(
 export function reorderTopAreas(
   orderedPaths: string[],
   moved: string,
-  target: string,
+  target: string | null,
 ): { path: string; order: number }[] {
   if (moved === target) {
     return [];
   }
   const without = orderedPaths.filter((path) => path !== moved);
-  const targetIndex = without.indexOf(target);
-  without.splice(targetIndex, 0, moved);
+  if (target === null) {
+    without.push(moved); // ans Ende
+  } else {
+    without.splice(without.indexOf(target), 0, moved); // vor das Ziel
+  }
   return without.map((path, index) => ({ path, order: index * 10 }));
 }
