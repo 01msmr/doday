@@ -1050,7 +1050,7 @@ details[open] > summary .chevron {
 .nav-item {
   /* Quadrat wie das Icon. EIN Regler steuert die Gesamtgröße: --keycap-size.
      DO, Wort, Einzug und Abstand skalieren proportional mit. */
-  --keycap-size: 3.3rem;
+  --keycap-size: min(4.13rem, 21vw); /* 25% größer; auf schmalen Screens begrenzt */
   width: var(--keycap-size);
   aspect-ratio: 1 / 1;
   border-radius: 18%; /* gerundete Ecken wie beim iOS-Icon */
@@ -1062,7 +1062,6 @@ details[open] > summary .chevron {
   gap: calc(var(--keycap-size) * 0.02);
   padding: 0;
   overflow: hidden;
-  font-size: calc(var(--keycap-size) * 0.33); /* Basis für DO + Wort */
   background: var(--keycap);
   border: 1px solid rgb(38 37 31 / 0.1);
   color: var(--keycap-ink);
@@ -1100,7 +1099,7 @@ details[open] > summary .chevron {
 
 /* "DO" groß und fett – trägt die Marke (wie im Icon) */
 .nav-do {
-  font-size: 1em; /* = --keycap-size * 0.33 */
+  font-size: 1.1rem; /* 1. Zeile bewusst unverändert gelassen */
   font-weight: 800;
   line-height: 0.95;
   letter-spacing: 0;
@@ -1109,7 +1108,7 @@ details[open] > summary .chevron {
 
 /* Ziel-Wort darunter, kleiner und gesperrt: Day · Morrow · Week · Month */
 .nav-label {
-  font-size: 0.42em; /* skaliert mit --keycap-size */
+  font-size: 0.62rem; /* 2. Zeile vergrößert */
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.02em;
