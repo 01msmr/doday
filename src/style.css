@@ -1091,6 +1091,7 @@ details[open] > summary .chevron {
   box-shadow: none;
   transform: translateY(2px);
   border-color: rgb(38 37 31 / 0.18);
+  background: var(--keycap); /* aktive Kachel ohne Grau-Tönung – hell/hervorgehoben */
 }
 
 /* "DO" groß und fett – trägt die Marke (wie im Icon) */
