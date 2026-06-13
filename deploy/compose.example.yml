@@ -13,6 +13,12 @@ services:
     env_file: ./doday/.env # NEXTCLOUD_URL, NEXTCLOUD_USER, NEXTCLOUD_APP_PASSWORD, …
     networks:
       - traefik
+    # Backend ruft serverseitig cd.msmr.co auf. Damit ein wackeliger Heim-DNS
+    # (split-horizon: cd.msmr.co → ucloud.fritz.box → LAN-IP) die App nicht
+    # lahmlegt, die IP fest verdrahten – das TLS-Zertifikat bleibt für
+    # cd.msmr.co gültig (verbunden wird nur per IP, SNI/Host unverändert):
+    extra_hosts:
+      - "cd.msmr.co:10.0.10.100" # LAN-IP des Servers (Traefik/Nextcloud)
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.doday.rule=Host(`do.msmr.co`)"
@@ -28,6 +34,12 @@ services:
       #   htpasswd -nB uli | sed 's/\$/$$/g'
       # - "traefik.http.middlewares.doday-auth.basicauth.users=uli:$$2y$$05$$BEISPIELHASH"
       # - "traefik.http.routers.doday.middlewares=doday-auth"
+      # Bei aktivem Basic Auth: damit iOS das PWA-Icon laden kann, einen zweiten
+      # Router NUR für die Icon-/Manifest-Dateien OHNE Auth-Middleware ergänzen:
+      # - "traefik.http.routers.doday-pwa.rule=Host(`do.msmr.co`) && PathRegexp(`\\.(png|json)$`)"
+      # - "traefik.http.routers.doday-pwa.entrypoints=websecure"
+      # - "traefik.http.routers.doday-pwa.tls=true"
+      # - "traefik.http.routers.doday-pwa.service=doday"
 
 # Nur nötig, falls die Datei eigenständig genutzt wird – in der bestehenden
 # Compose-Datei ist das Netzwerk "traefik" bereits deklariert.

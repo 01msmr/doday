@@ -64,12 +64,38 @@ Stand: 13. Juni 2026 · `main` = `05fb117` · 144 Tests grün · live auf https:
   Ebenen mit Unterbereichen enden auf `.` und zeigen sofort die nächste Stufe
 - Bedienung: Tipp/Klick, ↑/↓ + Enter, Escape; NFD-Umlaute werden gefunden
 
+### Navi-Leiste als Mini-Icons
+- Untere Tasten 1:1 nach dem App-Icon: quadratische Papier-Kachel,
+  großes „DO" (Mitte 37,5 %) über dem Wort (Mitte 75 %), Größe über
+  `--keycap-size`. Inaktiv = Grau-Tönung (50 %/15 %) + dunkler Schatten;
+  aktiv = hell, ohne Tönung, ohne Schatten. Nur „Do Day" hat das Wort +25 %.
+
+## Störungs-Lehren (13.06.2026) – wichtig fürs Deployment
+
+- **Dockerfile musste `COPY src ./src` bekommen** – das Backend importiert
+  `src/services/tagService`; ohne `src/` im Laufzeit-Image → Crash-Loop +
+  Traefik-404 (Fix: Commit 905ae43).
+- **Nextcloud-Datei-Sperre (HTTP 423):** Beim Speichern hängengebliebene
+  Sperre der „Temporary files lock"-App (`files_lock`). Lag NICHT in Redis
+  (Redis-Flush half nicht), sondern in der DB. Gelöst durch
+  `occ app:disable files_lock`. Diese App brauchen wir nicht.
+- **DNS-Ausfall des Heimnetzes:** `cd.msmr.co` (split-horizon →
+  `ucloud.fritz.box` → `10.0.10.100`) war zeitweise nicht auflösbar, weil der
+  Pi-hole-Resolver (`unhole`) wackelte. Dauerhafte Absicherung:
+  **`extra_hosts: cd.msmr.co:10.0.10.100`** im `doday`-Service (steht jetzt in
+  `deploy/compose.example.yml`) – das Backend ist damit vom Heim-DNS entkoppelt.
+- **PWA-Icon trotz Basic Auth:** zweiter auth-freier Traefik-Router nur für die
+  Icon-/Manifest-Dateien (`PathRegexp` `\.(png|json)$`); Beispiel in der Compose.
+- **Diagnose-Lehre:** „Speichern fehlgeschlagen – läuft das Backend?" war
+  irreführend (es lief). → offener Punkt: ehrlichere Fehlermeldung.
+
 ## Offene Punkte
 
 | Thema | Status |
 |---|---|
 | ~~PWA-Manifest (Vollbild auf dem iPhone)~~ | ✅ erledigt 13.06. – statisches `manifest.json` + apple-Meta-Tags, kein Service Worker (Nutzerwunsch) |
-| Verschieben per Drag & Drop | Konzept fertig: `docs/verschieben-konzept.md` (4 Stufen, Pointer Events) |
+| Verschieben per Drag & Drop | Konzept fertig: `docs/verschieben-konzept.md` (4 Stufen, Pointer Events) – **als Nächstes** |
+| Ehrlichere Sync-Fehlermeldung | „läuft das Backend?" war am 13.06. irreführend (Sperre/DNS); Ursache benennen statt pauschal |
 | Serientermine bearbeiten | bewusst ausgeklammert – Änderung in der Nextcloud (RECURRENCE-ID wäre nötig) |
 | Blättern in die ZUKUNFT (Week/Month) | bewusst weggelassen (YAGNI) – Cockpits zeigen jetzt + Vergangenheit |
 | Ziel-Historie | Ziele zeigen immer den aktuellen Stand, auch in Vorzeiträumen (keine Historie gespeichert) |
