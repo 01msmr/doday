@@ -186,3 +186,29 @@ describe('archive und all', () => {
     expect(registry.all().map((t) => t.path)).toEqual(['Banane', 'Apfel']);
   });
 });
+
+describe('setOrder', () => {
+  it('setzt die Reihenfolge eines vorhandenen Eintrags', () => {
+    const registry = seededRegistry();
+    registry.setOrder('Zuhause', 30);
+    expect(registry.resolve('Zuhause')?.order).toBe(30);
+  });
+
+  it('findet den Eintrag auch über einen Alias', () => {
+    const registry = seededRegistry();
+    registry.setOrder('Heim', 30);
+    expect(registry.resolve('Zuhause')?.order).toBe(30);
+  });
+
+  it('zählt die Version hoch (Basis für Konflikt-Erkennung)', () => {
+    const registry = seededRegistry();
+    const before = registry.toJSON().version;
+    registry.setOrder('Zuhause', 30);
+    expect(registry.toJSON().version).toBe(before + 1);
+  });
+
+  it('wirft bei unbekanntem Pfad', () => {
+    const registry = seededRegistry();
+    expect(() => registry.setOrder('GibtsNicht', 10)).toThrow();
+  });
+});

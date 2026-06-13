@@ -236,13 +236,20 @@ function renderSchedule(
 /* ---------- Aufgaben & Bereiche ---------- */
 
 /** Eine abhakbare Aufgabenzeile (Button statt Checkbox: größere Tippfläche, frei stylebar).
-    Während des Bearbeitens ersetzt das Inline-Formular die Zeile. */
-export function renderTask(task: Task, editingId: string | null = null): string {
+    Während des Bearbeitens ersetzt das Inline-Formular die Zeile.
+    fromPath = Bereich, in dem die Zeile gerade steht (Quelle beim Verschieben);
+    leer für "Ohne Bereich"/Cockpit – dort hängt retagTask den Tag dann an. */
+export function renderTask(task: Task, editingId: string | null = null, fromPath = ''): string {
   if (task.id === editingId) {
     return `<li>${renderTaskEditForm(task)}</li>`;
   }
+  // Greifer links, GETRENNT vom Abhak-Button: Ziehen darf nicht abhaken.
+  // touch-action:none (im CSS) verhindert, dass der Browser beim Ziehen scrollt.
+  const grip = `<span class="drag-grip" data-drag="task" data-id="${escapeHtml(task.id)}"
+        data-from="${escapeHtml(fromPath)}" aria-hidden="true" title="Zum Verschieben ziehen">&#10303;</span>`;
   return `
     <li class="task-row">
+      ${grip}
       <button type="button" class="task${task.completed ? ' done' : ''}"
         data-action="toggle-task" data-id="${task.id}" aria-pressed="${task.completed}">
         <span class="check" aria-hidden="true"></span>
@@ -266,6 +273,11 @@ function renderArea(group: AreaGroup, state: AppState): string {
   const open = state.collapsed.has(group.node.path) ? '' : ' open';
   const color = areaColor(state.registry, group.node.path);
   const path = escapeHtml(group.node.path);
+  // Kopf = Aufgaben-Ablageziel (data-drop) UND – nur auf oberster Ebene –
+  // selbst greifbar zum Umsortieren (data-drag). Unterbereiche bleiben nur Ziel.
+  const isTopLevel = !group.node.path.includes('.');
+  // data-from am Kopf = eigener Pfad: beim Umsortieren ist das die Quelle (info.from)
+  const dropAttrs = `data-drop="area" data-path="${path}"${isTopLevel ? ` data-drag="area" data-from="${path}"` : ''}`;
   // Name-Klick = Sprung (Filter auf den Bereich), ✎ = Umbenennen.
   // Während des Umbenennens ersetzt ein Eingabefeld den Namen.
   const name =
@@ -278,7 +290,7 @@ function renderArea(group: AreaGroup, state: AppState): string {
           aria-label="Bereich umbenennen">&#9998;</button>`;
   return `
     <details class="area"${open} data-area="${path}">
-      <summary class="area-head">
+      <summary class="area-head" ${dropAttrs}>
         <span class="chevron" aria-hidden="true"></span>
         <span class="area-dot" style="--c:${color}"></span>
         ${name}
@@ -286,7 +298,7 @@ function renderArea(group: AreaGroup, state: AppState): string {
       </summary>
       <div class="area-body">
         ${group.events.length > 0 ? `<ol class="group-events">${group.events.map(renderGroupEvent).join('')}</ol>` : ''}
-        ${renderTaskLists(group.tasks, state.editingTask)}
+        ${renderTaskLists(group.tasks, state.editingTask, group.node.path)}
         ${group.children.map((child) => renderArea(child, state)).join('')}
       </div>
     </details>`;
@@ -296,10 +308,10 @@ function renderArea(group: AreaGroup, state: AppState): string {
  * Offene Aufgaben links; erledigte darunter als Block nach rechts gerückt –
  * der Block selbst ist in sich linksbündig (gemeinsame linke Kante).
  */
-function renderTaskLists(tasks: Task[], editingId: string | null): string {
+function renderTaskLists(tasks: Task[], editingId: string | null, fromPath = ''): string {
   const open = tasks.filter((task) => !task.completed);
   const done = tasks.filter((task) => task.completed);
-  const row = (task: Task): string => renderTask(task, editingId);
+  const row = (task: Task): string => renderTask(task, editingId, fromPath);
   return `
     ${open.length > 0 ? `<ul class="task-list">${open.map(row).join('')}</ul>` : ''}
     ${done.length > 0 ? `<ul class="task-list task-list--done">${done.map(row).join('')}</ul>` : ''}`;

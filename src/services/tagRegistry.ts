@@ -142,6 +142,20 @@ export class InMemoryTagRegistry {
     this.touch();
   }
 
+  /**
+   * Setzt die Sortier-Reihenfolge eines Bereichs. Der Bereich wird über Pfad
+   * ODER Alias gefunden (wie resolve), damit auch frühere Schreibweisen greifen.
+   * Genutzt beim Umsortieren der Top-Level-Bereiche per Drag & Drop.
+   */
+  setOrder(path: string, order: number): void {
+    const entry = this.resolve(path);
+    if (!entry) {
+      throw new Error(`Tag mit Pfad "${path}" existiert nicht`);
+    }
+    entry.order = order;
+    this.touch();
+  }
+
   /** Aktueller Zustand – in Phase 2 wird genau das nach tags.json geschrieben. */
   toJSON(): TagRegistryData {
     return this.data;
