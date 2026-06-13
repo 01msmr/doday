@@ -1115,12 +1115,17 @@ details[open] > summary .chevron {
   top: 75%; /* mittig in der unteren Hälfte */
   transform: translateY(-50%);
   text-align: center;
-  font-size: 0.78rem; /* 2. Zeile (Wort) nochmals +25% */
+  font-size: 0.62rem; /* 2. Zeile (Wort) */
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.02em;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+/* Nur "Do Day" hat das Wort 25% größer – nicht Morrow/Week/Month */
+.nav-item[data-view='day'] .nav-label {
+  font-size: 0.78rem;
 }
 
 /* Tastatur-Fokus sichtbar halten (Barrierefreiheit) */
