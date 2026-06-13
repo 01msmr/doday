@@ -26,7 +26,7 @@ import { normalizeText, parseTags, replaceTagPrefix } from './services/tagServic
 import { applyTag, suggestTags, type TagSuggestion } from './services/tagSuggest';
 import { monthRange, weekRange } from './services/selectors';
 import { InMemoryTagRegistry } from './services/tagRegistry';
-import { retagTask, reorderTopAreas } from './services/dragMove';
+import { retagTask, untagTask, reorderTopAreas } from './services/dragMove';
 import { buildEventIcs } from './services/ics';
 import { renderApp, type AppState, type ViewId } from './ui/dayView';
 import { initDragDrop, type DropInfo } from './ui/dragDrop';
@@ -343,19 +343,27 @@ function registerTitleTags(title: string): void {
 /* ---------- Drag & Drop (optimistisch, bestehende Muster) ---------- */
 
 /**
- * Aufgabe per Ziehen in einen anderen Bereich: im rawText den Quell-Tag durch
- * den Ziel-Tag ersetzen (retagTask). Sofort sichtbar, dann im Hintergrund nach
- * Nextcloud. Der rawText bleibt die Wahrheit – title/tags leiten wir neu ab.
+ * Aufgabe per Ziehen verschieben: in einen anderen Bereich (retagTask: Quell-Tag
+ * durch Ziel-Tag ersetzen) oder in "Ohne Bereich" (untagTask: Quell-Tag entfernen).
+ * Sofort sichtbar, dann im Hintergrund nach Nextcloud. Der rawText bleibt die
+ * Wahrheit – title/tags leiten wir neu ab.
  */
-function moveTaskToArea(info: DropInfo): void {
+function dropTask(info: DropInfo): void {
   const task = state.data.tasks.find((t) => t.id === info.id);
-  if (!task || info.path === undefined) {
+  if (!task) {
     return;
   }
   const resolve = (tag: string): string | undefined => state.registry.resolve(tag)?.path;
-  const newRaw = retagTask(task.rawText, info.from ?? '', info.path, resolve);
+  let newRaw: string;
+  if (info.dropKind === 'untag') {
+    newRaw = untagTask(task.rawText, info.from ?? '', resolve);
+  } else if (info.path !== undefined) {
+    newRaw = retagTask(task.rawText, info.from ?? '', info.path, resolve);
+  } else {
+    return;
+  }
   if (newRaw === task.rawText) {
-    return; // No-Op: Drop auf denselben Bereich
+    return; // No-Op: Drop auf denselben Bereich / kein passender Tag
   }
 
   // Optimistisch: Zustand + Anzeige sofort aktualisieren
@@ -395,17 +403,19 @@ function moveTaskToArea(info: DropInfo): void {
  */
 function moveArea(info: DropInfo): void {
   const moved = info.from;
-  const target = info.path;
-  if (!moved || !target || moved === target) {
-    return;
+  if (!moved || moved.includes('.')) {
+    return; // nur oberste Ebene lässt sich umsortieren
   }
-  // Nur oberste Ebene – ein Unterbereich als Quelle/Ziel löst kein Reorder aus
-  if (moved.includes('.') || target.includes('.')) {
-    return;
+  // "area-end" = ans Ende anhängen (target null); sonst vor den Ziel-Bereich
+  const target = info.dropKind === 'area-end' ? null : (info.path ?? null);
+  if (target !== null && (target.includes('.') || target === moved)) {
+    return; // Unterbereich als Ziel bzw. Drop auf sich selbst → No-Op
   }
-  // Beide sicher in der Registry (setOrder braucht einen Eintrag)
+  // Beteiligte sicher in der Registry (setOrder braucht einen Eintrag)
   state.registry.register(moved);
-  state.registry.register(target);
+  if (target) {
+    state.registry.register(target);
+  }
   const orderedPaths = state.registry
     .all()
     .map((entry) => entry.path)
@@ -875,7 +885,7 @@ root.addEventListener(
 // Drag & Drop: Greifer/Ziele erkennt die Engine selbst, wir verarbeiten nur das Ergebnis
 initDragDrop(root, (info) => {
   if (info.dragKind === 'task') {
-    moveTaskToArea(info);
+    dropTask(info);
   } else if (info.dragKind === 'area') {
     moveArea(info);
   }

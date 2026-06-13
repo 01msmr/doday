@@ -359,7 +359,12 @@ function renderAreas(
         isEmpty
           ? '<p class="empty">Keine Aufgaben für diesen Tag.</p>'
           : grouped.groups.map((group) => renderArea(group, state)).join('') +
-            renderUntagged(grouped, state)
+            // Ablagezone fürs Verschieben nach ganz unten – nur beim Bereich-Ziehen
+            // greifbar (CSS), ein Strich darin = "hier ans Ende einsortieren".
+            '<div class="area-drop-end" data-drop="area-end" aria-hidden="true"></div>' +
+            renderUntagged(grouped, state) +
+            // Aufgabe hierher ziehen entfernt ihren Bereich – nur beim Aufgabe-Ziehen sichtbar
+            '<div class="untag-drop" data-drop="untag" aria-hidden="true">Aus Bereich entfernen</div>'
       }
     </section>`;
 }

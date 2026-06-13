@@ -25,8 +25,8 @@ export interface DropInfo {
 
 /** Welche Greifer-Art darf auf welche Ablage-Art? Alles andere wird ignoriert. */
 const ACCEPTS: Record<string, string[]> = {
-  task: ['area'], // Aufgabe → Bereich
-  area: ['area'], // Bereich → anderer Bereich (umsortieren)
+  task: ['area', 'untag'], // Aufgabe → Bereich ODER "Ohne Bereich" (Tag entfernen)
+  area: ['area', 'area-end'], // Bereich → vor anderen Bereich ODER ans Ende
 };
 
 /** Maus: ab so vielen Pixeln Bewegung beginnt das Ziehen */

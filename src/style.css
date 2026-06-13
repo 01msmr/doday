@@ -1460,3 +1460,32 @@ body.drag-area .drop-target::before {
   border-radius: 2px;
   background: var(--accent);
 }
+
+/* Ablagezone "ans Ende": nimmt normal keinen Platz weg, wird nur beim
+   Bereich-Ziehen zu einer treffbaren Fläche unter dem letzten Bereich. */
+.area-drop-end {
+  height: 0;
+}
+
+body.drag-area .area-drop-end {
+  height: 2.5rem;
+}
+
+/* "Aus Bereich entfernen": nur beim Aufgabe-Ziehen sichtbar. Eine Aufgabe hierher
+   ziehen löscht ihren (Quell-)Bereich – sie landet in "Ohne Bereich". */
+.untag-drop {
+  height: 0;
+  padding: 0;
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+body.drag-task .untag-drop {
+  height: auto;
+  margin-top: 0.75rem;
+  padding: 0.7rem 0.8rem;
+  border: 1.5px dashed var(--ink-faint);
+  border-radius: 0.6rem;
+}
