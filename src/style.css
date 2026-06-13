@@ -1034,8 +1034,9 @@ details[open] > summary .chevron {
   inset: auto 0 0 0; /* links/rechts/unten angedockt */
   display: flex;
   justify-content: center;
-  gap: clamp(0.25rem, 3vw, 1.5rem);
-  padding: 0.5rem 1rem max(0.6rem, env(safe-area-inset-bottom));
+  align-items: center; /* Quadrate behalten ihre Höhe (nicht strecken) */
+  gap: clamp(0.3rem, 3vw, 1.2rem);
+  padding: 0.5rem 0.8rem max(0.6rem, env(safe-area-inset-bottom));
   background: var(--nav-bg);
   /* Inhalt schimmert beim Scrollen weich durch (iOS-Gefühl) */
   -webkit-backdrop-filter: blur(14px);
@@ -1043,29 +1044,35 @@ details[open] > summary .chevron {
   border-top: 1px solid var(--hairline);
 }
 
-/* Jede Ansicht als eigene "Taste" – 1:1 dem App-Icon nachempfunden:
-   cremefarbene Kachel, großes rundes "DO" über dem kleineren Ziel-Wort. */
+/* Jede Ansicht als eigene "Taste" – IDENTISCH zum App-Icon:
+   quadratische Papier-Kachel, großes "DO" über dem kleineren Wort,
+   beides LINKSBÜNDIG mit demselben Einzug wie im Icon. */
 .nav-item {
+  /* Quadrat wie das Icon */
+  width: clamp(3.4rem, 18.5vw, 4.6rem);
+  aspect-ratio: 1 / 1;
+  border-radius: 18%; /* gerundete Ecken wie beim iOS-Icon */
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0;
-  min-width: 4.25rem;
-  padding: 0.4rem 0.7rem 0.45rem;
+  align-items: flex-start; /* Text linksbündig wie im Icon */
+  justify-content: center;
+  gap: 0.1rem;
+  /* linker Einzug + etwas Luft wie im Icon */
+  padding: 0 8% 0 14%;
   background: var(--keycap);
-  border: 1px solid rgb(38 37 31 / 0.12);
-  border-radius: 0.85rem;
+  border: 1px solid rgb(38 37 31 / 0.1);
   color: var(--keycap-ink);
   /* gerundete Schrift wie im Icon (SF Pro Rounded auf Apple-Geräten) */
   font-family: ui-rounded, 'SF Pro Rounded', 'Hiragino Maru Gothic ProN',
     'Arial Rounded MT Bold', system-ui, sans-serif;
-  /* zarter Präge-Effekt der Buchstaben wie im Icon */
-  text-shadow: 0 1px 0 rgb(255 255 255 / 0.55);
+  /* zarter Präge-Effekt der Buchstaben + Rand-Vignette wie im Icon */
+  text-shadow: 0 1px 0 rgb(255 255 255 / 0.5);
   cursor: pointer;
   /* INAKTIV = erhaben: deutlich sichtbarer Schatten (nicht gedrückt) */
   box-shadow:
     0 4px 9px var(--keycap-shadow),
-    0 1px 2px rgb(38 37 31 / 0.18);
+    0 1px 2px rgb(38 37 31 / 0.18),
+    inset 0 0 14px rgb(38 37 31 / 0.05);
   transition:
     box-shadow 0.15s ease,
     transform 0.15s ease;
@@ -1075,7 +1082,8 @@ details[open] > summary .chevron {
   transform: translateY(-1px);
   box-shadow:
     0 7px 14px var(--keycap-shadow),
-    0 1px 2px rgb(38 37 31 / 0.18);
+    0 1px 2px rgb(38 37 31 / 0.18),
+    inset 0 0 14px rgb(38 37 31 / 0.05);
 }
 
 /* AKTIV = gedrückt/flach: KEIN Schatten, leicht abgesenkt */
@@ -1086,23 +1094,23 @@ details[open] > summary .chevron {
   border-color: rgb(38 37 31 / 0.18);
 }
 
-/* "DO" groß, fett und rund – trägt die Marke (wie im Icon) */
+/* "DO" groß und fett – trägt die Marke (wie im Icon) */
 .nav-do {
-  font-size: 1.2rem;
+  font-size: clamp(1.15rem, 6vw, 1.5rem);
   font-weight: 800;
-  line-height: 1;
-  letter-spacing: 0.01em;
+  line-height: 0.95;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
-/* Ziel-Wort darunter, kleiner: Day · Morrow · Week · Month */
+/* Ziel-Wort darunter, kleiner und gesperrt: Day · Morrow · Week · Month */
 .nav-label {
-  font-size: 0.7rem;
-  font-weight: 600;
-  line-height: 1.1;
-  letter-spacing: 0.08em;
+  font-size: clamp(0.55rem, 2.6vw, 0.66rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  margin-top: 0.06rem;
+  white-space: nowrap;
 }
 
 /* Tastatur-Fokus sichtbar halten (Barrierefreiheit) */
