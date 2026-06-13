@@ -1048,8 +1048,8 @@ details[open] > summary .chevron {
    quadratische Papier-Kachel, großes "DO" über dem kleineren Wort,
    beides LINKSBÜNDIG mit demselben Einzug wie im Icon. */
 .nav-item {
-  /* Quadrat wie das Icon */
-  width: clamp(3.4rem, 18.5vw, 4.6rem);
+  /* Quadrat wie das Icon – Seitenlänge = lange Kante der vorigen Tasten */
+  width: 4.25rem;
   aspect-ratio: 1 / 1;
   border-radius: 18%; /* gerundete Ecken wie beim iOS-Icon */
   display: flex;
@@ -1096,7 +1096,7 @@ details[open] > summary .chevron {
 
 /* "DO" groß und fett – trägt die Marke (wie im Icon) */
 .nav-do {
-  font-size: clamp(1.15rem, 6vw, 1.5rem);
+  font-size: 1.4rem;
   font-weight: 800;
   line-height: 0.95;
   letter-spacing: 0;
@@ -1105,7 +1105,7 @@ details[open] > summary .chevron {
 
 /* Ziel-Wort darunter, kleiner und gesperrt: Day · Morrow · Week · Month */
 .nav-label {
-  font-size: clamp(0.55rem, 2.6vw, 0.66rem);
+  font-size: 0.62rem;
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.04em;
