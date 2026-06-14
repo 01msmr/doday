@@ -83,7 +83,20 @@ Stand: 13. Juni 2026 · `main` = `05fb117` · 144 Tests grün · live auf https:
   `ucloud.fritz.box` → `10.0.10.100`) war zeitweise nicht auflösbar, weil der
   Pi-hole-Resolver (`unhole`) wackelte. Dauerhafte Absicherung:
   **`extra_hosts: cd.msmr.co:10.0.10.100`** im `doday`-Service (steht jetzt in
-  `deploy/compose.example.yml`) – das Backend ist damit vom Heim-DNS entkoppelt.
+  `deploy/compose.example.yml`) – das **Backend** ist damit vom Heim-DNS entkoppelt.
+- **CNAME-auf-IP im Pi-hole = Bug (14.06.2026):** Die CLIENT-Auflösung von
+  `do.msmr.co`/`cd.msmr.co` brach am Heimnetz (v. a. iOS), weil im Pi-hole ein
+  **CNAME auf eine IP** stand (`ucloud.fritz.box → 10.0.10.100`). Ein CNAME darf
+  NUR auf einen Namen zeigen, nie auf eine IP – die Kette endet sonst beim
+  Pseudo-Namen `10.0.10.100.` ohne A-Record. macOS/`curl` deuten das nachsichtig
+  als IP-Literal (geht „zufällig"), **strikte Resolver (iOS) scheitern**. Fix:
+  die zwei CNAME-auf-IP-Einträge (`ucloud.fritz.box→10.0.10.100`,
+  `fritz.box→10.0.10.1`) **gelöscht**. Conditional Forwarding (war längst aktiv:
+  `10.0.10.0/24 → 10.0.10.1 / fritz.box`) liefert `ucloud.fritz.box` nun als
+  echten A-Record von der Fritzbox; die Aliase `*.msmr.co → ucloud.fritz.box`
+  (CNAME Name→Name) sind dadurch gültig. **Regel: im Pi-hole IP-Ziele als
+  A-Record (Local DNS Records), niemals als CNAME.** `extra_hosts` (oben) betrifft
+  nur das Backend und hat mit dieser Client-Auflösung nichts zu tun.
 - **PWA-Icon trotz Basic Auth:** zweiter auth-freier Traefik-Router nur für die
   Icon-/Manifest-Dateien (`PathRegexp` `\.(png|json)$`); Beispiel in der Compose.
 - **Diagnose-Lehre:** „Speichern fehlgeschlagen – läuft das Backend?" war
