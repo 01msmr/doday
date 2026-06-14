@@ -10,6 +10,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import { existsSync } from 'node:fs';
 import { loadConfig } from './config';
+import { installLoginGate } from './auth';
 import { WebDavClient, WebDavConflictError } from './webdav';
 import { CalDavClient, type CalendarInfo } from './caldav';
 import {
@@ -38,6 +39,12 @@ const defaultTags = () => ({ version: 0, updatedAt: new Date().toISOString(), ta
 const app = new Hono();
 
 app.get('/api/v1/health', (c) => c.json({ ok: true, dataDir: config.dataDir }));
+
+// Cookie-Login (statt Basic Auth): schützt API + ausgeliefertes Frontend, sobald
+// DODAY_PASSWORD gesetzt ist. Muss VOR den API-/Static-Routen stehen, damit es sie umfasst.
+if (config.auth) {
+  installLoginGate(app, config.auth);
+}
 
 /** GET = Datei lesen (oder Startwert), PUT = schreiben mit ETag-Konfliktschutz */
 function jsonFileRoutes(route: string, file: string, fallback: () => unknown): void {

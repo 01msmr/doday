@@ -28,18 +28,11 @@ services:
       # Port IM Container (doday-Backend lauscht auf 3000 – kein ports:-Mapping nötig)
       - "traefik.http.services.doday.loadbalancer.server.port=3000"
       - "traefik.docker.network=traefik"
-      # Zugriffsschutz per Basic Auth (Traefik fragt Benutzer/Passwort ab, BEVOR
-      # die Anfrage die App erreicht). Hash erzeugen: htpasswd -nB <name>
-      # Achtung: jedes $ im Hash muss in Compose als $$ geschrieben werden!
-      #   htpasswd -nB uli | sed 's/\$/$$/g'
-      # - "traefik.http.middlewares.doday-auth.basicauth.users=uli:$$2y$$05$$BEISPIELHASH"
-      # - "traefik.http.routers.doday.middlewares=doday-auth"
-      # Bei aktivem Basic Auth: damit iOS das PWA-Icon laden kann, einen zweiten
-      # Router NUR für die Icon-/Manifest-Dateien OHNE Auth-Middleware ergänzen:
-      # - "traefik.http.routers.doday-pwa.rule=Host(`do.msmr.co`) && PathRegexp(`\\.(png|json)$`)"
-      # - "traefik.http.routers.doday-pwa.entrypoints=websecure"
-      # - "traefik.http.routers.doday-pwa.tls=true"
-      # - "traefik.http.routers.doday-pwa.service=doday"
+      # Zugriffsschutz: KEIN Basic Auth mehr. Das Backend bringt einen Cookie-Login
+      # mit (Login-Seite + langlebiges Cookie) – setze dazu DODAY_PASSWORD in der
+      # ./doday/.env. Vorteil ggü. Basic Auth: iOS fragt beim PWA-Start nicht mehr
+      # ständig nach, und das PWA-Icon/Manifest lädt ohne Sonderrouter.
+      # (Falls von einer älteren Version Basic-Auth-Labels existieren: entfernen.)
 
 # Nur nötig, falls die Datei eigenständig genutzt wird – in der bestehenden
 # Compose-Datei ist das Netzwerk "traefik" bereits deklariert.
