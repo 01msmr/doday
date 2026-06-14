@@ -11,6 +11,10 @@
          für Browser-Tabs – beide aus public/app-icon-1024.png verkleinert -->
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <!-- macOS Safari „Zum Dock hinzufügen" maskiert NICHT selbst (anders als iOS).
+         Daher ein vorgeformtes Squircle-Icon (mit transparentem Rand) als großer
+         Icon-Hinweis – Browser nehmen für Tabs weiter favicon-32, der Dock das 1024er. -->
+    <link rel="icon" type="image/png" sizes="1024x1024" href="/icon-mac-1024.png" />
     <!-- PWA: Vollbild-Start vom Homescreen. Das Manifest gilt für alle Browser,
          die apple-* Meta-Tags sorgen auf iOS zuverlässig fürs Vollbild. -->
     <link rel="manifest" href="/manifest.json" />
