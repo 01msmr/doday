@@ -34,8 +34,11 @@ Stand: 13. Juni 2026 · `main` = `05fb117` · 144 Tests grün · live auf https:
 ### Betrieb (12./13. Juni 2026)
 - **Ausfall behoben:** Dockerfile kopierte `src/` nicht ins Laufzeit-Image →
   Backend-Crash-Loop → Traefik-404. Fix: `COPY src ./src`
-- **Basic Auth** vor do.msmr.co (Traefik-Middleware, bcrypt-Hash via
-  `htpasswd -nB`, `$$`-Escaping in Compose)
+- **Cookie-Login** vor do.msmr.co (seit 14.06.2026; löst Basic Auth ab):
+  Backend-Gate (`server/auth.ts`), Passwort als `DODAY_PASSWORD` in `./doday/.env`,
+  signiertes Cookie (HttpOnly/Secure/SameSite=Lax, 90 Tage) → iOS fragt beim
+  PWA-Kaltstart nicht mehr ständig nach. Traefik-`doday-auth`/`doday-pwa`-Labels
+  entfernt. URL/Icon unverändert. Abmelden: `/logout`.
 - **App-Icon** als iOS-Homescreen-Icon (180×180) und Favicon (32×32)
 
 ### Phase 4 – Do Week & Do Month (Cockpit)
@@ -98,7 +101,8 @@ Stand: 13. Juni 2026 · `main` = `05fb117` · 144 Tests grün · live auf https:
   A-Record (Local DNS Records), niemals als CNAME.** `extra_hosts` (oben) betrifft
   nur das Backend und hat mit dieser Client-Auflösung nichts zu tun.
 - **PWA-Icon trotz Basic Auth:** zweiter auth-freier Traefik-Router nur für die
-  Icon-/Manifest-Dateien (`PathRegexp` `\.(png|json)$`); Beispiel in der Compose.
+  Icon-/Manifest-Dateien (`PathRegexp` `\.(png|json)$`). _Hinfällig seit 14.06.:
+  Cookie-Login statt Basic Auth → kein Sonderrouter mehr nötig._
 - **Diagnose-Lehre:** „Speichern fehlgeschlagen – läuft das Backend?" war
   irreführend (es lief). → offener Punkt: ehrlichere Fehlermeldung.
 
@@ -128,7 +132,7 @@ flowchart LR
     UI["Frontend (PWA)<br/>Vanilla TS, aus dist/"]
   end
   subgraph Ucloud["Server ucloud (Docker)"]
-    T["Traefik<br/>TLS + Basic Auth"]
+    T["Traefik<br/>TLS (Cookie-Login im Backend)"]
     B["doday-Backend<br/>Hono, Port 3000<br/>App-Passwort als ENV"]
   end
   subgraph NC["Nextcloud (cd.msmr.co)"]
