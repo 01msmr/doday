@@ -104,6 +104,25 @@ overflow:hidden`). Breite Schirme (≥ 41 rem) bleiben unverändert zweispaltig.
   ≥ 16 px (verhindert iOS-Auto-Zoom beim Datumsfeld). Kein Gummiband-Scrollen
   (`overscroll-behavior`). Navi-Linie → weicher Schatten. Tap-Highlight aus.
 
+### Phase 7 – Mehrsprachigkeit, Header-Badges & Farbflächen (18.06.2026)
+- **i18n (DE/EN), zentral:** `src/lang.json` (ein Schlüssel → beide Sprachen) +
+  `src/i18n.ts` (`t()`, `getLang/otherLang/setLang/toggleLang`, `locale()`; Wahl in
+  `localStorage`, node-sicher; `resolveJsonModule` in tsconfig). Alle sichtbaren
+  Texte/ARIA in `dayView.ts`/`cockpitView.ts` und die Fehlermeldungen in `main.ts`
+  laufen über `t()`. Monatsnamen, Wochentage und Datum über `locale()`
+  (`de-DE` ⇆ `en-GB`). **Umschalter** unten rechts in der Navi (`.lang-toggle`,
+  Aktion `toggle-lang`) zeigt die AKTUELLE Sprache, leichte Schrift, ohne Rahmen.
+- **Header-Badges:** alle Sektions-Titel als invertierte, abgerundete Kästchen
+  (`.label-badge` + `.masthead-center`/`.card-handle-label`), einheitlich nach
+  Vorgabe „TERMINE" (0.72rem), nur leicht gesperrt, vertikal zentriert. Zahnrad
+  klein direkt hinter dem „Gewohnheiten"-Badge. „kein Inhalt"-Texte (`.empty`) kursiv.
+- **Farbflächen:** Aufgaben-Seite blau (`--pill`), Termine-Seite rot (`--pill-red`),
+  je ~17 % getönt – mobil (ganze Seite blau, Karte rot) wie Desktop (zwei getönte
+  Spalten mit feiner Kante im vollen Button-Ton bei 80 %, NUR Desktop). Navi bleibt
+  unberührt. Desktop nutzt jetzt ebenfalls die (+)-Pillen am Spaltenende.
+- **Feinschliff:** Jahres-Ziffern ≈ x-Höhe des Monats; weniger Weißraum über den
+  Badges; „Morgen" statt „Morgen · Wochentag".
+
 ## Störungs-Lehren (13.06.2026) – wichtig fürs Deployment
 
 - **Dockerfile musste `COPY src ./src` bekommen** – das Backend importiert

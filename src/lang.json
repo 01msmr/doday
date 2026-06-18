@@ -1,0 +1,120 @@
+{
+  "tasks": { "de": "Aufgaben", "en": "Tasks" },
+  "events": { "de": "Termine", "en": "Events" },
+  "habits": { "de": "Gewohnheiten", "en": "Habits" },
+  "goals": { "de": "Ziele", "en": "Goals" },
+  "tomorrow": { "de": "Morgen", "en": "Tomorrow" },
+  "addTask": { "de": "+ Aufgabe", "en": "+ Task" },
+  "addEvent": { "de": "+ Termin", "en": "+ Event" },
+  "save": { "de": "Speichern", "en": "Save" },
+  "cancel": { "de": "Abbrechen", "en": "Cancel" },
+  "create": { "de": "Anlegen", "en": "Create" },
+  "asIcs": { "de": "als .ics", "en": "as .ics" },
+  "done": { "de": "Erledigt", "en": "Done" },
+  "edit": { "de": "Bearbeiten", "en": "Edit" },
+  "noEvents": { "de": "noch keine Termine", "en": "no events yet" },
+  "noTasks": { "de": "Keine Aufgaben für diesen Tag.", "en": "No tasks for this day." },
+  "noHabits": {
+    "de": "noch keine Gewohnheiten – über das Zahnrad anlegen.",
+    "en": "no habits yet – add via the gear."
+  },
+  "nothingDue": { "de": "Nichts fällig in diesem Zeitraum.", "en": "Nothing due in this period." },
+  "untagged": { "de": "Ohne Bereich", "en": "No area" },
+  "removeFromArea": { "de": "Aus Bereich entfernen", "en": "Remove from area" },
+  "loading": {
+    "de": "Lade deine Daten aus der Nextcloud …",
+    "en": "Loading your data from Nextcloud …"
+  },
+  "newHabit": { "de": "Neue Gewohnheit", "en": "New habit" },
+  "titleEventPh": { "de": "Titel #Tag", "en": "Title #tag" },
+  "titleTaskPh": { "de": "Aufgabe #Bereich", "en": "Task #area" },
+  "fieldDate": { "de": "Datum", "en": "Date" },
+  "fieldStart": { "de": "Beginn", "en": "Start" },
+  "fieldEnd": { "de": "Ende", "en": "End" },
+  "fieldDue": { "de": "Fällig am", "en": "Due" },
+  "ariaAddTask": { "de": "Aufgabe anlegen", "en": "Create task" },
+  "ariaAddEvent": { "de": "Termin anlegen", "en": "Create event" },
+  "ariaEventTitle": { "de": "Termintitel, #Tags erlaubt", "en": "Event title, #tags allowed" },
+  "ariaTaskTitle": { "de": "Aufgabentitel, #Tags erlaubt", "en": "Task title, #tags allowed" },
+  "dragToMove": { "de": "Zum Verschieben ziehen", "en": "Drag to move" },
+  "onlyThisArea": { "de": "Nur diesen Bereich anzeigen", "en": "Show only this area" },
+  "renameArea": { "de": "Bereich umbenennen", "en": "Rename area" },
+  "habitName": { "de": "Name der Gewohnheit", "en": "Habit name" },
+  "period": { "de": "Zeitraum", "en": "Period" },
+  "daily": { "de": "täglich", "en": "daily" },
+  "weekly": { "de": "wöchentlich", "en": "weekly" },
+  "target": { "de": "Ziel", "en": "Goal" },
+  "targetHint": {
+    "de": "Ziel = Wiederholungen pro Zeitraum (optional)",
+    "en": "Goal = repetitions per period (optional)"
+  },
+  "addHabitBtn": { "de": "+ Gewohnheit hinzufügen", "en": "+ Add habit" },
+  "ariaColorOf": { "de": "Farbe von {name}", "en": "Color of {name}" },
+  "ariaDeleteHabit": { "de": "{name} löschen", "en": "Delete {name}" },
+  "ariaTargetField": {
+    "de": "Ziel: Wiederholungen pro Zeitraum",
+    "en": "Goal: repetitions per period"
+  },
+  "once": { "de": "Einmalig", "en": "Once" },
+  "recurring": { "de": "Regelmäßig", "en": "Recurring" },
+  "ariaOnceGoals": { "de": "Einmalige Ziele", "en": "One-off goals" },
+  "ariaRecurringGoals": { "de": "Regelmäßige Ziele", "en": "Recurring goals" },
+  "ariaDoneTasks": { "de": "Heute erledigte Aufgaben", "en": "Tasks completed today" },
+  "ariaTaskProgress": { "de": "Aufgaben-Fortschritt", "en": "Task progress" },
+  "ariaEditHabits": { "de": "Gewohnheiten bearbeiten", "en": "Edit habits" },
+  "ariaPeriodBack": { "de": "Zeitraum zurück", "en": "Previous period" },
+  "ariaPeriodFwd": { "de": "Zeitraum vor", "en": "Next period" },
+  "errorLoad": { "de": "Daten nicht geladen", "en": "Data not loaded" },
+  "errorBackend": {
+    "de": "Daten konnten nicht geladen werden – läuft das Backend? (npm run dev:server)",
+    "en": "Could not load data – is the backend running? (npm run dev:server)"
+  },
+  "saveFailed": {
+    "de": "Speichern fehlgeschlagen – läuft das Backend?",
+    "en": "Saving failed – is the backend running?"
+  },
+  "eventCreateFailed": {
+    "de": "Termin konnte nicht angelegt werden.",
+    "en": "Could not create the event."
+  },
+  "taskCreateFailed": {
+    "de": "Aufgabe konnte nicht angelegt werden.",
+    "en": "Could not create the task."
+  },
+  "toggleSaveFailed": {
+    "de": "Abhaken konnte nicht gespeichert werden.",
+    "en": "Could not save the check-off."
+  },
+  "moveSaveFailed": {
+    "de": "Verschieben konnte nicht gespeichert werden.",
+    "en": "Could not save the move."
+  },
+  "extChanged": {
+    "de": "In der Nextcloud extern geändert – Daten wurden neu geladen.",
+    "en": "Changed externally in Nextcloud – data was reloaded."
+  },
+  "areasExtChanged": {
+    "de": "Bereiche wurden extern geändert – Daten wurden neu geladen.",
+    "en": "Areas were changed externally – data was reloaded."
+  },
+  "areasSaveFailed": {
+    "de": "Speichern der Bereiche fehlgeschlagen.",
+    "en": "Saving the areas failed."
+  },
+  "taskExtChanged": {
+    "de": "Aufgabe wurde extern geändert – bitte neu laden und erneut bearbeiten.",
+    "en": "Task changed externally – please reload and edit again."
+  },
+  "taskSaveFailed": {
+    "de": "Aufgabe konnte nicht gespeichert werden.",
+    "en": "Could not save the task."
+  },
+  "eventExtChanged": {
+    "de": "Termin wurde extern geändert – bitte neu laden und erneut bearbeiten.",
+    "en": "Event changed externally – please reload and edit again."
+  },
+  "eventSaveFailed": {
+    "de": "Termin konnte nicht gespeichert werden.",
+    "en": "Could not save the event."
+  }
+}

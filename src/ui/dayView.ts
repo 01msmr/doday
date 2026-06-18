@@ -16,6 +16,7 @@ import { groupByArea, type AreaGroup, type GroupedDay } from './grouping';
 import { isoDate, localDateOf, shiftDays, startOfWeek, timeOf } from '../utils/dates';
 import { safeColor } from '../utils/colors';
 import { renderCockpit } from './cockpitView';
+import { t, getLang, locale } from '../i18n';
 
 /** Die vier Ansichten der unteren Navigation */
 export type ViewId = 'day' | 'morrow' | 'week' | 'month';
@@ -90,19 +91,19 @@ export function areaColor(registry: InMemoryTagRegistry, path: string): string {
 /* ---------- Datums-Formatierung (deutsch) ---------- */
 
 export function weekdayOf(date: Date): string {
-  return new Intl.DateTimeFormat('de-DE', { weekday: 'long' }).format(date);
+  return new Intl.DateTimeFormat(locale(), { weekday: 'long' }).format(date);
 }
 
 export function dayMonthOf(date: Date): string {
-  return new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'long' }).format(date);
+  return new Intl.DateTimeFormat(locale(), { day: 'numeric', month: 'long' }).format(date);
 }
 
 export function monthOf(date: Date): string {
-  return new Intl.DateTimeFormat('de-DE', { month: 'long' }).format(date);
+  return new Intl.DateTimeFormat(locale(), { month: 'long' }).format(date);
 }
 
 export function yearOf(date: Date): string {
-  return new Intl.DateTimeFormat('de-DE', { year: 'numeric' }).format(date);
+  return new Intl.DateTimeFormat(locale(), { year: 'numeric' }).format(date);
 }
 
 /** Kopf der Seite: EINE Zeile an der oberen Kante – Wochentag links, Datum rechts.
@@ -132,18 +133,18 @@ export function renderMasthead(
 export function renderEventForm(dateIso: string): string {
   return `
     <form class="event-form" data-event-form>
-      <input type="text" data-field="title" placeholder="Titel #Tag"
-        aria-label="Termintitel, #Tags erlaubt" required />
+      <input type="text" data-field="title" placeholder="${t('titleEventPh')}"
+        aria-label="${t('ariaEventTitle')}" required />
       <div class="event-form-row">
-        <input type="date" data-field="date" value="${dateIso}" aria-label="Datum" required />
-        <input type="time" data-field="start" value="09:00" aria-label="Beginn" required />
+        <input type="date" data-field="date" value="${dateIso}" aria-label="${t('fieldDate')}" required />
+        <input type="time" data-field="start" value="09:00" aria-label="${t('fieldStart')}" required />
         <span class="event-form-sep">&ndash;</span>
-        <input type="time" data-field="end" value="10:00" aria-label="Ende" required />
+        <input type="time" data-field="end" value="10:00" aria-label="${t('fieldEnd')}" required />
       </div>
       <div class="event-form-actions">
-        <button type="submit" class="btn-primary">Speichern</button>
-        <button type="button" class="btn-quiet" data-action="event-ics">als .ics</button>
-        <button type="button" class="btn-quiet" data-action="toggle-event-form">Abbrechen</button>
+        <button type="submit" class="btn-primary">${t('save')}</button>
+        <button type="button" class="btn-quiet" data-action="event-ics">${t('asIcs')}</button>
+        <button type="button" class="btn-quiet" data-action="toggle-event-form">${t('cancel')}</button>
       </div>
     </form>`;
 }
@@ -152,14 +153,14 @@ export function renderEventForm(dateIso: string): string {
 export function renderTaskForm(dateIso: string): string {
   return `
     <form class="event-form" data-task-form>
-      <input type="text" data-field="title" placeholder="Aufgabe #Bereich"
-        aria-label="Aufgabentitel, #Tags erlaubt" required />
+      <input type="text" data-field="title" placeholder="${t('titleTaskPh')}"
+        aria-label="${t('ariaTaskTitle')}" required />
       <div class="event-form-row">
-        <input type="date" data-field="due" value="${dateIso}" aria-label="Fällig am" />
+        <input type="date" data-field="due" value="${dateIso}" aria-label="${t('fieldDue')}" />
       </div>
       <div class="event-form-actions">
-        <button type="submit" class="btn-primary">Anlegen</button>
-        <button type="button" class="btn-quiet" data-action="toggle-task-form">Abbrechen</button>
+        <button type="submit" class="btn-primary">${t('create')}</button>
+        <button type="button" class="btn-quiet" data-action="toggle-task-form">${t('cancel')}</button>
       </div>
     </form>`;
 }
@@ -168,7 +169,7 @@ export function renderTaskForm(dateIso: string): string {
 export function renderEditPen(action: string, id: string): string {
   return `
       <button type="button" class="edit-pen" data-action="${action}"
-        data-id="${escapeHtml(id)}" aria-label="Bearbeiten">&#9998;</button>`;
+        data-id="${escapeHtml(id)}" aria-label="${t('edit')}">&#9998;</button>`;
 }
 
 /** Inline-Formular: Aufgabe bearbeiten – Titel (inkl. #Tags) und Fälligkeit */
@@ -176,13 +177,13 @@ export function renderTaskEditForm(task: Task): string {
   return `
     <form class="event-form" data-task-edit-form data-id="${escapeHtml(task.id)}">
       <input type="text" data-field="title" value="${escapeHtml(task.rawText)}"
-        aria-label="Aufgabentitel, #Tags erlaubt" required />
+        aria-label="${t('ariaTaskTitle')}" required />
       <div class="event-form-row">
-        <input type="date" data-field="due" value="${task.due ?? ''}" aria-label="Fällig am" />
+        <input type="date" data-field="due" value="${task.due ?? ''}" aria-label="${t('fieldDue')}" />
       </div>
       <div class="event-form-actions">
-        <button type="submit" class="btn-primary">Speichern</button>
-        <button type="button" class="btn-quiet" data-action="cancel-edit">Abbrechen</button>
+        <button type="submit" class="btn-primary">${t('save')}</button>
+        <button type="button" class="btn-quiet" data-action="cancel-edit">${t('cancel')}</button>
       </div>
     </form>`;
 }
@@ -191,20 +192,20 @@ export function renderTaskEditForm(task: Task): string {
 export function renderEventEditForm(event: CalendarEvent): string {
   const times = event.allDay
     ? ''
-    : `<input type="time" data-field="start" value="${timeOf(event.start)}" aria-label="Beginn" required />
+    : `<input type="time" data-field="start" value="${timeOf(event.start)}" aria-label="${t('fieldStart')}" required />
         <span class="event-form-sep">&ndash;</span>
-        <input type="time" data-field="end" value="${timeOf(event.end)}" aria-label="Ende" required />`;
+        <input type="time" data-field="end" value="${timeOf(event.end)}" aria-label="${t('fieldEnd')}" required />`;
   return `
     <form class="event-form" data-event-edit-form data-id="${escapeHtml(event.id)}">
       <input type="text" data-field="title" value="${escapeHtml(event.rawText)}"
-        aria-label="Termintitel, #Tags erlaubt" required />
+        aria-label="${t('ariaEventTitle')}" required />
       <div class="event-form-row">
-        <input type="date" data-field="date" value="${localDateOf(event.start)}" aria-label="Datum" required />
+        <input type="date" data-field="date" value="${localDateOf(event.start)}" aria-label="${t('fieldDate')}" required />
         ${times}
       </div>
       <div class="event-form-actions">
-        <button type="submit" class="btn-primary">Speichern</button>
-        <button type="button" class="btn-quiet" data-action="cancel-edit">Abbrechen</button>
+        <button type="submit" class="btn-primary">${t('save')}</button>
+        <button type="button" class="btn-quiet" data-action="cancel-edit">${t('cancel')}</button>
       </div>
     </form>`;
 }
@@ -237,12 +238,12 @@ function renderSchedule(
     .join('');
   return `
     <section class="panel">
-      <h2 class="section-label">Termine
+      <h2 class="section-label"><span class="label-badge">${t('events')}</span>
         <button type="button" class="add-event" data-action="toggle-event-form"
-          aria-expanded="${opts.creating}" aria-label="Termin anlegen">+</button>
+          aria-expanded="${opts.creating}" aria-label="${t('ariaAddEvent')}">+</button>
       </h2>
       ${opts.creating ? renderEventForm(opts.dateIso) : ''}
-      ${events.length > 0 ? `<ol class="timeline">${rows}</ol>` : '<p class="empty">Keine Termine.</p>'}
+      ${events.length > 0 ? `<ol class="timeline">${rows}</ol>` : `<p class="empty">${t('noEvents')}</p>`}
     </section>`;
 }
 
@@ -259,7 +260,7 @@ export function renderTask(task: Task, editingId: string | null = null, fromPath
   // Greifer links, GETRENNT vom Abhak-Button: Ziehen darf nicht abhaken.
   // touch-action:none (im CSS) verhindert, dass der Browser beim Ziehen scrollt.
   const grip = `<span class="drag-grip" data-drag="task" data-id="${escapeHtml(task.id)}"
-        data-from="${escapeHtml(fromPath)}" aria-hidden="true" title="Zum Verschieben ziehen">&#10303;</span>`;
+        data-from="${escapeHtml(fromPath)}" aria-hidden="true" title="${t('dragToMove')}">&#10303;</span>`;
   return `
     <li class="task-row">
       ${grip}
@@ -296,11 +297,11 @@ function renderArea(group: AreaGroup, state: AppState): string {
   const name =
     state.editing === group.node.path
       ? `<input class="area-rename" data-path="${path}" value="${escapeHtml(group.node.segment)}"
-          aria-label="Bereich umbenennen – Enter speichert, Escape bricht ab" />`
+          aria-label="${t('renameArea')}" />`
       : `<button type="button" class="area-name" data-action="filter-area" data-path="${path}"
-          title="Nur diesen Bereich anzeigen">${escapeHtml(group.node.segment)}</button>
+          title="${t('onlyThisArea')}">${escapeHtml(group.node.segment)}</button>
         <button type="button" class="area-edit" data-action="edit-area" data-path="${path}"
-          aria-label="Bereich umbenennen">&#9998;</button>`;
+          aria-label="${t('renameArea')}">&#9998;</button>`;
   return `
     <details class="area"${open} data-area="${path}">
       <summary class="area-head" ${dropAttrs}>
@@ -341,7 +342,7 @@ function renderUntagged(grouped: GroupedDay, state: AppState): string {
     <details class="area area--untagged"${open} data-area="${UNTAGGED_KEY}">
       <summary class="area-head">
         <span class="chevron" aria-hidden="true"></span>
-        <span class="area-name">Ohne Bereich</span>
+        <span class="area-name">${t('untagged')}</span>
         <span class="area-count">${tasks.length + events.length}</span>
       </summary>
       <div class="area-body">
@@ -363,21 +364,21 @@ function renderAreas(
     grouped.untagged.events.length === 0;
   return `
     <section class="panel">
-      <h2 class="section-label">Aufgaben
+      <h2 class="section-label"><span class="label-badge">${t('tasks')}</span>
         <button type="button" class="add-event" data-action="toggle-task-form"
-          aria-expanded="${opts.creating}" aria-label="Aufgabe anlegen">+</button>
+          aria-expanded="${opts.creating}" aria-label="${t('ariaAddTask')}">+</button>
       </h2>
       ${opts.creating ? renderTaskForm(opts.dateIso) : ''}
       ${
         isEmpty
-          ? '<p class="empty">Keine Aufgaben für diesen Tag.</p>'
+          ? `<p class="empty">${t('noTasks')}</p>`
           : grouped.groups.map((group) => renderArea(group, state)).join('') +
             // Ablagezone fürs Verschieben nach ganz unten – nur beim Bereich-Ziehen
             // greifbar (CSS), ein Strich darin = "hier ans Ende einsortieren".
             '<div class="area-drop-end" data-drop="area-end" aria-hidden="true"></div>' +
             renderUntagged(grouped, state) +
             // Aufgabe hierher ziehen entfernt ihren Bereich – nur beim Aufgabe-Ziehen sichtbar
-            '<div class="untag-drop" data-drop="untag" aria-hidden="true">Aus Bereich entfernen</div>'
+            `<div class="untag-drop" data-drop="untag" aria-hidden="true">${t('removeFromArea')}</div>`
       }
     </section>`;
 }
@@ -418,10 +419,10 @@ function renderTaskProgress(stats: { done: number; total: number }): string {
   const percent = Math.round((stats.done / stats.total) * 100);
   return `
       <li class="goal task-progress" role="progressbar" aria-valuenow="${stats.done}"
-        aria-valuemin="0" aria-valuemax="${stats.total}" aria-label="Heute erledigte Aufgaben">
+        aria-valuemin="0" aria-valuemax="${stats.total}" aria-label="${t('ariaDoneTasks')}">
         <div class="goal-fill" style="width:${percent}%"></div>
         <div class="goal-head">
-          <span class="goal-title"><strong>Aufgaben</strong></span>
+          <span class="goal-title"><strong>${t('tasks')}</strong></span>
         </div>
         ${renderRing(stats.done, stats.total)}
       </li>`;
@@ -448,17 +449,17 @@ function renderHabits(habits: Habit[], editing: boolean): string {
   const gear = `
       <button type="button" class="habit-gear${editing ? ' active' : ''}"
         data-action="toggle-habit-editor" aria-expanded="${editing}"
-        aria-label="Gewohnheiten bearbeiten">
+        aria-label="${t('ariaEditHabits')}">
         <i class="fa-solid fa-gear" aria-hidden="true"></i>
       </button>`;
   // Ohne Gewohnheiten: leiser Hinweis auf das Zahnrad
   const emptyHint =
     habits.length === 0 && !editing
-      ? '<p class="empty">Noch keine Gewohnheiten – über das Zahnrad anlegen.</p>'
+      ? `<p class="empty">${t('noHabits')}</p>`
       : '';
   return `
     <section class="panel">
-      <h2 class="section-label section-label--gear">Gewohnheiten${gear}</h2>
+      <h2 class="section-label section-label--gear"><span class="label-badge">${t('habits')}</span>${gear}</h2>
       <div class="habit-row">${items}</div>
       ${emptyHint}
       ${editing ? renderHabitEditor(habits) : ''}
@@ -473,17 +474,17 @@ function renderHabitEditor(habits: Habit[]): string {
       <div class="habit-editor-row">
         <input type="color" value="${escapeHtml(habit.color ?? '#8fae87')}"
           data-edit="color" data-id="${habit.id}"
-          aria-label="Farbe von ${escapeHtml(habit.title)}" />
+          aria-label="${t('ariaColorOf', { name: escapeHtml(habit.title) })}" />
         <input type="text" value="${escapeHtml(habit.title)}"
-          data-edit="title" data-id="${habit.id}" aria-label="Name der Gewohnheit" />
-        <select data-edit="schedule" data-id="${habit.id}" aria-label="Zeitraum">
-          <option value="daily"${habit.schedule === 'daily' ? ' selected' : ''}>täglich</option>
-          <option value="weekly"${habit.schedule === 'weekly' ? ' selected' : ''}>wöchentlich</option>
+          data-edit="title" data-id="${habit.id}" aria-label="${t('habitName')}" />
+        <select data-edit="schedule" data-id="${habit.id}" aria-label="${t('period')}">
+          <option value="daily"${habit.schedule === 'daily' ? ' selected' : ''}>${t('daily')}</option>
+          <option value="weekly"${habit.schedule === 'weekly' ? ' selected' : ''}>${t('weekly')}</option>
         </select>
-        <input type="number" min="1" max="99" value="${habit.target ?? ''}" placeholder="Ziel"
-          data-edit="target" data-id="${habit.id}" aria-label="Ziel: Wiederholungen pro Zeitraum" />
+        <input type="number" min="1" max="99" value="${habit.target ?? ''}" placeholder="${t('target')}"
+          data-edit="target" data-id="${habit.id}" aria-label="${t('ariaTargetField')}" />
         <button type="button" class="habit-delete" data-action="delete-habit" data-id="${habit.id}"
-          aria-label="${escapeHtml(habit.title)} löschen">&times;</button>
+          aria-label="${t('ariaDeleteHabit', { name: escapeHtml(habit.title) })}">&times;</button>
       </div>`,
     )
     .join('');
@@ -491,9 +492,9 @@ function renderHabitEditor(habits: Habit[]): string {
     <div class="habit-editor">
       ${rows}
       <button type="button" class="btn-quiet habit-add" data-action="add-habit">
-        + Gewohnheit hinzufügen
+        ${t('addHabitBtn')}
       </button>
-      <p class="habit-editor-hint">Ziel = Wiederholungen pro Zeitraum (optional)</p>
+      <p class="habit-editor-hint">${t('targetHint')}</p>
     </div>`;
 }
 
@@ -579,18 +580,18 @@ export function renderAchievements(
   const taskBar = renderTaskProgress(taskStats);
   return `
     <section class="panel">
-      <h2 class="section-label">Ziele</h2>
-      ${items ? `<ul class="goal-list" aria-label="Einmalige Ziele">${items}</ul>` : ''}
+      <h2 class="section-label"><span class="label-badge">${t('goals')}</span></h2>
+      ${items ? `<ul class="goal-list" aria-label="${t('ariaOnceGoals')}">${items}</ul>` : ''}
       ${
         recurring
-          ? `<p class="goal-group-label">Regelmäßig</p>
-             <ul class="goal-list" aria-label="Regelmäßige Ziele">${recurring}</ul>`
+          ? `<p class="goal-group-label">${t('recurring')}</p>
+             <ul class="goal-list" aria-label="${t('ariaRecurringGoals')}">${recurring}</ul>`
           : ''
       }
       ${
         taskBar
-          ? `<p class="goal-group-label">Aufgaben</p>
-             <ul class="goal-list" aria-label="Aufgaben-Fortschritt">${taskBar}</ul>`
+          ? `<p class="goal-group-label">${t('tasks')}</p>
+             <ul class="goal-list" aria-label="${t('ariaTaskProgress')}">${taskBar}</ul>`
           : ''
       }
     </section>`;
@@ -612,7 +613,7 @@ function renderDoneLine(tasks: Task[], events: CalendarEvent[]): string {
   const items = doneTitles
     .map((title) => `<span class="done-item">${escapeHtml(title)}</span>`)
     .join('<span class="done-sep"> · </span>');
-  return `<p class="done-line"><span class="done-label">Erledigt</span> ${items}</p>`;
+  return `<p class="done-line"><span class="done-label">${t('done')}</span> ${items}</p>`;
 }
 
 /* ---------- Untere Navigation ---------- */
@@ -634,7 +635,11 @@ function renderNav(active: ViewId): string {
       <span class="nav-label">${view.label}</span>
     </button>`,
   ).join('');
-  return `<nav class="bottom-nav" aria-label="Ansichten">${items}</nav>`;
+  // Sprach-Umschalter unten rechts: zeigt die AKTUELLE Sprache (Tipp wechselt)
+  const langBtn = `
+    <button type="button" class="lang-toggle" data-action="toggle-lang"
+      aria-label="Sprache wechseln">${getLang().toUpperCase()}</button>`;
+  return `<nav class="bottom-nav" aria-label="Ansichten">${items}${langBtn}</nav>`;
 }
 
 /** Aktiver Bereichs-Filter als Chip – das × hebt den Sprung wieder auf */
@@ -664,7 +669,7 @@ export function renderApp(root: HTMLElement, state: AppState): void {
     root.innerHTML = `
       <main class="page">
         ${renderMasthead(weekdayOf(today), dayMonthOf(today), yearOf(today), true)}
-        <p class="empty">Lade deine Daten aus der Nextcloud &hellip;</p>
+        <p class="empty">${t('loading')}</p>
       </main>
       ${renderNav(state.view)}`;
     return;
@@ -693,7 +698,7 @@ export function renderApp(root: HTMLElement, state: AppState): void {
     const grouped = groupByArea(tasks, events, orderOf);
 
     const small =
-      state.view === 'day' ? weekdayOf(date) : `Morgen · ${weekdayOf(date)}`;
+      state.view === 'day' ? weekdayOf(date) : t('tomorrow');
     // Gewohnheiten/Achievements gehören zum Heute – morgen gibt es nichts abzuhaken
     const taskStats = {
       done: dayTasks.filter((task) => task.completed).length,
@@ -724,16 +729,16 @@ export function renderApp(root: HTMLElement, state: AppState): void {
     // Icon links, „Termine" mittig.
     const cardHandle = `
       <button type="button" class="card-handle" data-action="switch-column"
-        aria-label="${onMain ? 'Termine zeigen' : 'Aufgaben zeigen'}">
+        aria-label="${onMain ? t('events') : t('tasks')}">
         ${calIcon}
-        <span class="card-handle-label">Termine</span>
+        <span class="card-handle-label">${t('events')}</span>
       </button>`;
 
     // „+ Termin" gehört zur Karte und sitzt unten in ihr → gleitet beim Wechsel mit.
     const cardAction = `
       <div class="card-action">
         <button type="button" class="add-pill add-pill--event"
-          data-action="toggle-event-form">+ Termin</button>
+          data-action="toggle-event-form">${t('addEvent')}</button>
       </div>`;
 
     // „+ Aufgabe" gehört zum Hintergrund und bleibt IMMER bestehen – die Karte
@@ -741,15 +746,15 @@ export function renderApp(root: HTMLElement, state: AppState): void {
     const hgAction = `
       <div class="hg-action">
         <button type="button" class="add-pill add-pill--task"
-          data-action="toggle-task-form">+ Aufgabe</button>
+          data-action="toggle-task-form">${t('addTask')}</button>
       </div>`;
 
     content = `
-      ${renderMasthead(small, dayMonthOf(date), yearOf(date), state.loading || Boolean(state.syncError), 'Aufgaben')}
+      ${renderMasthead(small, dayMonthOf(date), yearOf(date), state.loading || Boolean(state.syncError), t('tasks'))}
       ${state.view === 'day' ? renderDoneLine(dayTasks, dayEvents) : ''}
       ${renderFilterChip(state)}
       <div class="columns${animClass}" data-mobile="${state.mobileColumn}">
-        <div class="col-main">${renderAreas(grouped, state, { creating: state.creatingTask, dateIso })}</div>
+        <div class="col-main">${renderAreas(grouped, state, { creating: state.creatingTask, dateIso })}${hgAction}</div>
         <div class="col-side">
           ${cardHandle}
           <div class="col-side-body">
@@ -758,8 +763,7 @@ export function renderApp(root: HTMLElement, state: AppState): void {
           </div>
           ${cardAction}
         </div>
-      </div>
-      ${hgAction}`;
+      </div>`;
   } else {
     content = renderCockpit(state, '');
   }
