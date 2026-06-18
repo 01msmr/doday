@@ -38,6 +38,7 @@ import {
   yearOf,
   type AppState,
 } from './dayView';
+import { t, locale } from '../i18n';
 
 /** Lokales Date-Objekt zu einem ISO-Tag – mittags, damit nichts verrutscht */
 function dateAt(day: string): Date {
@@ -69,9 +70,9 @@ function renderPeriodMasthead(
       ${renderMasthead(small, big, yearOf(end))}
       <div class="period-nav">
         <button type="button" class="period-btn" data-action="switch-period" data-dir="-1"
-          aria-label="Zeitraum zurück">&lsaquo;</button>
+          aria-label="${t('ariaPeriodBack')}">&lsaquo;</button>
         <button type="button" class="period-btn" data-action="switch-period" data-dir="1"
-          aria-label="Zeitraum vor"${offset === 0 ? ' disabled' : ''}>&rsaquo;</button>
+          aria-label="${t('ariaPeriodFwd')}"${offset === 0 ? ' disabled' : ''}>&rsaquo;</button>
       </div>
     </div>`;
 }
@@ -110,12 +111,12 @@ function renderRangeTasks(
   }
   return `
     <section class="panel">
-      <h2 class="section-label">Aufgaben
+      <h2 class="section-label"><span class="label-badge">${t('tasks')}</span>
         <button type="button" class="add-event" data-action="toggle-task-form"
-          aria-expanded="${opts.creating}" aria-label="Aufgabe anlegen">+</button>
+          aria-expanded="${opts.creating}" aria-label="${t('ariaAddTask')}">+</button>
       </h2>
       ${opts.creating ? renderTaskForm(today) : ''}
-      ${groups.length > 0 ? groups.join('') : '<p class="empty">Nichts fällig in diesem Zeitraum.</p>'}
+      ${groups.length > 0 ? groups.join('') : `<p class="empty">${t('nothingDue')}</p>`}
     </section>`;
 }
 
@@ -194,13 +195,13 @@ function renderCockpitHabits(
       : `<ul class="goal-list">${habits.map((habit) => renderHabitMonthRow(habit, range)).join('')}</ul>`;
   return `
     <section class="panel">
-      <h2 class="section-label">Gewohnheiten</h2>
+      <h2 class="section-label"><span class="label-badge">${t('habits')}</span></h2>
       ${list}
     </section>`;
 }
 
 function weekdayShortOf(date: Date): string {
-  return new Intl.DateTimeFormat('de-DE', { weekday: 'short' }).format(date);
+  return new Intl.DateTimeFormat(locale(), { weekday: 'short' }).format(date);
 }
 
 /** Termine: eine schmale Zeile pro Tag (nur Tage mit Terminen) */
@@ -231,12 +232,12 @@ function renderRangeEvents(
     .join('');
   return `
     <section class="panel">
-      <h2 class="section-label">Termine
+      <h2 class="section-label"><span class="label-badge">${t('events')}</span>
         <button type="button" class="add-event" data-action="toggle-event-form"
-          aria-expanded="${opts.creating}" aria-label="Termin anlegen">+</button>
+          aria-expanded="${opts.creating}" aria-label="${t('ariaAddEvent')}">+</button>
       </h2>
       ${opts.creating ? renderEventForm(today) : ''}
-      ${rows ? `<ol class="day-events">${rows}</ol>` : '<p class="empty">Keine Termine.</p>'}
+      ${rows ? `<ol class="day-events">${rows}</ol>` : `<p class="empty">${t('noEvents')}</p>`}
     </section>`;
 }
 

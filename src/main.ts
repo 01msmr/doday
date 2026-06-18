@@ -31,6 +31,7 @@ import { buildEventIcs } from './services/ics';
 import { renderApp, type AppState, type ViewId } from './ui/dayView';
 import { initDragDrop, type DropInfo } from './ui/dragDrop';
 import { isoDate, shiftDays } from './utils/dates';
+import { t, toggleLang } from './i18n';
 import type { Habit } from './models/types';
 
 const root = document.querySelector<HTMLDivElement>('#app');
@@ -229,7 +230,7 @@ function refreshAgenda(): void {
     })
     .catch(() => {
       if (stillCurrent()) {
-        state.syncError = 'Daten nicht geladen';
+        state.syncError = t('errorLoad');
         rerender();
       }
     });
@@ -250,13 +251,13 @@ async function boot(showLoading = true): Promise<void> {
     state.syncError = null;
   } catch {
     state.syncError =
-      'Daten konnten nicht geladen werden – läuft das Backend? (npm run dev:server)';
+      t('errorBackend');
   }
   // Kalender getrennt laden: Fehler hier sollen Habits/Ziele nicht blockieren
   try {
     await reloadAgenda();
   } catch {
-    state.syncError = 'Daten nicht geladen';
+    state.syncError = t('errorLoad');
   }
   state.loading = false;
   rerender();
@@ -282,9 +283,9 @@ async function persistAchievements(): Promise<void> {
         // zweiter Konflikt in Folge → ehrlich neu laden
       }
       await boot(false);
-      state.syncError = 'In der Nextcloud extern geändert – Daten wurden neu geladen.';
+      state.syncError = t('extChanged');
     } else {
-      state.syncError = 'Speichern fehlgeschlagen – läuft das Backend?';
+      state.syncError = t('saveFailed');
     }
     rerender();
   }
@@ -304,9 +305,9 @@ async function persistTags(): Promise<void> {
         // zweiter Konflikt in Folge → ehrlich neu laden
       }
       await boot(false);
-      state.syncError = 'Bereiche wurden extern geändert – Daten wurden neu geladen.';
+      state.syncError = t('areasExtChanged');
     } else {
-      state.syncError = 'Speichern der Bereiche fehlgeschlagen.';
+      state.syncError = t('areasSaveFailed');
     }
     rerender();
   }
@@ -427,7 +428,7 @@ function dropTask(info: DropInfo): void {
       } catch {
         /* Agenda nicht erreichbar – Hinweis reicht */
       }
-      state.syncError = 'Verschieben konnte nicht gespeichert werden.';
+      state.syncError = t('moveSaveFailed');
       rerender();
     }
   });
@@ -497,7 +498,7 @@ async function submitEventForm(form: HTMLElement): Promise<void> {
     state.creatingEvent = false;
     state.syncError = null;
   } catch {
-    state.syncError = 'Termin konnte nicht angelegt werden.';
+    state.syncError = t('eventCreateFailed');
   }
   rerender();
 }
@@ -522,8 +523,8 @@ async function submitTaskEditForm(form: HTMLElement): Promise<void> {
   } catch (error) {
     state.syncError =
       error instanceof ApiConflictError
-        ? 'Aufgabe wurde extern geändert – bitte neu laden und erneut bearbeiten.'
-        : 'Aufgabe konnte nicht gespeichert werden.';
+        ? t('taskExtChanged')
+        : t('taskSaveFailed');
   }
   rerender();
 }
@@ -554,8 +555,8 @@ async function submitEventEditForm(form: HTMLElement): Promise<void> {
   } catch (error) {
     state.syncError =
       error instanceof ApiConflictError
-        ? 'Termin wurde extern geändert – bitte neu laden und erneut bearbeiten.'
-        : 'Termin konnte nicht gespeichert werden.';
+        ? t('eventExtChanged')
+        : t('eventSaveFailed');
   }
   rerender();
 }
@@ -574,7 +575,7 @@ async function submitTaskForm(form: HTMLElement): Promise<void> {
     state.creatingTask = false;
     state.syncError = null;
   } catch {
-    state.syncError = 'Aufgabe konnte nicht angelegt werden.';
+    state.syncError = t('taskCreateFailed');
   }
   rerender();
 }
@@ -690,10 +691,15 @@ root.addEventListener('click', (event) => {
     switchMobileColumn(state.mobileColumn === 'main' ? 'side' : 'main');
   }
 
+  if (action === 'toggle-lang') {
+    toggleLang();
+    rerender();
+  }
+
   if (action === 'add-habit') {
     const habit: Habit = {
       id: `h-${crypto.randomUUID()}`,
-      title: 'Neue Gewohnheit',
+      title: t('newHabit'),
       schedule: 'daily',
       log: [],
       color: '#8fae87',
@@ -738,7 +744,7 @@ root.addEventListener('click', (event) => {
             } catch {
               /* Agenda nicht erreichbar – Hinweis reicht */
             }
-            state.syncError = 'Abhaken konnte nicht gespeichert werden.';
+            state.syncError = t('toggleSaveFailed');
             rerender();
           }
         });
