@@ -56,9 +56,46 @@ const state: AppState = {
   collapsed: new Set(),
 };
 
+/** Mobile-Spalte wechseln (Knopf wie Wisch) – inkl. einmaliger Slide-Animation. */
+function switchMobileColumn(next: 'main' | 'side'): void {
+  if (state.mobileColumn === next) {
+    return;
+  }
+  state.mobileColumn = next;
+  state.columnAnim = next === 'side' ? 'to-side' : 'to-main';
+  rerender();
+  state.columnAnim = null; // Flag nur für diesen einen Render – danach wieder ruhig
+}
+
+// Fehler erscheinen kurz als Overlay (Toast) statt dauerhaft inline. Der Toast lebt
+// AUSSERHALB von #app, damit das ständige Neu-Rendern ihn nicht zerstört.
+let toastEl: HTMLDivElement | null = null;
+let toastTimer = 0;
+let lastToastError: string | null = null;
+
+function showToast(message: string): void {
+  if (!toastEl) {
+    toastEl = document.createElement('div');
+    toastEl.className = 'toast';
+    toastEl.setAttribute('role', 'status');
+    toastEl.setAttribute('aria-live', 'polite');
+    document.body.appendChild(toastEl);
+  }
+  toastEl.textContent = message;
+  // erst im nächsten Frame einblenden, damit die Einblend-Transition greift
+  requestAnimationFrame(() => toastEl?.classList.add('show'));
+  window.clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => toastEl?.classList.remove('show'), 3500);
+}
+
 function rerender(): void {
   closeSuggest(); // ein Neuaufbau des DOM würde das Dropdown sonst verwaisen lassen
   renderApp(root!, state);
+  // Nur beim NEUEN Auftreten eines Fehlers den Toast zeigen (nicht bei jedem Render)
+  if (state.syncError && state.syncError !== lastToastError) {
+    showToast(state.syncError);
+  }
+  lastToastError = state.syncError;
 }
 
 /* ---------- Tag-Vorschläge: Dropdown unter Titel-Feldern ---------- */
@@ -192,7 +229,7 @@ function refreshAgenda(): void {
     })
     .catch(() => {
       if (stillCurrent()) {
-        state.syncError = 'Kalender/Aufgaben konnten nicht geladen werden.';
+        state.syncError = 'Daten nicht geladen';
         rerender();
       }
     });
@@ -219,7 +256,7 @@ async function boot(showLoading = true): Promise<void> {
   try {
     await reloadAgenda();
   } catch {
-    state.syncError = 'Kalender/Aufgaben konnten nicht geladen werden.';
+    state.syncError = 'Daten nicht geladen';
   }
   state.loading = false;
   rerender();
@@ -650,8 +687,7 @@ root.addEventListener('click', (event) => {
   }
 
   if (action === 'switch-column') {
-    state.mobileColumn = state.mobileColumn === 'main' ? 'side' : 'main';
-    rerender();
+    switchMobileColumn(state.mobileColumn === 'main' ? 'side' : 'main');
   }
 
   if (action === 'add-habit') {
@@ -880,6 +916,60 @@ root.addEventListener(
     }
   },
   true,
+);
+
+// Mobile: waagerechtes Wischen wechselt zwischen Aufgaben (main) und
+// Termine/Gewohnheiten (side) – dieselbe Wirkung wie der Rand-Schalter.
+// Nur im Ein-Spalten-Modus aktiv (gleiche Schwelle wie das CSS: 40.999rem).
+const SWIPE_MIN_X = 25; // px Mindestweg, ab dem ein Wisch als Seitenwechsel zählt
+const singleColumn = window.matchMedia('(max-width: 40.999rem)');
+let swipeStartX = 0;
+let swipeStartY = 0;
+let swipeTracking = false;
+
+root.addEventListener(
+  'touchstart',
+  (event) => {
+    // Nur Einzelfinger und nur im schmalen Layout. Wische, die auf einem
+    // Drag-Greifer, in einem Eingabefeld oder auf einem Button beginnen,
+    // gehören diesen Elementen – nicht dem Seitenwechsel.
+    const target = event.target as HTMLElement;
+    if (
+      event.touches.length !== 1 ||
+      !singleColumn.matches ||
+      target.closest('[data-drag], input, textarea, select, button')
+    ) {
+      swipeTracking = false;
+      return;
+    }
+    swipeTracking = true;
+    swipeStartX = event.touches[0].clientX;
+    swipeStartY = event.touches[0].clientY;
+  },
+  { passive: true },
+);
+
+root.addEventListener(
+  'touchend',
+  (event) => {
+    if (!swipeTracking) {
+      return;
+    }
+    swipeTracking = false;
+    const touch = event.changedTouches[0];
+    if (!touch) {
+      return;
+    }
+    const dx = touch.clientX - swipeStartX;
+    const dy = touch.clientY - swipeStartY;
+    // Überwiegend waagerecht (sonst war es Scrollen) und weit genug?
+    if (Math.abs(dx) < SWIPE_MIN_X || Math.abs(dx) <= Math.abs(dy)) {
+      return;
+    }
+    const next = dx < 0 ? 'side' : 'main'; // links → Termine, rechts → Aufgaben
+    switchMobileColumn(next);
+  },
+  { passive: true },
 );
 
 // Drag & Drop: Greifer/Ziele erkennt die Engine selbst, wir verarbeiten nur das Ergebnis
