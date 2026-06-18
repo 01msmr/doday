@@ -48,6 +48,9 @@ export interface AppState {
   editingEvent: string | null;
   /** Schmale Bildschirme (Hochformat): welche Spalte ist sichtbar? */
   mobileColumn: 'main' | 'side';
+  /** Nur für die Wechsel-Animation: Richtung des letzten Spaltenwechsels
+      (wird direkt nach dem Render wieder auf null gesetzt). */
+  columnAnim?: 'to-main' | 'to-side' | null;
   /** Vom Nutzer zugeklappte Bereiche (alles andere ist offen) */
   collapsed: Set<string>;
 }
@@ -102,12 +105,22 @@ export function yearOf(date: Date): string {
   return new Intl.DateTimeFormat('de-DE', { year: 'numeric' }).format(date);
 }
 
-/** Kopf der Seite: kleine Zeile in Akzentfarbe, darunter das Datum groß in Serife.
-    Das Jahr läuft mit, aber visuell zurückgenommen. */
-export function renderMasthead(small: string, big: string, year: string): string {
+/** Kopf der Seite: EINE Zeile an der oberen Kante – Wochentag links, Datum rechts.
+    Links optional ein ASCII-Spinner (|/—\\), solange Daten laden bzw. nicht ladbar sind. */
+export function renderMasthead(
+  small: string,
+  big: string,
+  year: string,
+  busy = false,
+  center = '',
+): string {
+  const spinner = busy ? '<span class="load-spinner" aria-hidden="true"></span> ' : '';
+  // Mit center-Label: drei Spalten (Tag links · Label mittig · Datum rechts).
+  const centerEl = center ? `<p class="masthead-center">${center}</p>` : '';
   return `
-    <header class="masthead">
-      <p class="weekday">${small}</p>
+    <header class="masthead${center ? ' masthead--triple' : ''}">
+      <p class="weekday">${spinner}${small}</p>
+      ${centerEl}
       <h1 class="day-date">${big} <span class="day-year">${year}</span></h1>
     </header>`;
 }
@@ -431,8 +444,7 @@ function renderHabits(habits: Habit[], editing: boolean): string {
       </button>`;
     })
     .join('');
-  // Zahnrad am Ende der Reihe öffnet den Editor (Name, Farbe, Zeitraum, Ziel).
-  // Font-Awesome-Icon, per Schriftgröße auf 65 % der Kreishöhe skaliert.
+  // Zahnrad rechts in der „Gewohnheiten"-Kopfzeile (klein) öffnet den Editor.
   const gear = `
       <button type="button" class="habit-gear${editing ? ' active' : ''}"
         data-action="toggle-habit-editor" aria-expanded="${editing}"
@@ -446,8 +458,8 @@ function renderHabits(habits: Habit[], editing: boolean): string {
       : '';
   return `
     <section class="panel">
-      <h2 class="section-label">Gewohnheiten</h2>
-      <div class="habit-row">${items}${gear}</div>
+      <h2 class="section-label section-label--gear">Gewohnheiten${gear}</h2>
+      <div class="habit-row">${items}</div>
       ${emptyHint}
       ${editing ? renderHabitEditor(habits) : ''}
     </section>`;
@@ -651,16 +663,15 @@ export function renderApp(root: HTMLElement, state: AppState): void {
   if (state.loading) {
     root.innerHTML = `
       <main class="page">
-        ${renderMasthead(weekdayOf(today), dayMonthOf(today), yearOf(today))}
+        ${renderMasthead(weekdayOf(today), dayMonthOf(today), yearOf(today), true)}
         <p class="empty">Lade deine Daten aus der Nextcloud &hellip;</p>
       </main>
       ${renderNav(state.view)}`;
     return;
   }
 
-  const syncNote = state.syncError
-    ? `<p class="sync-note">&#9888; ${escapeHtml(state.syncError)}</p>`
-    : '';
+  // Der Fehlertext wird nicht mehr inline gezeigt, sondern als kurzes Overlay
+  // (Toast in main.ts). Der Lade-Spinner im Kopf signalisiert den Zustand dauerhaft.
   let content: string;
 
   if (state.view === 'day' || state.view === 'morrow') {
@@ -693,30 +704,69 @@ export function renderApp(root: HTMLElement, state: AppState): void {
         ? `<div class="col-extras">${renderHabits(state.data.habits, state.editingHabits)}${renderAchievements(state.data.achievements, state.data.habits, taskStats)}</div>`
         : '';
 
-    // Hochformat: Umschalter am Bildschirmrand wechselt zwischen den Spalten
     const onMain = state.mobileColumn === 'main';
-    const switcher = `
-      <button type="button" class="col-switch ${onMain ? 'col-switch--right' : 'col-switch--left'}"
-        data-action="switch-column"
-        aria-label="${onMain ? 'Termine und Gewohnheiten zeigen' : 'Aufgaben zeigen'}">
-        <span class="col-switch-label">${onMain ? 'Termine' : 'Aufgaben'}</span>
-        <span class="col-switch-arrow" aria-hidden="true">${onMain ? '&rsaquo;' : '&lsaquo;'}</span>
+
+    // Animationsklasse nur beim tatsächlichen Wechsel (sonst zappelt es bei jedem Render)
+    const animClass = state.columnAnim ? ` ${state.columnAnim}` : '';
+
+    // Kleines Kalender-Icon (Inline-SVG, einfarbig). Es sitzt an der LINKEN Kante
+    // der Karten-Oberleiste – im geparkten Zustand lugt genau diese Kante rechts
+    // heraus, also dient das Icon als „hier sind die Termine"-Hinweis.
+    const calIcon = `
+      <svg class="card-cal-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="4.5" width="18" height="16" rx="2.5" />
+        <path d="M3 9h18M8 2.5v4M16 2.5v4" />
+      </svg>`;
+
+    // Die Karte (Termine + Gewohnheiten) liegt als Blatt über dem Hintergrund
+    // (Aufgaben). Ihre Oberleiste ist zugleich der Griff zum Umschalten:
+    // Icon links, „Termine" mittig.
+    const cardHandle = `
+      <button type="button" class="card-handle" data-action="switch-column"
+        aria-label="${onMain ? 'Termine zeigen' : 'Aufgaben zeigen'}">
+        ${calIcon}
+        <span class="card-handle-label">Termine</span>
       </button>`;
 
+    // „+ Termin" gehört zur Karte und sitzt unten in ihr → gleitet beim Wechsel mit.
+    const cardAction = `
+      <div class="card-action">
+        <button type="button" class="add-pill add-pill--event"
+          data-action="toggle-event-form">+ Termin</button>
+      </div>`;
+
+    // „+ Aufgabe" gehört zum Hintergrund und bleibt IMMER bestehen – die Karte
+    // schiebt sich beim Wechsel darüber (überlagert ihn), blendet ihn aber nie aus.
+    const hgAction = `
+      <div class="hg-action">
+        <button type="button" class="add-pill add-pill--task"
+          data-action="toggle-task-form">+ Aufgabe</button>
+      </div>`;
+
     content = `
-      ${renderMasthead(small, dayMonthOf(date), yearOf(date))}
-      ${syncNote}
+      ${renderMasthead(small, dayMonthOf(date), yearOf(date), state.loading || Boolean(state.syncError), 'Aufgaben')}
       ${state.view === 'day' ? renderDoneLine(dayTasks, dayEvents) : ''}
       ${renderFilterChip(state)}
-      <div class="columns" data-mobile="${state.mobileColumn}">
-        <div class="col-schedule">${renderSchedule(events, state.registry, { creating: state.creatingEvent, dateIso, editing: state.editingEvent })}</div>
+      <div class="columns${animClass}" data-mobile="${state.mobileColumn}">
         <div class="col-main">${renderAreas(grouped, state, { creating: state.creatingTask, dateIso })}</div>
-        ${extras}
+        <div class="col-side">
+          ${cardHandle}
+          <div class="col-side-body">
+            <div class="col-schedule">${renderSchedule(events, state.registry, { creating: state.creatingEvent, dateIso, editing: state.editingEvent })}</div>
+            ${extras}
+          </div>
+          ${cardAction}
+        </div>
       </div>
-      ${switcher}`;
+      ${hgAction}`;
   } else {
-    content = renderCockpit(state, syncNote);
+    content = renderCockpit(state, '');
   }
 
-  root.innerHTML = `<main class="page">${content}</main>${renderNav(state.view)}`;
+  // Die Tagesansicht bekommt eine eigene Klasse: nur dort gilt das mobile
+  // Karten-Layout (Vollbild-Bühne mit eigenem Scrollen) – Woche/Monat nicht.
+  const pageClass =
+    state.view === 'day' || state.view === 'morrow' ? 'page page--day' : 'page';
+  root.innerHTML = `<main class="${pageClass}">${content}</main>${renderNav(state.view)}`;
 }

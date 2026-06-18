@@ -73,6 +73,37 @@ Stand: 13. Juni 2026 · `main` = `05fb117` · 144 Tests grün · live auf https:
   `--keycap-size`. Inaktiv = Grau-Tönung (50 %/15 %) + dunkler Schatten;
   aktiv = hell, ohne Tönung, ohne Schatten. Nur „Do Day" hat das Wort +25 %.
 
+### Phase 6 – Mobiles Karten-Layout der Tagesansicht (18.06.2026)
+Die schmale Tagesansicht (`.page--day`, `@media max-width:40.999rem`) ist eine
+App-Fläche statt einer Scroll-Seite: Kopf oben, **Bühne** (`.columns`) dazwischen,
+Pille + Navi unten. Nur die Bühne scrollt, der Rahmen steht (`height:100dvh;
+overflow:hidden`). Breite Schirme (≥ 41 rem) bleiben unverändert zweispaltig.
+
+- **Hintergrund = Aufgaben** (`.col-main`, absolut, eigener Scroll). **Termine +
+  Gewohnheiten = Karte** (`.col-side`), die als Blatt darüberliegt.
+- **Kopfzeile einzeilig:** Tag links · „Aufgaben" mittig · Datum rechts
+  (`renderMasthead(..., center)` → `.masthead--triple`). Links ein ASCII-Spinner
+  (`|/—\`), solange geladen wird oder Laden scheitert.
+- **Karte:** rundum große Radien, opak, dunkelgrauer Schatten. Sie wird per
+  **Wisch** (Achsen-Erkennung, ab 25 px) oder Tipp auf die Oberleiste
+  (`.card-handle`: Kalender-Icon links, „Termine" mittig) herein-/herausgeschoben.
+  Geparkt lugt sie nur als schmaler Streifen rechts heraus (`--card-peek`).
+  Animation per Keyframe (DOM wird je Render neu gebaut), `ease-out`.
+  Sie endet knapp über der Navi; der Navi-Schatten fällt in den Spalt auf den HG.
+  Stellschrauben in `:root`: `--card-radius`, `--card-top`, `--card-peek`,
+  `--bottombar-h`.
+- **Karten-Header** „Gewohnheiten"/„Ziele" mittig (Haarlinie aus); Zahnrad klein
+  rechts in der „Gewohnheiten"-Zeile (`.section-label--gear`).
+- **Aktions-Pillen:** „+ Aufgabe" (Blau, `--pill`) gehört zum HG und liegt HINTER
+  der Karte; „+ Termin" (Rot, `--pill-red`) sitzt in der Karte und gleitet mit.
+  Beide viewport-zentriert und **deckungsgleich** am Swipe-Ziel, mittlerer Abstand
+  über der Navi. Die alten inline-(+) in den Überschriften nur noch auf breit.
+- **Fehler** erscheinen als kurzes Overlay (`showToast`, lebt außerhalb von `#app`,
+  3,5 s), nicht mehr als Dauer-Zeile. Text gekürzt: „Daten nicht geladen".
+- **Kein Zoom:** Viewport `maximum-scale=1, user-scalable=no` + Eingabefelder
+  ≥ 16 px (verhindert iOS-Auto-Zoom beim Datumsfeld). Kein Gummiband-Scrollen
+  (`overscroll-behavior`). Navi-Linie → weicher Schatten. Tap-Highlight aus.
+
 ## Störungs-Lehren (13.06.2026) – wichtig fürs Deployment
 
 - **Dockerfile musste `COPY src ./src` bekommen** – das Backend importiert
@@ -112,7 +143,7 @@ Stand: 13. Juni 2026 · `main` = `05fb117` · 144 Tests grün · live auf https:
 |---|---|
 | ~~PWA-Manifest (Vollbild auf dem iPhone)~~ | ✅ erledigt 13.06. – statisches `manifest.json` + apple-Meta-Tags, kein Service Worker (Nutzerwunsch) |
 | Verschieben per Drag & Drop | Konzept fertig: `docs/verschieben-konzept.md` (4 Stufen, Pointer Events) – **als Nächstes** |
-| Ehrlichere Sync-Fehlermeldung | „läuft das Backend?" war am 13.06. irreführend (Sperre/DNS); Ursache benennen statt pauschal |
+| ~~Ehrlichere Sync-Fehlermeldung~~ | teilw. 18.06.: Lade-/Ladefehler jetzt als Spinner + kurzer Toast „Daten nicht geladen" statt Dauer-Zeile |
 | Serientermine bearbeiten | bewusst ausgeklammert – Änderung in der Nextcloud (RECURRENCE-ID wäre nötig) |
 | Blättern in die ZUKUNFT (Week/Month) | bewusst weggelassen (YAGNI) – Cockpits zeigen jetzt + Vergangenheit |
 | Ziel-Historie | Ziele zeigen immer den aktuellen Stand, auch in Vorzeiträumen (keine Historie gespeichert) |

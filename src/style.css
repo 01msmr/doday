@@ -12,6 +12,8 @@
   --ink-faint: #8e897c;
   --hairline: rgb(38 37 31 / 0.14);
   --accent: #5d7a55; /* dunkleres Salbei – genug Kontrast auf Papier */
+  --pill: #5f7596; /* gedecktes Blau (Schwester des Salbei) für „+ Aufgabe" */
+  --pill-red: #a25a50; /* gedecktes Backstein-Rot für „+ Termin" */
   --glow: #fcfaf3; /* sanfter Lichtfleck oben */
   --halo: rgb(93 122 85 / 0.28); /* Schein um erledigte Gewohnheiten */
   --strike: rgb(38 37 31 / 0.3); /* Durchstreichung erledigter Aufgaben */
@@ -36,6 +38,8 @@
     --ink-faint: #6e6b64;
     --hairline: rgb(232 229 221 / 0.1);
     --accent: #8fae87; /* helleres Salbei für dunklen Grund */
+    --pill: #8aa6c8; /* helleres gedecktes Blau für „+ Aufgabe" im Dunkeln */
+    --pill-red: #cf8d83; /* helleres gedecktes Rot für „+ Termin" im Dunkeln */
     --glow: #232631;
     --halo: rgb(143 174 135 / 0.22);
     --strike: rgb(232 229 221 / 0.25);
@@ -65,6 +69,11 @@ body {
     var(--bg);
   min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
+  /* Kein „Gummiband"-Wippen, wenn der Inhalt passt – echtes Scrollen bei
+     langem Inhalt bleibt erhalten. */
+  overscroll-behavior-y: none;
+  /* iOS: grauen Aufblitz-Kasten beim Antippen von Buttons/Links unterdrücken */
+  -webkit-tap-highlight-color: transparent;
 }
 
 .page {
@@ -79,8 +88,13 @@ body {
 
 /* ---------- Kopf ---------- */
 
+/* Eine Zeile an der oberen Kante: Wochentag links, Datum rechts. */
 .masthead {
-  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 0.5rem;
 }
 
 .weekday {
@@ -89,14 +103,80 @@ body {
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--accent);
+  white-space: nowrap;
 }
 
 .day-date {
-  margin: 0.15rem 0 0;
+  margin: 0;
   font-family: var(--serif);
   font-weight: 500;
-  font-size: clamp(1.9rem, 6vw, 2.5rem);
+  font-size: clamp(1.3rem, 5vw, 1.9rem);
   line-height: 1.1;
+  white-space: nowrap;
+}
+
+/* ASCII-Spinner (|/—\) links im Kopf, solange geladen wird / Laden scheitert.
+   Erbt die Akzentfarbe der Wochentag-Zeile. */
+.load-spinner::before {
+  content: '|';
+  display: inline-block;
+  width: 1ch;
+  text-align: center;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  animation: ascii-spin 0.7s steps(1, end) infinite;
+}
+
+@keyframes ascii-spin {
+  0% {
+    content: '|';
+  }
+  25% {
+    content: '/';
+  }
+  50% {
+    content: '—';
+  }
+  75% {
+    content: '\\';
+  }
+}
+
+/* Dreispaltige Kopfzeile: Tag links · „Aufgaben" mittig · Datum rechts. */
+.masthead--triple {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: baseline;
+}
+
+.masthead--triple .weekday {
+  justify-self: start;
+}
+
+.masthead--triple .day-date {
+  justify-self: end;
+}
+
+.masthead-center {
+  justify-self: center;
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+
+/* Breit: zwei Spalten – das mittige „Aufgaben" entfällt (Spalten-Titel übernehmen),
+   die Kopfzeile fällt auf links/rechts zurück. */
+@media (min-width: 41rem) {
+  .masthead--triple {
+    display: flex;
+  }
+
+  .masthead-center {
+    display: none;
+  }
 }
 
 /* Das Jahr läuft mit, hält sich aber visuell zurück */
@@ -107,35 +187,32 @@ body {
   letter-spacing: 0.04em;
 }
 
-/* ---------- Spalten-Layout ----------
-   Schmal (iPhone): alles untereinander – Termine oben, dann Aufgaben,
-   dann Gewohnheiten/Achievements.
-   Breit (ab 50rem): Aufgaben links, Termine + Gewohnheiten rechts. */
+/* ---------- Spalten-Layout & mobile Karten-Bühne ----------
+   Schmal (iPhone): Aufgaben sind der Hintergrund, Termine + Gewohnheiten
+   liegen als verschiebbare Karte darüber (Griff = Oberleiste mit Icon).
+   Breit (ab 41rem): klassisch zwei Spalten nebeneinander, keine Karte.
+   Alle „Stellschrauben" hier zentral: */
+:root {
+  --card-radius: 1.4rem; /* große Radien der Karte */
+  --card-top: -0.3rem; /* Oberkante 0.3rem höher (= 15 % kleinerer Schatten-Blur) */
+  --card-peek: 1.15rem; /* Karte lugt nur noch knapp heraus (20px weiter rausgeschoben) */
+  --bottombar-h: 5.3rem; /* Höhe der unteren Navi – steuert die Abstände unten */
+}
 
 .columns {
   display: grid;
   grid-template-areas:
-    'schedule'
     'main'
-    'extras';
+    'side';
 }
 
-.col-schedule {
-  grid-area: schedule;
+.col-schedule,
+.col-main,
+.col-side {
   min-width: 0;
 }
 
-.col-main {
-  grid-area: main;
-  min-width: 0;
-}
-
-.col-extras {
-  grid-area: extras;
-  min-width: 0;
-}
-
-/* Ab 41rem (~660px, auch iPhone quer) passen beide Spalten nebeneinander */
+/* === Breit (ab 41rem): zwei Spalten, keine Karte/Pille/Griff === */
 @media (min-width: 41rem) {
   .page {
     max-width: 66rem;
@@ -143,84 +220,304 @@ body {
 
   .columns {
     grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
-    grid-template-rows: auto 1fr;
-    grid-template-areas:
-      'main schedule'
-      'main extras';
+    grid-template-areas: 'main side';
     column-gap: clamp(2rem, 5vw, 4.5rem);
     align-items: start;
   }
+
+  .col-main {
+    grid-area: main;
+  }
+
+  .col-side {
+    grid-area: side;
+  }
+
+  .card-handle {
+    display: none; /* reines Mobil-Element (Pillen werden separat ausgeblendet) */
+  }
 }
 
-/* Hochformat/schmal: nur EINE Spalte sichtbar, der Rand-Umschalter wechselt */
+/* === Schmal (Hochformat): Vollbild-Bühne mit Karte === */
 @media (max-width: 40.999rem) {
-  .columns[data-mobile='main'] .col-schedule,
-  .columns[data-mobile='main'] .col-extras {
+  /* Die Tagesansicht wird zur App-Fläche: Kopf oben, Bühne dazwischen,
+     Pille + Navi unten – nur die Bühne scrollt, der Rahmen bleibt stehen. */
+  .page--day {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    /* Oben nur knapp Platz – aber die iOS-Statusleiste respektieren, damit der
+       Kopf nicht darunter rutscht. Unten reicht die Bühne hinter Pille/Navi. */
+    padding-top: calc(env(safe-area-inset-top) + 0.4rem);
+    padding-bottom: 0;
+    overflow: hidden;
+  }
+
+  /* Kopfzeilen behalten ihre natürliche Höhe; Abstände eng halten, damit die Karte
+     höher steigt und nah an den „Aufgaben"-Schriftzug heranrückt. */
+  .page--day > .masthead,
+  .page--day > .sync-note,
+  .page--day > .done-line,
+  .page--day > .filter-chip {
+    flex: none;
+  }
+
+  .page--day > .masthead {
+    margin-bottom: 0.1rem;
+  }
+
+  .page--day > .done-line {
+    margin-top: 0.25rem;
+  }
+
+  /* Die Bühne: HG (Aufgaben) und Karte liegen hier übereinander */
+  .page--day > .columns {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    margin-top: 0.2rem; /* nur ein schmaler Spalt über der Karte */
+  }
+
+  /* Hintergrund = Aufgaben: füllt die Bühne und scrollt für sich allein */
+  .page--day .col-main {
+    position: absolute;
+    inset: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: calc(var(--bottombar-h) + 4.5rem + env(safe-area-inset-bottom));
+  }
+
+  .page--day .col-main > .panel {
+    margin-top: 0;
+  }
+
+  /* „Aufgaben" steht jetzt mittig in der Kopfzeile → der Strip im Stage entfällt,
+     die Karte kann den ganzen Stage abdecken (inkl. „Keine Aufgaben…"). */
+  .page--day .col-main .section-label {
     display: none;
   }
 
-  .columns[data-mobile='side'] .col-main {
+  /* Die Karte: rundum abgerundetes Blatt über dem HG – opak. Endet KNAPP über der
+     Navi (Spalt > Reichweite des Navi-Schattens), damit dieser Schatten in den Spalt
+     auf den HG fällt und NICHT auf die Karte. */
+  .page--day .col-side {
+    position: absolute;
+    top: var(--card-top);
+    left: 0;
+    right: 0;
+    bottom: calc(var(--bottombar-h) + 0.35rem + env(safe-area-inset-bottom));
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--bg);
+    border-radius: var(--card-radius); /* alle vier Ecken gerundet */
+    /* dunkelgraue Optik wie der Navi-Schatten – 15 % kleiner als zuvor */
+    box-shadow:
+      0 -0.34rem 1.7rem rgb(12 12 14 / 0.45),
+      -0.43rem 0 1.53rem rgb(12 12 14 / 0.4),
+      0 0.34rem 1.53rem rgb(12 12 14 / 0.4);
+  }
+
+  /* Aufgaben aktiv → Karte parkt rechts, nur die linke Kante (Icon) lugt heraus */
+  .columns[data-mobile='main'] .col-side {
+    transform: translateX(calc(100% - var(--card-peek)));
+  }
+
+  /* Termine aktiv → Karte vollständig hereingezogen */
+  .columns[data-mobile='side'] .col-side {
+    transform: translateX(0);
+  }
+
+  /* Slide beim Wechsel. Weil das DOM bei jedem Render neu gebaut wird, animiert
+     eine Keyframe (nicht transition) – sie läuft nur, wenn gerade gewechselt wurde.
+     ease-out = schnell starten, am Ziel ausbremsen. */
+  @media (prefers-reduced-motion: no-preference) {
+    .columns.to-side .col-side {
+      animation: card-in 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .columns.to-main .col-side {
+      animation: card-out 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+  }
+
+  /* Oberleiste = Griff: Icon an der linken Kante, „Termine" mittig.
+     Schrift IDENTISCH zum „AUFGABEN"-Label im Kopf (Sans, gesperrt, Versalien). */
+  .card-handle {
+    flex: none;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 2.4rem;
+    padding: 0 0.9rem;
+    background: none;
+    border: none;
+    border-radius: var(--card-radius) var(--card-radius) 0 0;
+    color: var(--ink-faint);
+    font-family: inherit;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .card-cal-icon {
+    position: absolute;
+    left: 0.95rem; /* alte relative Position in der Karte (peekt im Ruhezustand nicht) */
+    width: 1.25rem;
+    height: 1.25rem;
+    color: var(--accent);
+  }
+
+  /* Karteninhalt scrollt unter dem Griff */
+  .col-side-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0 1.1rem;
+    /* Karte endet schon über der Navi → nur Platz für die „+ Termin"-Pille nötig */
+    padding-bottom: 3.4rem;
+  }
+
+  .col-side-body > .col-schedule > .panel,
+  .col-side-body > .col-extras > .panel:first-child {
+    margin-top: 0.7rem;
+  }
+
+  /* „Termine" steht schon auf dem Griff – die innere Überschrift entfällt */
+  .page--day .col-schedule .section-label {
+    display: none;
+  }
+
+  /* Karten-Header („Gewohnheiten", „Ziele") horizontal mittig, ohne Haarlinie */
+  .page--day .col-side .section-label {
+    justify-content: center;
+    text-align: center;
+  }
+
+  .page--day .col-side .section-label::after {
+    display: none;
+  }
+
+  /* Die inline-(+)-Knöpfe in den Überschriften weichen der unteren Pille */
+  .page--day .add-event {
     display: none;
   }
 }
 
-/* Der Umschalter: schwebt mittig am Bildschirmrand, Beschriftung senkrecht */
-.col-switch {
-  position: fixed;
-  top: 50%;
+@keyframes card-in {
+  from {
+    transform: translateX(calc(100% - var(--card-peek)));
+  }
+}
+
+@keyframes card-out {
+  from {
+    transform: translateX(0);
+  }
+}
+
+/* ---------- Untere Aktions-Pillen (mobil) ----------
+   „+ Aufgabe" gehört zum Hintergrund und liegt VOR der Karte (aber hinter der
+   Navi). „+ Termin" sitzt IN der Karte und gleitet beim Wechsel mit ihr.
+   Beide schweben direkt über der Navi-Leiste. */
+.hg-action,
+.card-action {
+  left: 0;
   right: 0;
-  z-index: 5;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.85rem 0.4rem;
-  background: var(--nav-bg);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
-  border: 1px solid var(--hairline);
-  border-right: none;
-  border-radius: 0.7rem 0 0 0.7rem;
-  color: var(--ink-soft);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.18em;
+  justify-content: center;
+  padding: 0 1rem;
+  pointer-events: none; /* nur die Pille selbst fängt Tipps */
+}
+
+/* „+ Aufgabe": fix über dem HG, HINTER der Karte (die Karte überlagert ihn beim
+   Hereinziehen) und hinter der Navi. Bleibt immer bestehen.
+   Bottom so gewählt, dass die Pille deckungsgleich zur „+ Termin"-Pille liegt. */
+.hg-action {
+  position: fixed;
+  z-index: 2;
+  bottom: calc(var(--bottombar-h) + 1rem + env(safe-area-inset-bottom));
+}
+
+/* „+ Termin": absolut am Kartenboden → erbt die Verschiebung der Karte. Die Karte
+   endet 0.7rem über der Navi, die Pille sitzt 0.3rem darüber → Screen-Position
+   identisch zur „+ Aufgabe"-Pille (1rem über der Navi). */
+.card-action {
+  position: absolute;
+  bottom: 0.65rem; /* Karte endet 0.35rem über der Navi → Pille bleibt bei 1rem
+                      über der Navi (deckungsgleich zu „+ Aufgabe") */
+}
+
+.add-pill {
+  pointer-events: auto;
+  /* Breite viewport-basiert (NICHT containerabhängig), damit „+ Aufgabe" (im HG)
+     und „+ Termin" (in der Karte) am Swipe-Ziel exakt deckungsgleich liegen.
+     35 % schmäler als zuvor (× 0.65). */
+  width: calc(min(22rem, 100vw - 3rem) * 0.65);
+  padding: 0.55rem 0.85rem; /* vertikal bewusst knapp – Touchfläche bleibt brauchbar */
+  border: none;
+  border-radius: 999px;
+  color: var(--bg);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   cursor: pointer;
-  transform: translateY(-50%);
-  transition: color 0.2s ease;
+  box-shadow: 0 0.3rem 1rem rgb(38 37 31 / 0.22);
 }
 
-/* Auf der rechten Spalte wandert er an den linken Rand ("und umgekehrt") */
-.col-switch--left {
-  right: auto;
-  left: 0;
-  border-right: 1px solid var(--hairline);
-  border-left: none;
-  border-radius: 0 0.7rem 0.7rem 0;
+.add-pill--task {
+  background: var(--pill); /* gedecktes Blau */
 }
 
-.col-switch:hover {
-  color: var(--accent);
+.add-pill--event {
+  background: var(--pill-red); /* gedecktes Rot */
 }
 
-.col-switch-label {
-  writing-mode: vertical-rl;
+.add-pill:active {
+  transform: translateY(1px);
 }
 
-.col-switch-arrow {
-  font-size: 1rem;
-  line-height: 1;
-  color: var(--accent);
-}
-
-/* Passen beide Spalten nebeneinander, gibt es nichts umzuschalten.
-   (Steht bewusst NACH der .col-switch-Definition – gleiche Spezifität,
-   die spätere Regel gewinnt.) */
+/* Breit: zwei Spalten sichtbar – die Pillen entfallen (inline-(+) übernimmt) */
 @media (min-width: 41rem) {
-  .col-switch {
+  .hg-action,
+  .card-action {
     display: none;
   }
+}
+
+/* ---------- Fehler-Toast (kurzes Overlay statt dauerhafter Inline-Zeile) ---------- */
+.toast {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 3.5rem);
+  left: 50%;
+  z-index: 20;
+  max-width: min(26rem, calc(100vw - 2rem));
+  padding: 0.6rem 1rem;
+  border-radius: 0.7rem;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 0.9rem;
+  text-align: center;
+  box-shadow: 0 0.5rem 1.5rem rgb(38 37 31 / 0.3);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -0.5rem);
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 /* ---------- Sektionen ---------- */
@@ -247,6 +544,27 @@ body {
   flex: 1;
   height: 1px;
   background: var(--hairline);
+}
+
+/* „Gewohnheiten"-Kopf mit kleinem Zahnrad rechts. Symmetrisches Polster, damit der
+   Titel (auf der Karte zentriert) trotz Zahnrad mittig bleibt. */
+.section-label--gear {
+  position: relative;
+  padding: 0 2rem;
+}
+
+.section-label--gear .habit-gear {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 1.7rem;
+  height: 1.7rem;
+  margin: 0;
+  transform: translateY(-50%);
+}
+
+.section-label--gear .habit-gear i {
+  font-size: 1rem; /* kleineres Zahnrad */
 }
 
 /* Leere Zustände: leise, kein Drama */
@@ -305,7 +623,7 @@ body {
   border-bottom: 1px solid var(--hairline);
   color: var(--ink);
   font: inherit;
-  font-size: 0.95rem;
+  font-size: 16px; /* min. 16px: sonst zoomt iOS beim Fokus automatisch hinein */
 }
 
 .event-form input:focus-visible {
@@ -504,7 +822,7 @@ details[open] > summary .chevron {
   border-bottom: 1px solid var(--accent);
   color: var(--ink);
   font: inherit;
-  font-size: 0.98rem;
+  font-size: 16px; /* min. 16px gegen iOS-Auto-Zoom beim Fokus */
   font-weight: 500;
   /* der Kopf erbt user-select:none – das Eingabefeld muss aber editierbar bleiben */
   user-select: text;
@@ -816,7 +1134,7 @@ details[open] > summary .chevron {
   border-bottom: 1px solid var(--hairline);
   color: var(--ink);
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 16px; /* min. 16px gegen iOS-Auto-Zoom beim Fokus */
 }
 
 .habit-editor input:focus-visible,
@@ -1035,6 +1353,7 @@ details[open] > summary .chevron {
 .bottom-nav {
   position: fixed;
   inset: auto 0 0 0; /* links/rechts/unten angedockt */
+  z-index: 7; /* immer VOR der Termine-Karte (die liegt dahinter) */
   display: flex;
   justify-content: center;
   align-items: center; /* Quadrate behalten ihre Höhe (nicht strecken) */
@@ -1044,7 +1363,9 @@ details[open] > summary .chevron {
   /* Inhalt schimmert beim Scrollen weich durch (iOS-Gefühl) */
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
-  border-top: 1px solid var(--hairline);
+  /* Statt dünner Linie: dunkelgrauer Schatten nach oben auf HG/Karte –
+     kompakt (60 % kleiner) und etwas heller (20 %). */
+  box-shadow: 0 -0.12rem 0.36rem rgb(12 12 14 / 0.48);
 }
 
 /* Jede Ansicht als eigene "Taste" – IDENTISCH zum App-Icon:
@@ -1105,8 +1426,11 @@ details[open] > summary .chevron {
   top: 37.5%; /* Mitte bei 3/4 der oberen Hälfte */
   transform: translateY(-50%);
   text-align: center;
-  font-size: 1.1rem; /* 1. Zeile bewusst unverändert gelassen */
-  font-weight: 800;
+  font-size: 1.1rem; /* 1. Zeile – Größe wie ursprünglich */
+  font-weight: 900;
+  /* 900 ist die schwerste echte Schriftstärke – darüber verdicken wir
+     die Buchstaben zusätzlich mit einer Kontur in derselben Farbe */
+  -webkit-text-stroke: 0.03em currentColor;
   line-height: 0.95;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -1120,7 +1444,7 @@ details[open] > summary .chevron {
   top: 75%; /* mittig in der unteren Hälfte */
   transform: translateY(-50%);
   text-align: center;
-  font-size: 0.62rem; /* 2. Zeile (Wort) */
+  font-size: 0.56rem; /* 2. Zeile (Wort) */
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.02em;
@@ -1130,7 +1454,7 @@ details[open] > summary .chevron {
 
 /* Nur "Do Day" hat das Wort 25% größer – nicht Morrow/Week/Month */
 .nav-item[data-view='day'] .nav-label {
-  font-size: 0.78rem;
+  font-size: 0.7rem;
 }
 
 /* Tastatur-Fokus sichtbar halten (Barrierefreiheit) */

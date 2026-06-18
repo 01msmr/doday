@@ -2,8 +2,11 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <!-- viewport-fit=cover: nutzt auf dem iPhone die volle Fläche (Notch-Bereich) -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- viewport-fit=cover: nutzt auf dem iPhone die volle Fläche (Notch-Bereich).
+         maximum-scale=1 + user-scalable=no: unterbindet Pinch-Zoom UND den iOS-Auto-Zoom,
+         der sonst beim Antippen eines Eingabefelds (z. B. Datum) hineinzoomt. -->
+    <meta name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <!-- Browser-Chrome-Farbe folgt dem Hell/Dunkel-Modus des Geräts -->
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f3f0e9" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#16171b" />
