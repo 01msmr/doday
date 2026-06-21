@@ -952,19 +952,23 @@ root.addEventListener('keydown', (event) => {
   }
 });
 
-// Escape im Erstell-Formular (Aufgabe/Termin) → Modus schließen, nichts anlegen.
-// Läuft nur, wenn kein Vorschlags-Dropdown den Escape vorher verbraucht hat.
+// Escape im Erstell- ODER Bearbeiten-Formular (Aufgabe/Termin) → abbrechen,
+// nichts anlegen/ändern. Läuft nur, wenn kein Vorschlags-Dropdown den Escape
+// vorher verbraucht hat (siehe stopImmediatePropagation oben).
 root.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') {
     return;
   }
-  const form = (event.target as HTMLElement).closest?.('[data-task-form], [data-event-form]');
-  if (!form) {
-    return;
+  const el = event.target as HTMLElement;
+  if (el.closest?.('[data-task-form], [data-event-form]')) {
+    state.creatingTask = false;
+    state.creatingEvent = false;
+    rerender();
+  } else if (el.closest?.('[data-task-edit-form], [data-event-edit-form]')) {
+    state.editingTask = null;
+    state.editingEvent = null;
+    rerender();
   }
-  state.creatingTask = false;
-  state.creatingEvent = false;
-  rerender();
 });
 
 // Klick/Tipp auf einen Vorschlag – mousedown statt click, damit das
