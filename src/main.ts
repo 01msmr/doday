@@ -74,6 +74,10 @@ let toastEl: HTMLDivElement | null = null;
 let toastTimer = 0;
 let lastToastError: string | null = null;
 
+// Zeitstempel des letzten „leeres Erstell-Formular verlassen"-Schließens –
+// unterdrückt das sofortige Wieder-Öffnen durch denselben (+)-Pillen-Tipp.
+let suppressCreateToggle = 0;
+
 function showToast(message: string): void {
   if (!toastEl) {
     toastEl = document.createElement('div');
@@ -506,7 +510,13 @@ function readForm(form: HTMLElement, names: string[]): Record<string, string> {
 async function submitEventForm(form: HTMLElement): Promise<void> {
   const { date, start, end } = readForm(form, ['date', 'start', 'end']);
   const title = normalizeText(readForm(form, ['title']).title);
-  if (!title || !date || !start || !end) {
+  // Enter/Speichern ohne Titel → Erstell-Modus schließen, nichts anlegen.
+  if (!title) {
+    state.creatingEvent = false;
+    rerender();
+    return;
+  }
+  if (!date || !start || !end) {
     return;
   }
   registerTitleTags(title);
@@ -588,7 +598,11 @@ async function submitEventEditForm(form: HTMLElement): Promise<void> {
 async function submitTaskForm(form: HTMLElement): Promise<void> {
   const { due } = readForm(form, ['due']);
   const title = normalizeText(readForm(form, ['title']).title);
+  // Enter/Anlegen ohne Titel → Erstell-Modus schließen, nichts anlegen
+  // (schnellstes Abbrechen auf iOS: Return-Taste).
   if (!title) {
+    state.creatingTask = false;
+    rerender();
     return;
   }
   registerTitleTags(title);
@@ -663,15 +677,25 @@ root.addEventListener('click', (event) => {
   }
 
   if (action === 'toggle-event-form') {
-    state.creatingEvent = !state.creatingEvent;
-    rerender();
-    root!.querySelector<HTMLInputElement>('[data-event-form] [data-field="title"]')?.focus();
+    // Gerade per Verlassen eines leeren Formulars geschlossen? Dann NICHT sofort
+    // wieder öffnen (derselbe Tipp auf die Pille hat das Schließen ausgelöst).
+    if (Date.now() - suppressCreateToggle < 500) {
+      suppressCreateToggle = 0;
+    } else {
+      state.creatingEvent = !state.creatingEvent;
+      rerender();
+      root!.querySelector<HTMLInputElement>('[data-event-form] [data-field="title"]')?.focus();
+    }
   }
 
   if (action === 'toggle-task-form') {
-    state.creatingTask = !state.creatingTask;
-    rerender();
-    root!.querySelector<HTMLInputElement>('[data-task-form] [data-field="title"]')?.focus();
+    if (Date.now() - suppressCreateToggle < 500) {
+      suppressCreateToggle = 0;
+    } else {
+      state.creatingTask = !state.creatingTask;
+      rerender();
+      root!.querySelector<HTMLInputElement>('[data-task-form] [data-field="title"]')?.focus();
+    }
   }
 
   if (action === 'edit-task' && id) {
@@ -923,7 +947,24 @@ root.addEventListener('keydown', (event) => {
     pickSuggest(suggestIndex);
   } else if (event.key === 'Escape') {
     closeSuggest();
+    // Escape hat hier nur die Liste geschlossen – NICHT auch das Formular schließen.
+    event.stopImmediatePropagation();
   }
+});
+
+// Escape im Erstell-Formular (Aufgabe/Termin) → Modus schließen, nichts anlegen.
+// Läuft nur, wenn kein Vorschlags-Dropdown den Escape vorher verbraucht hat.
+root.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') {
+    return;
+  }
+  const form = (event.target as HTMLElement).closest?.('[data-task-form], [data-event-form]');
+  if (!form) {
+    return;
+  }
+  state.creatingTask = false;
+  state.creatingEvent = false;
+  rerender();
 });
 
 // Klick/Tipp auf einen Vorschlag – mousedown statt click, damit das
@@ -946,6 +987,29 @@ root.addEventListener(
   },
   true,
 );
+
+// Erstell-Formular (Aufgabe/Termin) OHNE Eingabe verlassen → Modus schließen,
+// nichts anlegen. Greift nur, wenn der Fokus das Formular ganz verlässt und der
+// Titel leer ist. suppressCreateToggle verhindert, dass ein Tipp auf dieselbe
+// (+)-Pille das Formular gleich wieder öffnet (siehe Toggle-Handler oben).
+root.addEventListener('focusout', (event) => {
+  const form = (event.target as HTMLElement).closest?.('[data-task-form], [data-event-form]');
+  if (!form) {
+    return;
+  }
+  const next = event.relatedTarget as Node | null;
+  if (next && form.contains(next)) {
+    return; // Fokus bleibt im Formular (z. B. ins Datumsfeld) → offen lassen
+  }
+  const title = form.querySelector<HTMLInputElement>('[data-field="title"]')?.value.trim() ?? '';
+  if (title) {
+    return; // schon etwas getippt → nicht automatisch verwerfen
+  }
+  state.creatingTask = false;
+  state.creatingEvent = false;
+  suppressCreateToggle = Date.now();
+  rerender();
+});
 
 // Mobile: waagerechtes Wischen wechselt zwischen Aufgaben (main) und
 // Termine/Gewohnheiten (side) – dieselbe Wirkung wie der Rand-Schalter.

@@ -90,6 +90,24 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Mobil ist JEDE Ansicht eine 100dvh-Bühne (page--staged) → das Dokument selbst
+   darf NIE scrollen/wippen. Body hart fixieren (kein iOS-Rubberband); gescrollt
+   wird ausschließlich INNEN (.col-main / .col-side-body, nur wenn nötig). */
+@media (max-width: 40.999rem) {
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  body {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+  }
+}
+
 .page {
   max-width: 38rem;
   margin: 0 auto;
@@ -330,13 +348,16 @@ body {
     margin-top: 0.2rem; /* nur ein schmaler Spalt über der Karte */
   }
 
-  /* Hintergrund = Aufgaben: füllt die Bühne und scrollt für sich allein. */
+  /* Hintergrund = Aufgaben: füllt die Bühne und scrollt für sich allein.
+     Rechts dasselbe Polster wie IM Termine-Karteninhalt (--card-peek), damit die
+     geparkte Karte die Bearbeiten-Stifte der Aufgaben nicht überdeckt. */
   .page--staged .col-main {
     position: absolute;
     inset: 0;
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;
+    padding-right: 1.1rem;
     padding-bottom: calc(var(--bottombar-h) + 4.5rem + env(safe-area-inset-bottom));
   }
 

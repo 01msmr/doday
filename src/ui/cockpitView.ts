@@ -34,6 +34,7 @@ import {
   renderMasthead,
   renderTask,
   renderTaskForm,
+  renderTaskLists,
   weekdayOf,
   yearOf,
   type AppState,
@@ -101,7 +102,7 @@ function renderTaskGroup(
   return `
     <div class="day-group${variant ? ` day-group--${variant}` : ''}">
       <h3 class="day-group-label">${label}</h3>
-      <ul class="task-list">${tasks.map((task) => renderTask(task, editingId)).join('')}</ul>
+      ${renderTaskLists(tasks, editingId)}
     </div>`;
 }
 
