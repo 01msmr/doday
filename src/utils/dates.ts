@@ -16,16 +16,17 @@ function hasZone(isoDateTime: string): boolean {
 }
 
 /**
- * Uhrzeit "HH:MM" – lokale Zeitstempel werden geschnitten,
- * UTC-Zeitstempel aus CalDAV in die lokale Uhrzeit umgerechnet.
+ * Uhrzeit "H:MM" OHNE führende Null bei der Stunde (z. B. "9:00", "0:30") –
+ * lokale Zeitstempel werden geschnitten, UTC-Zeitstempel aus CalDAV in die
+ * lokale Uhrzeit umgerechnet. Die Minute bleibt immer zweistellig.
  */
 export function timeOf(isoDateTime: string): string {
   if (hasZone(isoDateTime)) {
-    return new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' }).format(
-      new Date(isoDateTime),
-    );
+    const local = new Date(isoDateTime);
+    return `${local.getHours()}:${String(local.getMinutes()).padStart(2, '0')}`;
   }
-  return isoDateTime.slice(11, 16);
+  const [hour, minute] = isoDateTime.slice(11, 16).split(':');
+  return `${Number(hour)}:${minute}`;
 }
 
 /** Lokales Datum ("YYYY-MM-DD") eines Zeitstempels – UTC wird umgerechnet */

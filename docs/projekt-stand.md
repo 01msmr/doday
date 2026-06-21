@@ -1,6 +1,6 @@
 # Do Day – Projektstand
 
-Stand: 13. Juni 2026 · `main` = `05fb117` · 144 Tests grün · live auf https://do.msmr.co
+Stand: 21. Juni 2026 · `main` · 173 Tests grün · live auf https://do.msmr.co
 
 ## Erledigt
 
@@ -122,6 +122,43 @@ overflow:hidden`). Breite Schirme (≥ 41 rem) bleiben unverändert zweispaltig.
   unberührt. Desktop nutzt jetzt ebenfalls die (+)-Pillen am Spaltenende.
 - **Feinschliff:** Jahres-Ziffern ≈ x-Höhe des Monats; weniger Weißraum über den
   Badges; „Morgen" statt „Morgen · Wochentag".
+
+### Phase 8 – Vereinheitlichtes Karten-Design & „UN:DONE" (21.06.2026)
+Großes UI-Redesign: **alle** Tabs nutzen jetzt dieselbe Karten-Bühne, dazu ein
+neuer fünfter Tab. `.page--day` heißt jetzt `.page--staged` (gilt für alle Ansichten).
+
+- **Week & Month wie Day/Morrow:** gleiche Bühne (Aufgaben-Hintergrund + Karte mit
+  Termine/Gewohnheiten/Zielen), Desktop zweispaltig mit Rahmen, schmal per Swipe.
+  `cockpitView` liefert dafür `renderCockpitParts()` (vier Zonen) statt einer
+  eigenen Seite; `renderApp` baut die Bühne für alle Views.
+- **Gleiche Top-Bar in Week/Month:** Monat + Jahr immer rechts, `‹ ›` links neben
+  dem Zeitraum-Label, „Aufgaben"-Badge mittig (wie Day).
+- **Neuer Tab „UN DONE"** (Übersicht ALLER Aufgaben): links offen (BG, weiß),
+  rechts erledigt (dunkle Karte, invers). Abhaken verschiebt die Aufgabe in die
+  andere Spalte. Tab-Knopf rahmenlos/grau (aktiv = Keycap); auf **Mobil** nur „UN"
+  (66 % Grau, aktiv invers schwarz) über dem Sprach-Umschalter, Seite ganz weiß.
+  Header in UN:DONE invers (schwarz/weiß) statt farbig.
+- **Header-Badges nach Seite eingefärbt:** Aufgaben-Seite blau (`--pill`),
+  Karten-Seite (Termine/Gewohnheiten/Ziele) rot (`--pill-red`).
+- **Überfällig konsistent (Week + Month):** „überfällig" = offen UND vor HEUTE
+  fällig (nicht vor Zeitraumanfang) → Monat zeigt die Gruppe wie die Woche. Jede
+  überfällige Aufgabe zeigt ihr Datum **inline in Rot**; Sammel-Überschriften
+  „Überfällig"/„Anstehend" etwas kräftiger.
+- **Kompakte Gewohnheiten** in Week/Month (weniger Weißraum, kleinere Stat-Schrift);
+  Monats-Ziel „X×/Woche" jetzt **tag-genau** (`round(target × Tage ÷ 7)`).
+  Gewohnheiten/Ziele in Week/Month **nicht mehr doppelt** (kein „Regelmäßig"-Block,
+  da die Gewohnheiten-Sektion sie schon zeigt).
+- **Vergangene Termine** in allen Tabs rechtsbündig + gedämpft (wie abgehakt).
+- **Feinschliff:** keine Scrollbalken, kein horizontales Scrollen; iOS-Statusleiste
+  = echte Seitenfarbe (dynamisches `<meta theme-color>` aus `getComputedStyle`);
+  Uhrzeiten ohne führende Null (`9:00`); engl. Wochendatum ohne Punkt (`5–14 June`);
+  Morrow-Top-Bar zeigt den Wochentag; Dark Mode: schwacher weißer Glow als
+  Karten-Schatten.
+- **Aufräumen:** `DEFAULT_HABIT_COLOR` zentral in `models/types.ts`; tote
+  Reste entfernt (i18n-Key `once`, CSS `.goal-num/.goal-sep/.masthead-row`,
+  ungenutzter `weeksInRange`-Import). Entscheidung dokumentiert: **Habits NICHT als
+  wiederkehrende Nextcloud-Tasks** (RRULE behält keine Tages-Historie → Streak/
+  Monatsbilanz nicht rekonstruierbar; „3×/Woche" nicht abbildbar).
 
 ## Störungs-Lehren (13.06.2026) – wichtig fürs Deployment
 
