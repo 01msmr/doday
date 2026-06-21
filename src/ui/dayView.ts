@@ -146,7 +146,7 @@ export function renderEventForm(dateIso: string): string {
   return `
     <form class="event-form" data-event-form>
       <input type="text" data-field="title" placeholder="${t('titleEventPh')}"
-        aria-label="${t('ariaEventTitle')}" required />
+        aria-label="${t('ariaEventTitle')}" />
       <div class="event-form-row">
         <input type="date" data-field="date" value="${dateIso}" aria-label="${t('fieldDate')}" required />
         <input type="time" data-field="start" value="09:00" aria-label="${t('fieldStart')}" required />
@@ -166,7 +166,7 @@ export function renderTaskForm(dateIso: string): string {
   return `
     <form class="event-form" data-task-form>
       <input type="text" data-field="title" placeholder="${t('titleTaskPh')}"
-        aria-label="${t('ariaTaskTitle')}" required />
+        aria-label="${t('ariaTaskTitle')}" />
       <div class="event-form-row">
         <input type="date" data-field="due" value="${dateIso}" aria-label="${t('fieldDue')}" />
       </div>
@@ -347,7 +347,7 @@ function renderArea(group: AreaGroup, state: AppState): string {
  * Offene Aufgaben links; erledigte darunter als Block nach rechts gerückt –
  * der Block selbst ist in sich linksbündig (gemeinsame linke Kante).
  */
-function renderTaskLists(tasks: Task[], editingId: string | null, fromPath = ''): string {
+export function renderTaskLists(tasks: Task[], editingId: string | null, fromPath = ''): string {
   const open = tasks.filter((task) => !task.completed);
   const done = tasks.filter((task) => task.completed);
   const row = (task: Task): string => renderTask(task, editingId, fromPath);
