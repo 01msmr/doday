@@ -9,17 +9,24 @@
 // Layout: Aufgaben links, Termine + Gewohnheiten + Achievements rechts –
 // auf schmalen Bildschirmen (iPhone) stapelt sich alles untereinander,
 // mit den Terminen oben.
-import type { Achievement, AppData, CalendarEvent, Habit, Task } from '../models/types';
+import {
+  DEFAULT_HABIT_COLOR,
+  type Achievement,
+  type AppData,
+  type CalendarEvent,
+  type Habit,
+  type Task,
+} from '../models/types';
 import type { InMemoryTagRegistry } from '../services/tagRegistry';
 import { eventsOn, filterByArea, tasksDueOn, withCanonicalTags } from '../services/selectors';
 import { groupByArea, type AreaGroup, type GroupedDay } from './grouping';
 import { isoDate, localDateOf, shiftDays, startOfWeek, timeOf } from '../utils/dates';
 import { safeColor } from '../utils/colors';
-import { renderCockpit } from './cockpitView';
+import { renderCockpitParts } from './cockpitView';
 import { t, getLang, locale } from '../i18n';
 
-/** Die vier Ansichten der unteren Navigation */
-export type ViewId = 'day' | 'morrow' | 'week' | 'month';
+/** Die Ansichten der unteren Navigation */
+export type ViewId = 'day' | 'morrow' | 'week' | 'month' | 'undone';
 
 /** Gesamter Zustand der App – eine einzige Quelle der Wahrheit */
 export interface AppState {
@@ -104,6 +111,11 @@ export function monthOf(date: Date): string {
 
 export function yearOf(date: Date): string {
   return new Intl.DateTimeFormat(locale(), { year: 'numeric' }).format(date);
+}
+
+/** Reine Tageszahl – im Deutschen mit Ordnungspunkt ("14."), im Englischen ohne ("14"). */
+export function dayNum(date: Date): string {
+  return getLang() === 'de' ? `${date.getDate()}.` : `${date.getDate()}`;
 }
 
 /** Kopf der Seite: EINE Zeile an der oberen Kante – Wochentag links, Datum rechts.
@@ -222,19 +234,24 @@ function renderSchedule(
   registry: InMemoryTagRegistry,
   opts: { creating: boolean; dateIso: string; editing: string | null },
 ): string {
+  const now = new Date();
   const rows = events
-    .map((event) =>
-      event.id === opts.editing
-        ? `<li>${renderEventEditForm(event)}</li>`
-        : `
-      <li class="timeline-row">
-        <span class="time">${event.allDay ? 'Tag' : timeOf(event.start)}</span>
+    .map((event) => {
+      if (event.id === opts.editing) {
+        return `<li>${renderEventEditForm(event)}</li>`;
+      }
+      // Vergangener Termin (Ende liegt zurück): wie eine abgehakte Aufgabe nach
+      // rechts gerückt und gedämpft – ganztägige zählen nie als vergangen.
+      const past = !event.allDay && new Date(event.end) <= now;
+      return `
+      <li class="timeline-row${past ? ' timeline-row--past' : ''}">
+        <span class="time">${event.allDay ? t('allDayShort') : timeOf(event.start)}</span>
         <span class="area-dot" style="--c:${event.tags[0] ? areaColor(registry, event.tags[0]) : FALLBACK_COLOR}"></span>
         <span class="row-title">${escapeHtml(event.title)}</span>
-        <span class="time-soft">${event.allDay ? 'ganztägig' : `bis ${timeOf(event.end)}`}</span>
+        <span class="time-soft">${event.allDay ? t('allDay') : t('until', { time: timeOf(event.end) })}</span>
         ${eventPen(event)}
-      </li>`,
-    )
+      </li>`;
+    })
     .join('');
   return `
     <section class="panel">
@@ -253,7 +270,12 @@ function renderSchedule(
     Während des Bearbeitens ersetzt das Inline-Formular die Zeile.
     fromPath = Bereich, in dem die Zeile gerade steht (Quelle beim Verschieben);
     leer für "Ohne Bereich"/Cockpit – dort hängt retagTask den Tag dann an. */
-export function renderTask(task: Task, editingId: string | null = null, fromPath = ''): string {
+export function renderTask(
+  task: Task,
+  editingId: string | null = null,
+  fromPath = '',
+  dueLabel = '',
+): string {
   if (task.id === editingId) {
     return `<li>${renderTaskEditForm(task)}</li>`;
   }
@@ -261,6 +283,8 @@ export function renderTask(task: Task, editingId: string | null = null, fromPath
   // touch-action:none (im CSS) verhindert, dass der Browser beim Ziehen scrollt.
   const grip = `<span class="drag-grip" data-drag="task" data-id="${escapeHtml(task.id)}"
         data-from="${escapeHtml(fromPath)}" aria-hidden="true" title="${t('dragToMove')}">&#10303;</span>`;
+  // dueLabel nur gesetzt, wo wir es ausdrücklich wollen (Überfällig-Liste) → sonst leer.
+  const due = dueLabel ? `<span class="task-due">${escapeHtml(dueLabel)}</span>` : '';
   return `
     <li class="task-row">
       ${grip}
@@ -268,6 +292,7 @@ export function renderTask(task: Task, editingId: string | null = null, fromPath
         data-action="toggle-task" data-id="${task.id}" aria-pressed="${task.completed}">
         <span class="check" aria-hidden="true"></span>
         <span class="task-title">${escapeHtml(task.title)}</span>
+        ${due}
       </button>
       ${task.href ? renderEditPen('edit-task', task.id) : ''}
     </li>`;
@@ -472,7 +497,7 @@ function renderHabitEditor(habits: Habit[]): string {
     .map(
       (habit) => `
       <div class="habit-editor-row">
-        <input type="color" value="${escapeHtml(habit.color ?? '#8fae87')}"
+        <input type="color" value="${escapeHtml(habit.color ?? DEFAULT_HABIT_COLOR)}"
           data-edit="color" data-id="${habit.id}"
           aria-label="${t('ariaColorOf', { name: escapeHtml(habit.title) })}" />
         <input type="text" value="${escapeHtml(habit.title)}"
@@ -510,10 +535,10 @@ function renderHabitBar(habit: Habit): string {
   if (habit.schedule === 'weekly') {
     const monday = isoDate(startOfWeek(new Date()));
     done = habit.log.filter((day) => day >= monday && day <= today).length;
-    periodLabel = 'Woche';
+    periodLabel = t('periodWeek');
   } else {
     done = habit.log.includes(today) ? 1 : 0;
-    periodLabel = 'heute';
+    periodLabel = t('periodToday');
   }
   const total = habit.target ?? 1;
   const percent = Math.min(100, Math.round((done / total) * 100));
@@ -554,11 +579,16 @@ export function renderAchievements(
   achievements: Achievement[],
   habits: Habit[],
   taskStats: { done: number; total: number },
+  // Day zeigt Gewohnheiten oben nur als Kreise → hier zusätzlich als Balken (true).
+  // Week/Month zeigen Gewohnheiten oben bereits als Balken → hier NICHT doppeln (false).
+  showRecurring = true,
 ): string {
   // Habits, deren Fortschritt nicht schon über ein einmaliges Ziel abgebildet ist
-  const unlinkedHabits = habits.filter(
-    (habit) => !achievements.some((achievement) => achievement.habitId === habit.id),
-  );
+  const unlinkedHabits = showRecurring
+    ? habits.filter(
+        (habit) => !achievements.some((achievement) => achievement.habitId === habit.id),
+      )
+    : [];
   const items = achievements
     .map((achievement) => {
       const percent = Math.min(100, Math.round((achievement.progress / achievement.target) * 100));
@@ -578,6 +608,10 @@ export function renderAchievements(
     .join('');
   const recurring = unlinkedHabits.map(renderHabitBar).join('');
   const taskBar = renderTaskProgress(taskStats);
+  // Nichts anzuzeigen? Dann auch keine leere „Ziele"-Überschrift rendern.
+  if (!items && !recurring && !taskBar) {
+    return '';
+  }
   return `
     <section class="panel">
       <h2 class="section-label"><span class="label-badge">${t('goals')}</span></h2>
@@ -625,7 +659,7 @@ const VIEWS: { id: ViewId; label: string }[] = [
   { id: 'month', label: 'Month' },
 ];
 
-/** Feste Navigation am unteren Rand: Do Day · Do Morrow · Do Week · Do Month */
+/** Feste Navigation am unteren Rand: Do Day · Do Morrow · Do Week · Do Month · UN DONE */
 function renderNav(active: ViewId): string {
   const items = VIEWS.map(
     (view) => `
@@ -635,11 +669,22 @@ function renderNav(active: ViewId): string {
       <span class="nav-label">${view.label}</span>
     </button>`,
   ).join('');
+  // „UN DONE": gleiches Tasten-Layout (großes Wort oben, kleines unten), aber
+  // RAHMENLOS (kein Keycap). Das „:" aus „UN:DONE" wird bewusst nicht gezeigt.
+  const undoneBtn = `
+    <button type="button" class="nav-item nav-item--plain${active === 'undone' ? ' active' : ''}"
+      data-action="switch-view" data-view="undone"${active === 'undone' ? ' aria-current="page"' : ''}>
+      <span class="nav-do" aria-hidden="true">UN</span>
+      <span class="nav-label">DONE</span>
+    </button>`;
+  // Unsichtbarer Platzhalter links in GLEICHER Breite wie „UN DONE" rechts →
+  // die vier Tabs dazwischen bleiben exakt mittig.
+  const spacer = `<span class="nav-item nav-item--plain nav-spacer" aria-hidden="true"></span>`;
   // Sprach-Umschalter unten rechts: zeigt die AKTUELLE Sprache (Tipp wechselt)
   const langBtn = `
     <button type="button" class="lang-toggle" data-action="toggle-lang"
       aria-label="Sprache wechseln">${getLang().toUpperCase()}</button>`;
-  return `<nav class="bottom-nav" aria-label="Ansichten">${items}${langBtn}</nav>`;
+  return `<nav class="bottom-nav" aria-label="Ansichten">${spacer}${items}${undoneBtn}${langBtn}</nav>`;
 }
 
 /** Aktiver Bereichs-Filter als Chip – das × hebt den Sprung wieder auf */
@@ -667,7 +712,7 @@ export function renderApp(root: HTMLElement, state: AppState): void {
   // Beim Start: erst die Nextcloud-Daten abwarten
   if (state.loading) {
     root.innerHTML = `
-      <main class="page">
+      <main class="page page--staged">
         ${renderMasthead(weekdayOf(today), dayMonthOf(today), yearOf(today), true)}
         <p class="empty">${t('loading')}</p>
       </main>
@@ -677,7 +722,17 @@ export function renderApp(root: HTMLElement, state: AppState): void {
 
   // Der Fehlertext wird nicht mehr inline gezeigt, sondern als kurzes Overlay
   // (Toast in main.ts). Der Lade-Spinner im Kopf signalisiert den Zustand dauerhaft.
-  let content: string;
+  const busy = state.loading || Boolean(state.syncError);
+
+  // ALLE Ansichten teilen sich jetzt dieselbe Karten-Bühne: Aufgaben als
+  // Hintergrund, Termine + Gewohnheiten + Ziele als Karte darüber. Day/Morrow und
+  // Week/Month füllen nur die vier Zonen mit unterschiedlichem Inhalt.
+  let mastheadHtml: string;
+  let mainHtml: string; // Hintergrund: Aufgaben
+  let scheduleHtml: string; // Karte: Termine
+  let extrasHtml: string; // Karte: Gewohnheiten + Ziele
+  let doneLine = '';
+  let filterChip = '';
 
   if (state.view === 'day' || state.view === 'morrow') {
     // "Do Day" und "Do Morrow" sind dieselbe Ansicht mit anderem Datum
@@ -697,80 +752,127 @@ export function renderApp(root: HTMLElement, state: AppState): void {
     const events = filterByArea(dayEvents, state.filterArea);
     const grouped = groupByArea(tasks, events, orderOf);
 
-    const small =
-      state.view === 'day' ? weekdayOf(date) : t('tomorrow');
+    // Day wie Morrow zeigen den Wochentag des jeweiligen Datums (Morrow also z. B. „Montag").
+    const small = weekdayOf(date);
     // Gewohnheiten/Achievements gehören zum Heute – morgen gibt es nichts abzuhaken
     const taskStats = {
       done: dayTasks.filter((task) => task.completed).length,
       total: dayTasks.length,
     };
-    const extras =
+
+    mastheadHtml = renderMasthead(small, dayMonthOf(date), yearOf(date), busy, t('tasks'));
+    doneLine = state.view === 'day' ? renderDoneLine(dayTasks, dayEvents) : '';
+    filterChip = renderFilterChip(state);
+    mainHtml = renderAreas(grouped, state, { creating: state.creatingTask, dateIso });
+    scheduleHtml = renderSchedule(events, state.registry, {
+      creating: state.creatingEvent,
+      dateIso,
+      editing: state.editingEvent,
+    });
+    extrasHtml =
       state.view === 'day'
-        ? `<div class="col-extras">${renderHabits(state.data.habits, state.editingHabits)}${renderAchievements(state.data.achievements, state.data.habits, taskStats)}</div>`
+        ? `${renderHabits(state.data.habits, state.editingHabits)}${renderAchievements(state.data.achievements, state.data.habits, taskStats)}`
         : '';
+  } else if (state.view === 'undone') {
+    // „UN DONE": GLEICHES Karten-Gerüst wie Tabs 1–4 – offene Aufgaben im
+    // Hintergrund (col-main, normales Design), erledigte in der Karte (col-side,
+    // invertiert/dunkel). Abhaken nutzt toggle-task → wandert in die andere Spalte.
+    const undone = state.data.tasks.filter((task) => !task.completed);
+    const done = state.data.tasks.filter((task) => task.completed);
+    const list = (tasks: Task[]): string =>
+      tasks.length > 0
+        ? `<ul class="task-list">${tasks.map((task) => renderTask(task)).join('')}</ul>`
+        : `<p class="empty">–</p>`;
+    // Top-Bar wie die anderen: „UN" links, „DONE" rechts, „OFFEN"-Badge mittig
+    // (= col-main-Label, das auf Mobil in den Kopf wandert).
+    mastheadHtml = renderMasthead('UN', 'DONE', '', busy, t('open'));
+    mainHtml = `
+      <section class="panel">
+        <h2 class="section-label"><span class="label-badge">${t('open')}</span></h2>
+        ${list(undone)}
+      </section>`;
+    scheduleHtml = `
+      <section class="panel">
+        <h2 class="section-label"><span class="label-badge">${t('done')}</span></h2>
+        ${list(done)}
+      </section>`;
+    extrasHtml = '';
+  } else {
+    // Week/Month: gleiche Zonen, nur mit Zeitraum-Inhalt gefüllt
+    const parts = renderCockpitParts(state, busy);
+    mastheadHtml = parts.masthead;
+    mainHtml = parts.mainZone;
+    scheduleHtml = parts.scheduleZone;
+    extrasHtml = parts.extrasZone;
+  }
 
-    const onMain = state.mobileColumn === 'main';
+  const isUndone = state.view === 'undone';
+  const onMain = state.mobileColumn === 'main';
+  // Animationsklasse nur beim tatsächlichen Wechsel (sonst zappelt es bei jedem Render)
+  const animClass = state.columnAnim ? ` ${state.columnAnim}` : '';
 
-    // Animationsklasse nur beim tatsächlichen Wechsel (sonst zappelt es bei jedem Render)
-    const animClass = state.columnAnim ? ` ${state.columnAnim}` : '';
-
-    // Kleines Kalender-Icon (Inline-SVG, einfarbig). Es sitzt an der LINKEN Kante
-    // der Karten-Oberleiste – im geparkten Zustand lugt genau diese Kante rechts
-    // heraus, also dient das Icon als „hier sind die Termine"-Hinweis.
-    const calIcon = `
+  // Karten-Icon links in der Oberleiste (lugt im geparkten Zustand heraus):
+  // Kalender für die Termine-Karte, Häkchen für die „Erledigt"-Karte (UN DONE).
+  const calIcon = `
       <svg class="card-cal-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
         stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <rect x="3" y="4.5" width="18" height="16" rx="2.5" />
         <path d="M3 9h18M8 2.5v4M16 2.5v4" />
       </svg>`;
+  const checkIcon = `
+      <svg class="card-cal-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M20 6 9 17l-5-5" />
+      </svg>`;
+  const cardIcon = isUndone ? checkIcon : calIcon;
+  const cardLabel = isUndone ? t('done') : t('events');
 
-    // Die Karte (Termine + Gewohnheiten) liegt als Blatt über dem Hintergrund
-    // (Aufgaben). Ihre Oberleiste ist zugleich der Griff zum Umschalten:
-    // Icon links, „Termine" mittig.
-    const cardHandle = `
+  // Die Karte liegt als Blatt über dem Hintergrund. Ihre Oberleiste ist zugleich
+  // der Griff zum Umschalten: Icon links, Label mittig.
+  const cardHandle = `
       <button type="button" class="card-handle" data-action="switch-column"
-        aria-label="${onMain ? t('events') : t('tasks')}">
-        ${calIcon}
-        <span class="card-handle-label">${t('events')}</span>
+        aria-label="${onMain ? cardLabel : t('tasks')}">
+        ${cardIcon}
+        <span class="card-handle-label">${cardLabel}</span>
       </button>`;
 
-    // „+ Termin" gehört zur Karte und sitzt unten in ihr → gleitet beim Wechsel mit.
-    const cardAction = `
+  // Untere Aktions-Pillen nur in den Planungs-Tabs (Day/Morrow/Week/Month).
+  // UN DONE ist eine reine Übersicht → keine „+"-Pillen.
+  const cardAction = isUndone
+    ? ''
+    : `
       <div class="card-action">
         <button type="button" class="add-pill add-pill--event"
           data-action="toggle-event-form">${t('addEvent')}</button>
       </div>`;
-
-    // „+ Aufgabe" gehört zum Hintergrund und bleibt IMMER bestehen – die Karte
-    // schiebt sich beim Wechsel darüber (überlagert ihn), blendet ihn aber nie aus.
-    const hgAction = `
+  const hgAction = isUndone
+    ? ''
+    : `
       <div class="hg-action">
         <button type="button" class="add-pill add-pill--task"
           data-action="toggle-task-form">${t('addTask')}</button>
       </div>`;
 
-    content = `
-      ${renderMasthead(small, dayMonthOf(date), yearOf(date), state.loading || Boolean(state.syncError), t('tasks'))}
-      ${state.view === 'day' ? renderDoneLine(dayTasks, dayEvents) : ''}
-      ${renderFilterChip(state)}
-      <div class="columns${animClass}" data-mobile="${state.mobileColumn}">
-        <div class="col-main">${renderAreas(grouped, state, { creating: state.creatingTask, dateIso })}${hgAction}</div>
+  const extrasWrap = extrasHtml ? `<div class="col-extras">${extrasHtml}</div>` : '';
+
+  const content = `
+      ${mastheadHtml}
+      ${doneLine}
+      ${filterChip}
+      <div class="columns${animClass}${isUndone ? ' columns--undone' : ''}" data-mobile="${state.mobileColumn}">
+        <div class="col-main">${mainHtml}${hgAction}</div>
         <div class="col-side">
           ${cardHandle}
           <div class="col-side-body">
-            <div class="col-schedule">${renderSchedule(events, state.registry, { creating: state.creatingEvent, dateIso, editing: state.editingEvent })}</div>
-            ${extras}
+            <div class="col-schedule">${scheduleHtml}</div>
+            ${extrasWrap}
           </div>
           ${cardAction}
         </div>
       </div>`;
-  } else {
-    content = renderCockpit(state, '');
-  }
 
-  // Die Tagesansicht bekommt eine eigene Klasse: nur dort gilt das mobile
-  // Karten-Layout (Vollbild-Bühne mit eigenem Scrollen) – Woche/Monat nicht.
-  const pageClass =
-    state.view === 'day' || state.view === 'morrow' ? 'page page--day' : 'page';
+  // Alle Ansichten nutzen dieselbe Karten-Bühne (page--staged); UN:DONE bekommt
+  // zusätzlich page--undone (u. a. ganzseitig weiß auf Mobil).
+  const pageClass = `page page--staged${isUndone ? ' page--undone' : ''}`;
   root.innerHTML = `<main class="${pageClass}">${content}</main>${renderNav(state.view)}`;
 }

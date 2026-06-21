@@ -32,7 +32,7 @@ import { renderApp, type AppState, type ViewId } from './ui/dayView';
 import { initDragDrop, type DropInfo } from './ui/dragDrop';
 import { isoDate, shiftDays } from './utils/dates';
 import { t, toggleLang } from './i18n';
-import type { Habit } from './models/types';
+import { DEFAULT_HABIT_COLOR, type Habit } from './models/types';
 
 const root = document.querySelector<HTMLDivElement>('#app');
 if (!root) {
@@ -89,9 +89,32 @@ function showToast(message: string): void {
   toastTimer = window.setTimeout(() => toastEl?.classList.remove('show'), 3500);
 }
 
+/**
+ * Statusleisten-/Browser-Chrome-Farbe an die ECHTE Seitenfarbe angleichen.
+ * Wir lesen den berechneten Hintergrund der Seite (inkl. blauer Tönung) und
+ * schreiben ihn ins <meta name="theme-color"> – so kann die iOS-Statusleiste
+ * nie von der Seite abweichen. Fällt auf die Body-Farbe zurück (Desktop, wo die
+ * Seite selbst transparent ist).
+ */
+function syncThemeColor(): void {
+  const meta = document.querySelector('meta#theme-color');
+  if (!meta) {
+    return;
+  }
+  const page = root!.querySelector('.page');
+  let color = page ? getComputedStyle(page).backgroundColor : '';
+  if (!color || color === 'rgba(0, 0, 0, 0)' || color === 'transparent') {
+    color = getComputedStyle(document.body).backgroundColor;
+  }
+  if (color) {
+    meta.setAttribute('content', color);
+  }
+}
+
 function rerender(): void {
   closeSuggest(); // ein Neuaufbau des DOM würde das Dropdown sonst verwaisen lassen
   renderApp(root!, state);
+  syncThemeColor();
   // Nur beim NEUEN Auftreten eines Fehlers den Toast zeigen (nicht bei jedem Render)
   if (state.syncError && state.syncError !== lastToastError) {
     showToast(state.syncError);
@@ -702,7 +725,7 @@ root.addEventListener('click', (event) => {
       title: t('newHabit'),
       schedule: 'daily',
       log: [],
-      color: '#8fae87',
+      color: DEFAULT_HABIT_COLOR,
     };
     state.data.habits.push(habit);
     rerender();
@@ -986,6 +1009,9 @@ initDragDrop(root, (info) => {
     moveArea(info);
   }
 });
+
+// Hell/Dunkel-Wechsel des Geräts: Statusleisten-Farbe sofort nachziehen
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncThemeColor);
 
 rerender(); // Lade-Ansicht sofort zeigen …
 void boot(); // … und die echten Daten holen

@@ -183,21 +183,23 @@ describe('tasksByDay', () => {
   const range = { start: '2026-06-08', end: '2026-06-14' };
   const today = '2026-06-12';
 
-  it('gruppiert Aufgaben nach Fälligkeitstag – nur Tage mit Aufgaben', () => {
-    const tasks = [task('mo', '2026-06-08'), task('mi', '2026-06-10'), task('mi2', '2026-06-10')];
+  it('gruppiert ab heute fällige Aufgaben nach Tag – nur Tage mit Aufgaben', () => {
+    const tasks = [task('heute', '2026-06-12'), task('do', '2026-06-13'), task('do2', '2026-06-13')];
     const result = tasksByDay(tasks, range, today);
     expect(result.days).toEqual([
-      { date: '2026-06-08', tasks: [tasks[0]] },
-      { date: '2026-06-10', tasks: [tasks[1], tasks[2]] },
+      { date: '2026-06-12', tasks: [tasks[0]] },
+      { date: '2026-06-13', tasks: [tasks[1], tasks[2]] },
     ]);
+    expect(result.overdue).toEqual([]);
   });
 
-  it('sammelt unerledigte Aufgaben von VOR dem Zeitraum als überfällig', () => {
-    const old = task('alt', '2026-06-01');
+  it('sammelt unerledigte, vor HEUTE fällige Aufgaben als überfällig (Woche wie Monat)', () => {
+    const old = task('alt', '2026-06-01'); // vor dem Zeitraum
+    const thisWeek = task('mo', '2026-06-08'); // im Zeitraum, aber vor heute
     const doneOld: Task = { ...task('erledigt', '2026-06-02'), completed: true };
-    const result = tasksByDay([old, doneOld], range, today);
-    expect(result.overdue).toEqual([old]); // erledigte Altlasten zählen nicht
-    expect(result.days).toEqual([]);
+    const result = tasksByDay([old, thisWeek, doneOld], range, today);
+    expect(result.overdue).toEqual([old, thisWeek]); // erledigte Altlasten zählen nicht
+    expect(result.days).toEqual([]); // keine Aufgabe ab heute fällig
   });
 
   it('zeigt Aufgaben ohne Datum unter dem heutigen Tag – nur wenn heute im Zeitraum liegt', () => {

@@ -118,10 +118,15 @@ export interface RangeTasks {
  * nur, wenn der Zeitraum den heutigen Tag enthält.
  */
 export function tasksByDay(tasks: Task[], range: DateRange, today: ISODate): RangeTasks {
-  const overdue = tasks.filter(
-    (task) => !task.completed && !!task.due && task.due < range.start,
-  );
+  // „Überfällig" = offen UND vor HEUTE fällig – relativ zu heute, nicht zum
+  // Zeitraumanfang. So erscheint die Gruppe in Woche UND Monat gleich (z. B. eine
+  // am 10. fällige Aufgabe ist im Juni-Monat ebenso überfällig wie in der Woche).
+  // Liegt der ganze Zeitraum in der Vergangenheit, fällt der Trenner auf den
+  // Zeitraumanfang zurück (dann gliedern die Tage selbst).
+  const pivot = range.end < today ? range.start : today;
+  const overdue = tasks.filter((task) => !task.completed && !!task.due && task.due < pivot);
   const days = datesInRange(range)
+    .filter((date) => date >= pivot)
     .map((date) => ({ date, tasks: tasksDueOn(tasks, date, today) }))
     .filter((day) => day.tasks.length > 0);
   return { overdue, days };

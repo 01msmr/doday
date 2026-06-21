@@ -2,6 +2,10 @@
 // Wichtig: Diese Formen entsprechen dem, was später in Nextcloud liegt –
 // Habit/Achievement spiegeln achievements.json, Task/CalendarEvent kommen aus CalDAV.
 
+/** Standardfarbe neuer Gewohnheiten (gedecktes Salbei). An EINER Stelle, damit
+    Anlegen (main.ts) und Farb-Editor (dayView.ts) nie auseinanderlaufen. */
+export const DEFAULT_HABIT_COLOR = '#8fae87';
+
 /** ISO-Datum ohne Uhrzeit, z. B. "2026-06-12" */
 export type ISODate = string;
 

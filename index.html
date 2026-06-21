@@ -7,9 +7,10 @@
          der sonst beim Antippen eines Eingabefelds (z. B. Datum) hineinzoomt. -->
     <meta name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <!-- Browser-Chrome-Farbe folgt dem Hell/Dunkel-Modus des Geräts -->
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f3f0e9" />
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#16171b" />
+    <!-- Browser-Chrome-/Statusleisten-Farbe. EIN Meta, das main.ts nach jedem Render
+         auf die TATSÄCHLICHE Seitenfarbe setzt (inkl. blauer Tönung) – so sind
+         Statusleiste und Seite garantiert identisch, in Hell wie Dunkel. -->
+    <meta name="theme-color" id="theme-color" content="#f3f0e9" />
     <!-- App-Icon: Homescreen-Icon fürs iPhone ("Zum Home-Bildschirm") und Favicon
          für Browser-Tabs – beide aus public/app-icon-1024.png verkleinert -->
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />

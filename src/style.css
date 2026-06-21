@@ -49,12 +49,24 @@
 
 * {
   box-sizing: border-box;
+  /* Nie einen Scrollbalken zeigen – gescrollt wird weiter, nur unsichtbar (Firefox). */
+  scrollbar-width: none;
+}
+
+/* … dasselbe für WebKit/Blink (iOS Safari, Chrome) */
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 html {
   /* Teilt dem Browser mit, dass wir beide Modi beherrschen
      (Scrollbalken, Formularelemente usw. passen sich an) */
   color-scheme: light dark;
+  /* Waagerechtes Scrollen in JEDER Lage unterbinden. */
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
 }
 
 body {
@@ -68,10 +80,12 @@ body {
     radial-gradient(50rem 30rem at 50% -12rem, var(--glow) 0%, transparent 70%),
     var(--bg);
   min-height: 100dvh;
+  max-width: 100%;
+  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   /* Kein „Gummiband"-Wippen, wenn der Inhalt passt – echtes Scrollen bei
      langem Inhalt bleibt erhalten. */
-  overscroll-behavior-y: none;
+  overscroll-behavior: none;
   /* iOS: grauen Aufblitz-Kasten beim Antippen von Buttons/Links unterdrücken */
   -webkit-tap-highlight-color: transparent;
 }
@@ -150,10 +164,14 @@ body {
 
 .masthead--triple .weekday {
   justify-self: start;
+  /* darf schrumpfen statt das Datum (rechts) zu verdrängen */
+  min-width: 0;
+  overflow: hidden;
 }
 
 .masthead--triple .day-date {
   justify-self: end;
+  min-width: 0;
 }
 
 .masthead-center {
@@ -230,20 +248,20 @@ body {
 
   /* Spalten als getönte Panels – Gegenstücke zur mobilen Optik (blau/rot).
      Feine Kante im VOLLEN Button-Ton bei 80 % Deckkraft. */
-  .page--day .col-main,
-  .page--day .col-side {
+  .page--staged .col-main,
+  .page--staged .col-side {
     border-radius: var(--card-radius);
     border: 1px solid;
     padding: 1.2rem 1.4rem;
   }
 
-  .page--day .col-main {
+  .page--staged .col-main {
     grid-area: main;
     background: color-mix(in srgb, var(--pill) 17%, var(--bg));
     border-color: color-mix(in srgb, var(--pill) 80%, transparent);
   }
 
-  .page--day .col-side {
+  .page--staged .col-side {
     grid-area: side;
     background: color-mix(in srgb, var(--pill-red) 17%, var(--bg));
     border-color: color-mix(in srgb, var(--pill-red) 80%, transparent);
@@ -251,12 +269,12 @@ body {
 
   /* Auch auf Desktop: untere (+)-Pillen statt der inline-(+) in den Überschriften.
      In-flow am Spaltenende (nicht fixiert wie mobil). */
-  .page--day .add-event {
+  .page--staged .add-event {
     display: none;
   }
 
-  .page--day .hg-action,
-  .page--day .card-action {
+  .page--staged .hg-action,
+  .page--staged .card-action {
     display: flex;
     position: static;
     bottom: auto;
@@ -273,7 +291,7 @@ body {
 @media (max-width: 40.999rem) {
   /* Die Tagesansicht wird zur App-Fläche: Kopf oben, Bühne dazwischen,
      Pille + Navi unten – nur die Bühne scrollt, der Rahmen bleibt stehen. */
-  .page--day {
+  .page--staged {
     height: 100dvh;
     display: flex;
     flex-direction: column;
@@ -289,23 +307,23 @@ body {
 
   /* Kopfzeilen behalten ihre natürliche Höhe; Abstände eng halten, damit die Karte
      höher steigt und nah an den „Aufgaben"-Schriftzug heranrückt. */
-  .page--day > .masthead,
-  .page--day > .sync-note,
-  .page--day > .done-line,
-  .page--day > .filter-chip {
+  .page--staged > .masthead,
+  .page--staged > .sync-note,
+  .page--staged > .done-line,
+  .page--staged > .filter-chip {
     flex: none;
   }
 
-  .page--day > .masthead {
+  .page--staged > .masthead {
     margin-bottom: 0.1rem;
   }
 
-  .page--day > .done-line {
+  .page--staged > .done-line {
     margin-top: 0.25rem;
   }
 
   /* Die Bühne: HG (Aufgaben) und Karte liegen hier übereinander */
-  .page--day > .columns {
+  .page--staged > .columns {
     position: relative;
     flex: 1;
     min-height: 0;
@@ -313,24 +331,25 @@ body {
   }
 
   /* Hintergrund = Aufgaben: füllt die Bühne und scrollt für sich allein. */
-  .page--day .col-main {
+  .page--staged .col-main {
     position: absolute;
     inset: 0;
     overflow-y: auto;
+    overflow-x: hidden;
     overscroll-behavior: contain;
     padding-bottom: calc(var(--bottombar-h) + 4.5rem + env(safe-area-inset-bottom));
   }
 
   /* „Aufgaben" steht jetzt mittig in der Kopfzeile → der Strip im Stage entfällt,
      die Karte kann den ganzen Stage abdecken (inkl. „Keine Aufgaben…"). */
-  .page--day .col-main .section-label {
+  .page--staged .col-main .section-label {
     display: none;
   }
 
   /* Die Karte: rundum abgerundetes Blatt über dem HG – opak. Endet KNAPP über der
      Navi (Spalt > Reichweite des Navi-Schattens), damit dieser Schatten in den Spalt
      auf den HG fällt und NICHT auf die Karte. */
-  .page--day .col-side {
+  .page--staged .col-side {
     position: absolute;
     top: var(--card-top);
     /* Außenabstand zum Rand auf 55 % verkürzt → Karte ragt um 45 % des
@@ -411,6 +430,7 @@ body {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
     overscroll-behavior: contain;
     padding: 0 1.1rem;
     /* Karte endet schon über der Navi → nur Platz für die „+ Termin"-Pille nötig */
@@ -418,22 +438,22 @@ body {
   }
 
   /* „Termine" steht schon auf dem Griff – die innere Überschrift entfällt */
-  .page--day .col-schedule .section-label {
+  .page--staged .col-schedule .section-label {
     display: none;
   }
 
   /* Karten-Header („Gewohnheiten", „Ziele") horizontal mittig, ohne Haarlinie */
-  .page--day .col-side .section-label {
+  .page--staged .col-side .section-label {
     justify-content: center;
     text-align: center;
   }
 
-  .page--day .col-side .section-label::after {
+  .page--staged .col-side .section-label::after {
     display: none;
   }
 
   /* Die inline-(+)-Knöpfe in den Überschriften weichen der unteren Pille */
-  .page--day .add-event {
+  .page--staged .add-event {
     display: none;
   }
 }
@@ -549,16 +569,16 @@ body {
 
 /* Tagesansicht: deutlich weniger Weißraum über den Sektions-Badges.
    Erste Sektion je Spalte praktisch ohne oberen Abstand. */
-.page--day .panel {
+.page--staged .panel {
   margin-top: 1.3rem;
 }
 
-.page--day .col-main > .panel:first-child {
+.page--staged .col-main > .panel:first-child {
   margin-top: 0;
 }
 
-.page--day .col-schedule > .panel:first-child,
-.page--day .col-extras > .panel:first-child {
+.page--staged .col-schedule > .panel:first-child,
+.page--staged .col-extras > .panel:first-child {
   margin-top: 0.4rem;
 }
 
@@ -596,10 +616,19 @@ body {
      als unten, damit der Text WIRKLICH mittig im Kästchen steht. */
   padding: 0.26rem 0.55rem 0.18rem;
   border-radius: 0.45rem; /* wieder die alten Radien */
-  background: var(--ink-faint);
+  /* Standard-Grund = Farbe der blauen „Aufgaben"-Seite (= „+ Aufgabe"-Pille) */
+  background: var(--pill);
   color: var(--bg);
   letter-spacing: 0.06em; /* nur leicht gesperrt (nicht so weit wie die Section-Labels) */
   text-indent: 0.06em; /* gleicht die rechte Sperr-Lücke aus */
+}
+
+/* Jedes Badge trägt die Farbe SEINER Seite, nicht durchweg Blau:
+   die blaue Aufgaben-Seite (Hintergrund) bleibt --pill, die rote Karten-Seite
+   (Termine + Gewohnheiten + Ziele) bekommt --pill-red – passend zur „+ Termin"-Pille. */
+.col-side .label-badge,
+.card-handle-label {
+  background: var(--pill-red);
 }
 
 /* „Gewohnheiten"-Kopf: kleines Zahnrad DIREKT hinter dem Badge (eng, nicht am Rand) */
@@ -748,6 +777,15 @@ body {
 
 .timeline-row:last-child {
   border-bottom: none;
+}
+
+/* Vergangener Termin: wie eine abgehakte Aufgabe als Block nach rechts gerückt
+   (gemeinsame rechte Kante) und farblich gedämpft. */
+.timeline-row--past {
+  display: flex;
+  width: fit-content;
+  margin-left: auto;
+  color: var(--ink-faint);
 }
 
 .time {
@@ -1286,17 +1324,6 @@ details[open] > summary .chevron {
   font-weight: 650;
 }
 
-.goal-num {
-  font-variant-numeric: tabular-nums;
-  font-size: 0.85rem;
-  color: var(--ink-soft);
-}
-
-.goal-sep {
-  padding: 0 0.1em;
-  color: var(--ink-faint);
-}
-
 .goal-fill {
   position: absolute;
   inset: 0 auto 0 0; /* volle Zeilenhöhe, wächst von links */
@@ -1469,6 +1496,32 @@ details[open] > summary .chevron {
   background: var(--keycap); /* aktive Kachel ohne Grau-Tönung – hell/hervorgehoben */
 }
 
+/* „UN DONE" INAKTIV: RAHMENLOS – keine Kachel/Schatten/Tönung, Schrift in reinem
+   50%-Grau. Maße/Abstände bleiben EXAKT die einer Kachel (keine Größen-Overrides),
+   damit der Knopf beim Aktivieren nicht springt. */
+.nav-item--plain:not(.active),
+.nav-item--plain:not(.active):hover {
+  background: none;
+  border: none;
+  box-shadow: none;
+  transform: none;
+  text-shadow: none;
+  color: #ababab; /* passiv: 33 % Grau (heller, zurückgenommen) */
+}
+
+/* AKTIV: Keycap-Design der anderen Knöpfe (Maße/Rahmen via .nav-item.active),
+   Schrift in 50 % Grau. */
+.nav-item--plain.active {
+  color: #808080;
+}
+
+/* Unsichtbarer Platzhalter links, GLEICHE Breite wie „UN DONE" rechts → die
+   vier Kacheln dazwischen bleiben exakt mittig (UN:DONE zählt nicht mit). */
+.nav-spacer {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* "DO" groß und fett – trägt die Marke (wie im Icon) */
 .nav-do {
   position: absolute;
@@ -1536,27 +1589,28 @@ details[open] > summary .chevron {
 
 /* ---------- Cockpit (Do Week / Do Month) ---------- */
 
-.masthead-row {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
+/* ‹ › sitzen jetzt im linken Masthead-Slot, direkt vor dem Zeitraum-Wort.
+   Klein und rund, an der Grundlinie der gesperrten Versalien ausgerichtet. */
+.period-nav {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin-left: 0.5rem;
+  vertical-align: middle;
 }
 
-.period-nav {
-  display: flex;
-  gap: 0.4rem;
-  padding-bottom: 1rem;
+.period-label {
+  vertical-align: middle;
 }
 
 .period-btn {
-  width: 2.2rem;
-  height: 2.2rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
   border: 1px solid var(--hairline);
   border-radius: 50%;
   background: none;
   color: var(--ink-soft);
-  font-size: 1.3rem;
+  font-size: 1rem;
   line-height: 1;
   cursor: pointer;
 }
@@ -1567,7 +1621,8 @@ details[open] > summary .chevron {
 }
 
 .day-group {
-  margin: 0.9rem 0;
+  /* mehr Luft ÜBER der Tagesgruppe, weniger darunter */
+  margin: 1.4rem 0 0.4rem;
 }
 
 .day-group-label {
@@ -1584,26 +1639,53 @@ details[open] > summary .chevron {
   color: #b3543e;
 }
 
+/* Sammel-Überschriften „Überfällig" und „Anstehend": etwas kräftiger (nicht ganz fett). */
+.day-group-label--section {
+  font-weight: 700;
+}
+
+.day-group-label--upcoming {
+  margin-top: 0.9rem;
+}
+
+/* Inline-Fälligkeitsdatum (nur an überfälligen Aufgaben in Woche/Monat): rechts,
+   rot – signalisiert die Überfälligkeit direkt an der Zeile. */
+.task-due {
+  margin-left: auto;
+  padding-left: 0.6rem;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: #b3543e;
+}
+
 .cockpit-habits {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.45rem;
+  gap: 0.3rem;
 }
 
+/* Gleiche kompakte Optik wie die Monatsbalken: weniger Weißraum, kleinere
+   Schrift. Layout (Name · Dots · Zähler) bleibt – die Reihe ist weiter tappbar. */
 .cockpit-habit {
   display: flex;
   align-items: center;
   gap: 0.6rem;
   width: 100%;
-  padding: 0.35rem 0.1rem;
+  padding: 0.18rem 0.1rem;
   background: none;
   border: 0;
   cursor: pointer;
   font: inherit;
+  font-size: 0.85rem;
   color: var(--ink);
   text-align: left;
+}
+
+.cockpit-habit .habit-name {
+  font-size: 0.85rem;
 }
 
 .cockpit-habit:disabled {
@@ -1635,13 +1717,30 @@ details[open] > summary .chevron {
   min-width: 2.4rem;
   text-align: right;
   font-family: var(--sans);
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   color: var(--ink-soft);
 }
 
-/* Monats-Habit-Balken haben keinen Kreisring rechts – Platz dafür entfällt */
+/* Monats-Habit-Balken sind reine Anzeige (kein Tap) → kompakter als die
+   antippbaren Ziel-Pillen: ~50 % weniger vertikaler Weißraum, keine Ringbreite. */
 .goal--bare {
-  padding-right: 1.1rem;
+  min-height: 1.7rem;
+  padding: 0.2rem 0.85rem;
+}
+
+/* Die Stat-Zeile („Ziel 3×/Woche: 1 von 13") kleiner, damit auch lange Texte
+   auf dem Smartphone in eine Zeile passen (Basis-.goal-period ist 1.26rem). */
+.goal--bare .goal-period {
+  font-size: 0.78rem;
+}
+
+.goal--bare .goal-title {
+  font-size: 0.85rem;
+}
+
+/* Kompakte Liste der Monats-Gewohnheiten: enger gestapelt als die Ziel-Liste. */
+.goal-list--compact {
+  gap: 0.5rem;
 }
 
 .day-events {
@@ -1676,6 +1775,81 @@ details[open] > summary .chevron {
 
 .day-event .area-dot {
   margin-right: 0.25rem;
+}
+
+/* Vergangene Termine: gleiches „abgehakt"-Bild wie in der Tagesansicht –
+   gedämpft, und ein komplett vergangener Tag rückt seinen Block nach rechts. */
+.day-event--past {
+  color: var(--ink-faint);
+}
+
+.day-events-row--past .day-events-list {
+  margin-left: auto;
+  text-align: right;
+}
+
+/* ---------- UN DONE (gleiches Karten-Gerüst wie Tabs 1–4) ----------
+   Nur der Karten-Inhalt unterscheidet sich: die KARTE selbst ist dunkel, die
+   erledigten Aufgaben sitzen ohne eigene Item-Fläche darauf (heller Text).
+   FESTE Farben (nicht --ink/--bg) → der Dunkelmodus invertiert NICHT erneut.
+   Layout/Rahmen/Swipe kommen 1:1 aus den .page--staged-Regeln. */
+/* Linke Spalte (offen): fest helle Fläche mit dunklem Text – FESTE Farben, damit
+   der Dunkelmodus NICHT invertiert (Gegenstück zur dunklen rechten Karte). */
+.columns--undone .col-main {
+  background: #ffffff;
+}
+
+.columns--undone .col-main .task,
+.columns--undone .col-main .task .task-title {
+  color: #26251f;
+}
+
+.columns--undone .col-main .edit-pen {
+  background: rgb(38 37 31 / 0.1);
+  color: #6b675c;
+}
+
+.columns--undone .col-side {
+  background: #26251f;
+}
+
+/* Header in UN:DONE INVERS statt farbig: passend zur Spaltenfläche – „Offen"
+   schwarz auf der weißen Spalte, „Erledigt" weiß auf der dunklen Karte.
+   (Gilt auch fürs mittige Kopf-Badge auf Mobil und das Karten-Griff-Label.) */
+.columns--undone .col-main .label-badge,
+.page--undone .masthead-center {
+  background: #000;
+  color: #fff;
+}
+
+.columns--undone .col-side .label-badge,
+.columns--undone .card-handle-label {
+  background: #fff;
+  color: #000;
+}
+
+.columns--undone .col-side .task,
+.columns--undone .col-side .task .task-title {
+  color: #f3f0e9;
+}
+
+.columns--undone .col-side .task.done .check {
+  background: #f3f0e9;
+  border-color: #f3f0e9;
+}
+
+.columns--undone .col-side .task.done .check::after {
+  color: #26251f;
+}
+
+/* Erledigte Aufgaben sind nicht editierbar → Stift in der Karte entfernen */
+.columns--undone .col-side .edit-pen {
+  display: none;
+}
+
+/* In der Übersicht wird nicht in Bereiche gezogen → Greifer ausblenden */
+.columns--undone .drag-grip {
+  display: none;
 }
 
 /* ---------- Bearbeiten-Stifte (Aufgaben & Termine) ---------- */
@@ -1893,4 +2067,74 @@ body.drag-task .untag-drop {
   padding: 0.7rem 0.8rem;
   border: 1.5px dashed var(--ink-faint);
   border-radius: 0.6rem;
+}
+
+/* ---------- Mobil: UN DONE kompakt („UN" in der Ecke) + ganzseitig weiß ---------- */
+@media (max-width: 40.999rem) {
+  /* Kein Platzhalter nötig – „UN" sitzt absolut in der Ecke, die 4 Tabs zentrieren sich selbst. */
+  .nav-spacer {
+    display: none;
+  }
+
+  /* „UN DONE" → nur „UN", klein, deutlich ÜBER dem Sprach-Umschalter (gleiche
+     rechte Kante). GLEICHER Kasten in beiden States (Position/Größe/Padding) →
+     beim Aktivieren kommt nur die schwarze Fläche dazu, nichts springt. */
+  .nav-item--plain,
+  .nav-item--plain.active {
+    position: absolute;
+    /* 2px nach rechts versetzt, damit der „UN"-Text trotz 2px-Padding genau auf
+       der vertikalen Linie des „EN"/„DE"-Textes steht. */
+    right: calc(clamp(0.5rem, 3vw, 1.1rem) - 2px);
+    bottom: calc(env(safe-area-inset-bottom) + 0.6rem + min(4.13rem, 21vw) * 0.18 + 1.6rem);
+    width: auto;
+    min-width: 0;
+    height: auto;
+    aspect-ratio: auto;
+    padding: 2px; /* überall 2px */
+    border: none;
+    border-radius: 3px;
+    box-shadow: none;
+    transform: none;
+    background: none;
+  }
+
+  .nav-item--plain .nav-label {
+    display: none; /* nur die „UN"-Buchstaben */
+  }
+
+  .nav-item--plain .nav-do {
+    position: static;
+    transform: none;
+    -webkit-text-stroke: 0;
+    font-size: 0.56rem; /* wie der Sprach-Umschalter */
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: #575757; /* 66 % Grau */
+  }
+
+  /* AKTIV: invers – „UN" weiß auf schwarzer Fläche. */
+  .nav-item--plain.active {
+    background: #000;
+  }
+
+  .nav-item--plain.active .nav-do {
+    color: #fff;
+  }
+
+  /* UN:DONE: die GANZE Seite weiß (nicht nur die Listenfläche). */
+  .page--undone {
+    background: #ffffff;
+  }
+}
+
+/* ---------- Dark Mode: weiße Glow-Schatten statt unsichtbarer dunkler ----------
+   Auf dunklem Grund verschwinden die dunklen Schatten – die schwebende Karte
+   bekommt daher einen ABGESCHWÄCHTEN weißen Glow, damit sie sich abhebt. */
+@media (max-width: 40.999rem) and (prefers-color-scheme: dark) {
+  .page--staged .col-side {
+    box-shadow:
+      0 -0.34rem 1.7rem rgb(255 255 255 / 0.1),
+      -0.43rem 0 1.53rem rgb(255 255 255 / 0.08),
+      0 0.34rem 1.53rem rgb(255 255 255 / 0.08);
+  }
 }

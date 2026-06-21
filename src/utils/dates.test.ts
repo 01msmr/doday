@@ -9,16 +9,16 @@ describe('isoDate', () => {
 });
 
 describe('timeOf', () => {
-  it('liest die Uhrzeit HH:MM aus einem lokalen ISO-Zeitstempel', () => {
-    expect(timeOf('2026-06-12T09:30:00')).toBe('09:30');
+  it('liest die Uhrzeit H:MM (ohne führende Null) aus einem lokalen ISO-Zeitstempel', () => {
+    expect(timeOf('2026-06-12T09:30:00')).toBe('9:30');
+    expect(timeOf('2026-06-12T00:30:00')).toBe('0:30');
+    expect(timeOf('2026-06-12T13:05:00')).toBe('13:05');
   });
 
-  it('rechnet UTC-Zeitstempel (CalDAV) in die lokale Uhrzeit um', () => {
+  it('rechnet UTC-Zeitstempel (CalDAV) in die lokale Uhrzeit um (ohne führende Null)', () => {
     const utc = '2026-06-12T07:00:00Z';
-    const expected = new Intl.DateTimeFormat('de-DE', {
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(utc));
+    const local = new Date(utc);
+    const expected = `${local.getHours()}:${String(local.getMinutes()).padStart(2, '0')}`;
     expect(timeOf(utc)).toBe(expected);
   });
 });
