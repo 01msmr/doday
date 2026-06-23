@@ -195,8 +195,9 @@ function endEdgePreview(dx: number): void {
     return;
   }
   const w = window.innerWidth;
-  // genug gezogen? (mind. SWIPE_MIN_X, spätestens bei ~30 % Bildschirmbreite)
-  const committed = Math.abs(dx) >= Math.min(80, w * 0.3);
+  // genug gezogen? Bewusst kurz gehalten – eingeübte (knappe) Kanten-Wische
+  // sollen sicher zünden, nicht abbrechen. ~12 % Breite, höchstens 48 px.
+  const committed = Math.abs(dx) >= Math.min(48, w * 0.12);
 
   if (committed && previewWrap) {
     // „Flug über alle Tabs": die Zwischen-Ansichten fliegen – jede mit ihrem
