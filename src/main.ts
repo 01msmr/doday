@@ -68,6 +68,29 @@ function switchMobileColumn(next: 'main' | 'side'): void {
   state.columnAnim = null; // Flag nur für diesen einen Render – danach wieder ruhig
 }
 
+/** Reihenfolge der Tabs für den Kanten-Wisch (mit Umlauf). */
+const VIEW_ORDER: ViewId[] = ['day', 'morrow', 'week', 'month', 'undone'];
+
+/** Tab wechseln (Klick wie Wisch): Zeitraum zurück auf jetzt, dann frische Daten. */
+function goToView(next: ViewId): void {
+  if (next === state.view) {
+    return;
+  }
+  state.view = next;
+  state.periodOffset = 0; // Tab-Wechsel landet immer im Jetzt
+  rerender(); // sofort zeigen – die frischen Daten folgen gleich
+  refreshAgenda(); // Zeitfenster hat sich geändert → passende Daten holen
+}
+
+/** Tab relativ wechseln (Wisch von der Kante), mit Umlauf am Anfang/Ende. */
+function switchTab(delta: number): void {
+  const i = VIEW_ORDER.indexOf(state.view);
+  if (i < 0) {
+    return;
+  }
+  goToView(VIEW_ORDER[(i + delta + VIEW_ORDER.length) % VIEW_ORDER.length]!);
+}
+
 // Fehler erscheinen kurz als Overlay (Toast) statt dauerhaft inline. Der Toast lebt
 // AUSSERHALB von #app, damit das ständige Neu-Rendern ihn nicht zerstört.
 let toastEl: HTMLDivElement | null = null;
@@ -632,11 +655,8 @@ root.addEventListener('click', (event) => {
   }
   const { action, id, view, path } = trigger.dataset;
 
-  if (action === 'switch-view' && view && view !== state.view) {
-    state.view = view as ViewId;
-    state.periodOffset = 0; // Tab-Wechsel landet immer im Jetzt
-    rerender(); // sofort zeigen – die frischen Daten folgen gleich
-    refreshAgenda(); // Zeitfenster hat sich geändert → passende Daten holen
+  if (action === 'switch-view' && view) {
+    goToView(view as ViewId);
   }
 
   if (action === 'switch-period' && trigger.dataset.dir) {
@@ -1015,13 +1035,20 @@ root.addEventListener('focusout', (event) => {
   rerender();
 });
 
-// Mobile: waagerechtes Wischen wechselt zwischen Aufgaben (main) und
-// Termine/Gewohnheiten (side) – dieselbe Wirkung wie der Rand-Schalter.
-// Nur im Ein-Spalten-Modus aktiv (gleiche Schwelle wie das CSS: 40.999rem).
-const SWIPE_MIN_X = 25; // px Mindestweg, ab dem ein Wisch als Seitenwechsel zählt
+// Mobile-Wisch, nur im Ein-Spalten-Layout (gleiche Schwelle wie das CSS: 40.999rem):
+//   • Wisch von der Bildschirm-KANTE  → Tab wechseln (Reihenfolge, mit Umlauf)
+//   • Wisch von INNEN                 → Haupt-/Karten-Spalte umschalten
+// Wichtig gegen das alte „nur perfekt waagerecht"-Problem: die Achse wird FRÜH
+// (per touchmove) festgelegt; ist der Wisch waagerecht, sperren wir das vertikale
+// Scrollen (preventDefault) – so zählt er zuverlässig, auch auf langen Seiten.
 const singleColumn = window.matchMedia('(max-width: 40.999rem)');
+const EDGE_ZONE = 28; // px ab Rand: Start hier = Tab-Wechsel statt Spalten-Toggle
+const AXIS_LOCK = 8; // px Bewegung, ab der die Richtung (waagerecht/senkrecht) feststeht
+const SWIPE_MIN_X = 36; // px Mindest-Weg waagerecht, damit der Wisch zählt
 let swipeStartX = 0;
 let swipeStartY = 0;
+let swipeEdge = 0; // -1 linke Kante, +1 rechte Kante, 0 = innen
+let swipeAxis: 'none' | 'h' | 'v' = 'none';
 let swipeTracking = false;
 
 root.addEventListener(
@@ -1029,7 +1056,7 @@ root.addEventListener(
   (event) => {
     // Nur Einzelfinger und nur im schmalen Layout. Wische, die auf einem
     // Drag-Greifer, in einem Eingabefeld oder auf einem Button beginnen,
-    // gehören diesen Elementen – nicht dem Seitenwechsel.
+    // gehören diesen Elementen – nicht dem Wisch.
     const target = event.target as HTMLElement;
     if (
       event.touches.length !== 1 ||
@@ -1039,17 +1066,51 @@ root.addEventListener(
       swipeTracking = false;
       return;
     }
+    const touch = event.touches[0];
     swipeTracking = true;
-    swipeStartX = event.touches[0].clientX;
-    swipeStartY = event.touches[0].clientY;
+    swipeAxis = 'none';
+    swipeStartX = touch.clientX;
+    swipeStartY = touch.clientY;
+    const width = window.innerWidth;
+    swipeEdge = touch.clientX <= EDGE_ZONE ? -1 : touch.clientX >= width - EDGE_ZONE ? 1 : 0;
   },
   { passive: true },
 );
 
 root.addEventListener(
-  'touchend',
+  'touchmove',
   (event) => {
     if (!swipeTracking) {
+      return;
+    }
+    const touch = event.touches[0];
+    if (!touch) {
+      return;
+    }
+    const dx = touch.clientX - swipeStartX;
+    const dy = touch.clientY - swipeStartY;
+    if (swipeAxis === 'none') {
+      if (Math.abs(dx) < AXIS_LOCK && Math.abs(dy) < AXIS_LOCK) {
+        return; // noch zu wenig Bewegung, um die Achse sicher zu bestimmen
+      }
+      swipeAxis = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+      if (swipeAxis === 'v') {
+        swipeTracking = false; // senkrecht → der Liste das normale Scrollen lassen
+        return;
+      }
+    }
+    if (swipeAxis === 'h') {
+      event.preventDefault(); // waagerecht → Scroll sperren, der Wisch gehört uns
+    }
+  },
+  { passive: false },
+);
+
+root.addEventListener(
+  'touchend',
+  (event) => {
+    if (!swipeTracking || swipeAxis !== 'h') {
+      swipeTracking = false;
       return;
     }
     swipeTracking = false;
@@ -1058,13 +1119,16 @@ root.addEventListener(
       return;
     }
     const dx = touch.clientX - swipeStartX;
-    const dy = touch.clientY - swipeStartY;
-    // Überwiegend waagerecht (sonst war es Scrollen) und weit genug?
-    if (Math.abs(dx) < SWIPE_MIN_X || Math.abs(dx) <= Math.abs(dy)) {
+    if (Math.abs(dx) < SWIPE_MIN_X) {
       return;
     }
-    const next = dx < 0 ? 'side' : 'main'; // links → Termine, rechts → Aufgaben
-    switchMobileColumn(next);
+    if (swipeEdge !== 0) {
+      // Von der Kante: nach links = nächster Tab, nach rechts = voriger (mit Umlauf)
+      switchTab(dx < 0 ? 1 : -1);
+    } else {
+      // Von innen: links → Termine-Karte, rechts → Aufgaben
+      switchMobileColumn(dx < 0 ? 'side' : 'main');
+    }
   },
   { passive: true },
 );

@@ -2133,8 +2133,12 @@ body.drag-task .untag-drop {
     color: #575757; /* 66 % Grau */
   }
 
-  /* AKTIV: invers – „UN" weiß auf schwarzer Fläche. */
-  .nav-item--plain.active {
+  /* AKTIV: invers – „UN" weiß auf schwarzer Fläche. Auch :hover/:focus mit
+     abdecken, sonst gewinnt auf iOS der „klebende" Hover-Zustand der Basis-Regel
+     (.nav-item.active:hover → helle Kachel) → sonst weiß auf weiß. */
+  .nav-item--plain.active,
+  .nav-item--plain.active:hover,
+  .nav-item--plain.active:focus {
     background: #000;
   }
 
