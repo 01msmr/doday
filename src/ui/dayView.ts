@@ -704,20 +704,25 @@ function renderFilterChip(state: AppState): string {
 
 /* ---------- Zusammenbau der Ansichten ---------- */
 
-/** Komplette App rendern */
+/** Komplette App rendern: Seite + untere Navi ins DOM schreiben. */
 export function renderApp(root: HTMLElement, state: AppState): void {
+  root.innerHTML = buildPageHtml(state) + renderNav(state.view);
+}
+
+/** Nur die Seite (`<main>…</main>`) als HTML-String – OHNE die untere Navi.
+    Wird auch für die statische Wisch-Vorschau der Nachbaransicht genutzt
+    (Live-Snapshot: einmaliges Rendern beim Wisch-Start, nicht interaktiv). */
+export function buildPageHtml(state: AppState): string {
   const orderOf = (path: string): number | undefined => state.registry.resolve(path)?.order;
   const today = new Date();
 
   // Beim Start: erst die Nextcloud-Daten abwarten
   if (state.loading) {
-    root.innerHTML = `
+    return `
       <main class="page page--staged">
         ${renderMasthead(weekdayOf(today), dayMonthOf(today), yearOf(today), true)}
         <p class="empty">${t('loading')}</p>
-      </main>
-      ${renderNav(state.view)}`;
-    return;
+      </main>`;
   }
 
   // Der Fehlertext wird nicht mehr inline gezeigt, sondern als kurzes Overlay
@@ -874,5 +879,5 @@ export function renderApp(root: HTMLElement, state: AppState): void {
   // Alle Ansichten nutzen dieselbe Karten-Bühne (page--staged); UN:DONE bekommt
   // zusätzlich page--undone (u. a. ganzseitig weiß auf Mobil).
   const pageClass = `page page--staged${isUndone ? ' page--undone' : ''}`;
-  root.innerHTML = `<main class="${pageClass}">${content}</main>${renderNav(state.view)}`;
+  return `<main class="${pageClass}">${content}</main>`;
 }
