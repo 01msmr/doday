@@ -97,8 +97,10 @@ let previewWrap = false; // am Reihen-Ende? dann „Rückspul"-Sprung ans andere
 let swipeResetTimer = 0;
 let swipeNavTop = 0; // y-Oberkante der Navi beim Wisch-Start (= Inhalts-Unterkante)
 let swipeDividerEl: HTMLDivElement | null = null;
+// Zonengrenze bei 40 % der Inhaltshöhe → obere Zone 40 %, untere Zone 60 %.
+const ZONE_SPLIT = 0.4;
 
-/** Waagerechte Trennlinie an der Zonengrenze (50 % der Inhaltshöhe ohne Navi)
+/** Waagerechte Trennlinie an der Zonengrenze (40 % der Inhaltshöhe ohne Navi)
     einblenden – macht obere (invers) / untere (direkt) Wisch-Zone sichtbar. */
 function showSwipeDivider(): void {
   if (swipeDividerEl) {
@@ -107,7 +109,7 @@ function showSwipeDivider(): void {
   const navTop = swipeNavTop || window.innerHeight;
   swipeDividerEl = document.createElement('div');
   swipeDividerEl.className = 'tab-swipe-divider';
-  swipeDividerEl.style.top = `${navTop / 2}px`;
+  swipeDividerEl.style.top = `${navTop * ZONE_SPLIT}px`;
   document.body.appendChild(swipeDividerEl);
 }
 
@@ -127,8 +129,8 @@ function startEdgePreview(): void {
     return;
   }
   const navTop = swipeNavTop || window.innerHeight;
-  const split = navTop / 2; // Mitte des Inhalts OHNE die Navi-Leiste
-  const topHalf = swipeStartY < split; // obere Hälfte → inverser Wisch
+  const split = navTop * ZONE_SPLIT; // Zonengrenze bei 40 % der Inhaltshöhe (ohne Navi)
+  const topHalf = swipeStartY < split; // obere Zone (40 %) → inverser Wisch
   const natural = swipeEdge; // links(-1)=zurück, rechts(+1)=vor
   const dir = topHalf ? -natural : natural; // gewünschte Tab-Richtung der Geste
   // Am Rand der Tab-Reihe KEIN Endlosband: ans andere Ende springen, aber die
