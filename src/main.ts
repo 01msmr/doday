@@ -1291,13 +1291,15 @@ root.addEventListener(
   'touchstart',
   (event) => {
     // Nur Einzelfinger und nur im schmalen Layout. Wische, die auf einem
-    // Drag-Greifer, in einem Eingabefeld oder auf einem Button beginnen,
-    // gehören diesen Elementen – nicht dem Wisch.
+    // Drag-Greifer oder in einem Eingabefeld beginnen, gehören diesen Elementen.
+    // Buttons (Aufgaben/Habits/Termine sind ganze Buttons!) NICHT ausschließen:
+    // der Wisch schlägt erst bei waagerechter Bewegung zu, ein reiner Tap klickt
+    // weiter ganz normal den Button.
     const target = event.target as HTMLElement;
     if (
       event.touches.length !== 1 ||
       !singleColumn.matches ||
-      target.closest('[data-drag], input, textarea, select, button')
+      target.closest('[data-drag], input, textarea, select')
     ) {
       swipeTracking = false;
       return;
