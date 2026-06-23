@@ -204,6 +204,31 @@ function endEdgePreview(dx: number): void {
     const p1 = 0.09; // Anlauf-Phase
     const p2 = 0.16; // Einschwing-Phase
 
+    // Nav-Tabs gestaffelt anstoßen: alle Zwischentabs in Reihenfolge kurz nudgen.
+    const curIdx = VIEW_ORDER.indexOf(state.view);
+    const tgtIdx = VIEW_ORDER.indexOf(previewTarget!);
+    // Richtung: rechts-wrap (sign=+1) → von curIdx-1 bis tgtIdx absteigend,
+    //           links-wrap (sign=-1) → von curIdx+1 bis tgtIdx aufsteigend.
+    const steps: number[] = [];
+    if (sign > 0) {
+      for (let k = curIdx - 1; k >= tgtIdx; k--) steps.push(k);
+    } else {
+      for (let k = curIdx + 1; k <= tgtIdx; k++) steps.push(k);
+    }
+    const nudgePx = sign * 13;
+    steps.forEach((idx, i) => {
+      const viewId = VIEW_ORDER[idx]!;
+      window.setTimeout(() => {
+        const el = root?.querySelector<HTMLElement>(`[data-action="switch-view"][data-view="${viewId}"]`);
+        if (!el) return;
+        el.style.setProperty('--nudge-x', `${nudgePx}px`);
+        el.classList.remove('tab--wrap-nudge');
+        void el.offsetWidth; // reflow um Animation neu zu starten
+        el.classList.add('tab--wrap-nudge');
+        el.addEventListener('animationend', () => el.classList.remove('tab--wrap-nudge'), { once: true });
+      }, i * 65);
+    });
+
     previewPage.style.transition = `transform ${p1}s ease-out`;
     previewEl.style.transition = `transform ${p1}s ease-out`;
     previewPage.style.transform = `translateX(${kick}px)`;
