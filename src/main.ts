@@ -82,13 +82,89 @@ function goToView(next: ViewId): void {
   refreshAgenda(); // Zeitfenster hat sich geändert → passende Daten holen
 }
 
-/** Tab relativ wechseln (Wisch von der Kante), mit Umlauf am Anfang/Ende. */
-function switchTab(delta: number): void {
+/** Marken-Titel je Tab für die Wisch-Vorschau (Dummy-Panel). */
+const VIEW_LABEL: Record<ViewId, string> = {
+  day: 'Do Day',
+  morrow: 'Do Morrow',
+  week: 'Do Week',
+  month: 'Do Month',
+  undone: 'UN · DONE',
+};
+
+/* ---------- Kanten-Wisch-Vorschau („billiges" Finger-Follow-Paging) ----------
+   Die aktuelle Seite (Live-DOM) folgt per transform dem Finger; von der Gegenseite
+   schiebt ein leichtes Dummy-Panel (Tönung + Ziel-Tab-Name) herein. Beim Commit
+   rendert goToView die ECHTE Ansicht – an derselben Stelle, gleiche HG-Farbe →
+   nahtloser Übergang. Kein zweites Live-Rendering nötig. */
+let previewEl: HTMLDivElement | null = null;
+let previewPage: HTMLElement | null = null;
+let previewTarget: ViewId | null = null;
+let previewDir = 0; // 1 = nächster Tab (von rechts), -1 = voriger (von links)
+
+function startEdgePreview(dir: number): void {
   const i = VIEW_ORDER.indexOf(state.view);
   if (i < 0) {
     return;
   }
-  goToView(VIEW_ORDER[(i + delta + VIEW_ORDER.length) % VIEW_ORDER.length]!);
+  previewDir = dir;
+  previewTarget = VIEW_ORDER[(i + dir + VIEW_ORDER.length) % VIEW_ORDER.length]!;
+  previewPage = root!.querySelector('.page');
+  const w = window.innerWidth;
+  previewEl = document.createElement('div');
+  previewEl.className = `tab-swipe-dummy${previewTarget === 'undone' ? ' tab-swipe-dummy--undone' : ''}`;
+  previewEl.innerHTML = `<span class="tab-swipe-title">${VIEW_LABEL[previewTarget]}</span>`;
+  previewEl.style.transform = `translateX(${dir > 0 ? w : -w}px)`; // wartet an der Gegenseite
+  document.body.appendChild(previewEl);
+}
+
+function moveEdgePreview(dx: number): void {
+  if (!previewEl || !previewPage) {
+    return;
+  }
+  const w = window.innerWidth;
+  // Nur in die festgelegte Richtung ziehen (Gegenrichtung auf 0 klemmen).
+  const d = previewDir > 0 ? Math.min(0, dx) : Math.max(0, dx);
+  previewPage.style.transform = `translateX(${d}px)`;
+  previewEl.style.transform = `translateX(${(previewDir > 0 ? w : -w) + d}px)`;
+}
+
+function endEdgePreview(dx: number): void {
+  if (!previewEl || !previewPage || previewTarget === null) {
+    teardownEdgePreview();
+    return;
+  }
+  const w = window.innerWidth;
+  const ease = 'transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)';
+  previewEl.style.transition = ease;
+  previewPage.style.transition = ease;
+  // genug gezogen? (mind. SWIPE_MIN_X, spätestens bei ~30 % Bildschirmbreite)
+  const committed = Math.abs(dx) >= Math.min(80, w * 0.3);
+  if (committed) {
+    previewPage.style.transform = `translateX(${previewDir > 0 ? -w : w}px)`;
+    previewEl.style.transform = 'translateX(0)';
+    const target = previewTarget;
+    window.setTimeout(() => {
+      goToView(target); // echtes Rendern an Position 0 – deckungsgleich zum Dummy
+      teardownEdgePreview();
+    }, 230);
+  } else {
+    previewPage.style.transform = 'translateX(0)';
+    previewEl.style.transform = `translateX(${previewDir > 0 ? w : -w}px)`;
+    const page = previewPage;
+    window.setTimeout(() => {
+      page.style.transition = '';
+      page.style.transform = '';
+      teardownEdgePreview();
+    }, 230);
+  }
+}
+
+function teardownEdgePreview(): void {
+  previewEl?.remove();
+  previewEl = null;
+  previewPage = null;
+  previewTarget = null;
+  previewDir = 0;
 }
 
 // Fehler erscheinen kurz als Overlay (Toast) statt dauerhaft inline. Der Toast lebt
@@ -1101,6 +1177,13 @@ root.addEventListener(
     }
     if (swipeAxis === 'h') {
       event.preventDefault(); // waagerecht → Scroll sperren, der Wisch gehört uns
+      if (swipeEdge !== 0) {
+        // Kanten-Wisch: Seite folgt dem Finger, Ziel-Tab schiebt sich als Dummy herein
+        if (!previewEl) {
+          startEdgePreview(dx < 0 ? 1 : -1);
+        }
+        moveEdgePreview(dx);
+      }
     }
   },
   { passive: false },
@@ -1111,27 +1194,31 @@ root.addEventListener(
   (event) => {
     if (!swipeTracking || swipeAxis !== 'h') {
       swipeTracking = false;
+      if (previewEl) {
+        endEdgePreview(0); // sicher zurückschnappen
+      }
       return;
     }
     swipeTracking = false;
-    const touch = event.changedTouches[0];
-    if (!touch) {
-      return;
-    }
-    const dx = touch.clientX - swipeStartX;
-    if (Math.abs(dx) < SWIPE_MIN_X) {
-      return;
-    }
-    if (swipeEdge !== 0) {
-      // Von der Kante: nach links = nächster Tab, nach rechts = voriger (mit Umlauf)
-      switchTab(dx < 0 ? 1 : -1);
-    } else {
+    const dx = (event.changedTouches[0]?.clientX ?? swipeStartX) - swipeStartX;
+    if (swipeEdge !== 0 && previewEl) {
+      // Von der Kante: die Vorschau entscheidet Commit (Tab-Wechsel) vs. Zurückschnappen
+      endEdgePreview(dx);
+    } else if (swipeEdge === 0 && Math.abs(dx) >= SWIPE_MIN_X) {
       // Von innen: links → Termine-Karte, rechts → Aufgaben
       switchMobileColumn(dx < 0 ? 'side' : 'main');
     }
   },
   { passive: true },
 );
+
+// Bricht iOS den Wisch ab (z. B. System-Zurück), Vorschau sauber aufräumen.
+root.addEventListener('touchcancel', () => {
+  swipeTracking = false;
+  if (previewEl) {
+    endEdgePreview(0);
+  }
+});
 
 // Drag & Drop: Greifer/Ziele erkennt die Engine selbst, wir verarbeiten nur das Ergebnis
 initDragDrop(root, (info) => {
