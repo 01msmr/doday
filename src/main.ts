@@ -102,11 +102,12 @@ function startEdgePreview(dir: number): void {
   previewTarget = VIEW_ORDER[(i + dir + VIEW_ORDER.length) % VIEW_ORDER.length]!;
   previewPage = root!.querySelector('.page');
   // Snapshot-Zustand: Zielansicht, jetzt, ohne offene Formulare/Filter/Animation.
+  // mobileColumn wird ÜBERNOMMEN – so passt der Snapshot zur gerade sichtbaren
+  // Ansicht (BG-Tab ODER Termine-Karte), genau wie nach dem Commit.
   const snap: AppState = {
     ...state,
     view: previewTarget,
     periodOffset: 0,
-    mobileColumn: 'main',
     columnAnim: null,
     filterArea: null,
     creatingTask: false,
@@ -119,7 +120,7 @@ function startEdgePreview(dir: number): void {
   const w = window.innerWidth;
   previewEl = document.createElement('div');
   previewEl.className = `tab-swipe-layer${previewTarget === 'undone' ? ' tab-swipe-layer--undone' : ''}`;
-  previewEl.innerHTML = `<div class="tab-swipe-inner">${buildPageHtml(snap)}</div>`;
+  previewEl.innerHTML = buildPageHtml(snap);
   previewEl.style.transform = `translateX(${dir > 0 ? w : -w}px)`; // wartet an der Gegenseite
   document.body.appendChild(previewEl);
 }
