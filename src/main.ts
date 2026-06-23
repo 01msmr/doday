@@ -183,7 +183,7 @@ function moveEdgePreview(dx: number): void {
   previewEl.style.transform = `translateX(${(previewDir > 0 ? w : -w) + offset}px)`;
   if (previewChevron) {
     previewChevron.style.transform = `translate(${offset}px, -50%)`; // reitet mit dem Inhalt
-    previewChevron.style.opacity = String(Math.min(1, progress / (w * 0.3)));
+    previewChevron.style.opacity = String(Math.min(1, progress / (w * 0.1)));
   }
 }
 
@@ -193,16 +193,55 @@ function endEdgePreview(dx: number): void {
     return;
   }
   const w = window.innerWidth;
-  // Beim „Rückspul"-Sprung ans andere Ende schneller (kürzere Dauer).
-  const secs = previewWrap ? 0.14 : 0.22;
+  // genug gezogen? (mind. SWIPE_MIN_X, spätestens bei ~30 % Bildschirmbreite)
+  const committed = Math.abs(dx) >= Math.min(80, w * 0.3);
+
+  if (committed && previewWrap) {
+    // Wrap-Animation: erst 15% Anlauf in Wischrichtung, dann Ziel einschwingen.
+    // previewDir ist bei Wrap invertiert → natürliche Richtung ist -previewDir.
+    const sign = -previewDir; // +1 = rechts, -1 = links
+    const kick = sign * w * 0.15;
+    const p1 = 0.09; // Anlauf-Phase
+    const p2 = 0.16; // Einschwing-Phase
+
+    previewPage.style.transition = `transform ${p1}s ease-out`;
+    previewEl.style.transition = `transform ${p1}s ease-out`;
+    previewPage.style.transform = `translateX(${kick}px)`;
+    previewEl.style.transform = `translateX(${-sign * w + kick}px)`; // Ziel folgt mit
+    if (previewChevron) {
+      previewChevron.style.transition = `transform ${p1}s ease-out, opacity ${p1}s ease`;
+      previewChevron.style.transform = `translate(${kick}px, -50%)`;
+      previewChevron.style.opacity = '0';
+    }
+
+    window.setTimeout(() => {
+      if (!previewEl || !previewPage) return;
+      const ease2 = `transform ${p2}s cubic-bezier(0.22, 1, 0.36, 1)`;
+      previewPage.style.transition = ease2;
+      previewEl.style.transition = ease2;
+      previewPage.style.transform = `translateX(${sign * w}px)`; // aktuelle Seite ab
+      previewEl.style.transform = 'translateX(0)'; // Ziel rein
+      if (previewChevron) {
+        previewChevron.style.transition = ease2;
+        previewChevron.style.transform = `translate(${sign * w}px, -50%)`;
+      }
+      const target = previewTarget!;
+      window.setTimeout(() => {
+        goToView(target);
+        teardownEdgePreview();
+      }, p2 * 1000 + 10);
+    }, p1 * 1000);
+
+    return;
+  }
+
+  const secs = 0.22;
   const ease = `transform ${secs}s cubic-bezier(0.22, 1, 0.36, 1)`;
   previewEl.style.transition = ease;
   previewPage.style.transition = ease;
   if (previewChevron) {
     previewChevron.style.transition = `${ease}, opacity ${secs}s ease`;
   }
-  // genug gezogen? (mind. SWIPE_MIN_X, spätestens bei ~30 % Bildschirmbreite)
-  const committed = Math.abs(dx) >= Math.min(80, w * 0.3);
   if (committed) {
     const out = previewDir > 0 ? -w : w;
     previewPage.style.transform = `translateX(${out}px)`;
@@ -1270,8 +1309,8 @@ root.addEventListener(
     }
     if (swipeAxis === 'h') {
       event.preventDefault(); // waagerecht → Scroll sperren, der Wisch gehört uns
-      showSwipeDivider(); // Zonengrenze (oben invers / unten direkt) sichtbar machen
       if (swipeEdge !== 0) {
+        showSwipeDivider(); // Zonengrenze sichtbar machen (nur beim Kanten-Wisch)
         // Kanten-Wisch: Richtung kommt aus Kante + vertikaler Hälfte (startEdgePreview).
         if (!previewEl) {
           startEdgePreview();
@@ -1300,11 +1339,8 @@ root.addEventListener(
       // Von der Kante: die Vorschau entscheidet Commit (Tab-Wechsel) vs. Zurückschnappen
       endEdgePreview(dx);
     } else if (swipeEdge === 0 && Math.abs(dx) >= SWIPE_MIN_X) {
-      // Von innen: untere Hälfte direkt (links → Termine-Karte, rechts → Aufgaben),
-      // obere Hälfte invers – dieselbe Trennlinie wie beim Kanten-Wisch.
-      const topHalf = swipeStartY < swipeNavTop / 2;
-      const toSide = dx < 0;
-      switchMobileColumn((topHalf ? !toSide : toSide) ? 'side' : 'main');
+      // Von innen: links → Termine-Karte, rechts → Aufgaben (immer direkt, keine Zonen).
+      switchMobileColumn(dx < 0 ? 'side' : 'main');
     }
   },
   { passive: true },
