@@ -28,7 +28,7 @@ import { monthRange, weekRange } from './services/selectors';
 import { InMemoryTagRegistry } from './services/tagRegistry';
 import { retagTask, untagTask, reorderTopAreas } from './services/dragMove';
 import { buildEventIcs } from './services/ics';
-import { renderApp, type AppState, type ViewId } from './ui/dayView';
+import { renderApp, buildPageHtml, type AppState, type ViewId } from './ui/dayView';
 import { initDragDrop, type DropInfo } from './ui/dragDrop';
 import { isoDate, shiftDays } from './utils/dates';
 import { t, toggleLang } from './i18n';
@@ -82,20 +82,12 @@ function goToView(next: ViewId): void {
   refreshAgenda(); // Zeitfenster hat sich geändert → passende Daten holen
 }
 
-/** Marken-Titel je Tab für die Wisch-Vorschau (Dummy-Panel). */
-const VIEW_LABEL: Record<ViewId, string> = {
-  day: 'Do Day',
-  morrow: 'Do Morrow',
-  week: 'Do Week',
-  month: 'Do Month',
-  undone: 'UN · DONE',
-};
-
 /* ---------- Kanten-Wisch-Vorschau („billiges" Finger-Follow-Paging) ----------
    Die aktuelle Seite (Live-DOM) folgt per transform dem Finger; von der Gegenseite
-   schiebt ein leichtes Dummy-Panel (Tönung + Ziel-Tab-Name) herein. Beim Commit
-   rendert goToView die ECHTE Ansicht – an derselben Stelle, gleiche HG-Farbe →
-   nahtloser Übergang. Kein zweites Live-Rendering nötig. */
+   schiebt ein STATISCHER Snapshot der Zielansicht herein (einmal beim Wisch-Start
+   gerendert, nicht interaktiv) – leicht verschwommen (liest sich als Inhalt UND als
+   Bewegungs-Unschärfe; scharf wird er erst beim Ankommen). Beim Commit rendert
+   goToView die echte Ansicht deckungsgleich → nahtlos. Kein zweites Live-Rendering. */
 let previewEl: HTMLDivElement | null = null;
 let previewPage: HTMLElement | null = null;
 let previewTarget: ViewId | null = null;
@@ -109,10 +101,25 @@ function startEdgePreview(dir: number): void {
   previewDir = dir;
   previewTarget = VIEW_ORDER[(i + dir + VIEW_ORDER.length) % VIEW_ORDER.length]!;
   previewPage = root!.querySelector('.page');
+  // Snapshot-Zustand: Zielansicht, jetzt, ohne offene Formulare/Filter/Animation.
+  const snap: AppState = {
+    ...state,
+    view: previewTarget,
+    periodOffset: 0,
+    mobileColumn: 'main',
+    columnAnim: null,
+    filterArea: null,
+    creatingTask: false,
+    creatingEvent: false,
+    editingTask: null,
+    editingEvent: null,
+    editing: null,
+    editingHabits: false,
+  };
   const w = window.innerWidth;
   previewEl = document.createElement('div');
-  previewEl.className = `tab-swipe-dummy${previewTarget === 'undone' ? ' tab-swipe-dummy--undone' : ''}`;
-  previewEl.innerHTML = `<span class="tab-swipe-title">${VIEW_LABEL[previewTarget]}</span>`;
+  previewEl.className = `tab-swipe-layer${previewTarget === 'undone' ? ' tab-swipe-layer--undone' : ''}`;
+  previewEl.innerHTML = `<div class="tab-swipe-inner">${buildPageHtml(snap)}</div>`;
   previewEl.style.transform = `translateX(${dir > 0 ? w : -w}px)`; // wartet an der Gegenseite
   document.body.appendChild(previewEl);
 }
