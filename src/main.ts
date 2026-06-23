@@ -215,7 +215,7 @@ function endEdgePreview(dx: number): void {
     } else {
       for (let k = curIdx + 1; k <= tgtIdx; k++) steps.push(k);
     }
-    const nudgePx = sign * 13;
+    const nudgePx = sign * Math.round(w * 0.15);
     steps.forEach((idx, i) => {
       const viewId = VIEW_ORDER[idx]!;
       window.setTimeout(() => {
