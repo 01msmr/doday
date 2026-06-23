@@ -2229,5 +2229,5 @@ body.drag-task .untag-drop {
   100% { transform: translateX(0); }
 }
 .tab--wrap-nudge {
-  animation: tab-wrap-nudge 0.28s ease-out both;
+  animation: tab-wrap-nudge 0.15s ease-out both;
 }
