@@ -2185,3 +2185,25 @@ body.drag-task .untag-drop {
 .tab-swipe-layer--undone {
   background: #ffffff;
 }
+
+/* Sehr großes Chevron während des Kanten-Wisches: zeigt die Reise-Richtung
+   (› vor / ‹ zurück), einfach = direkt, doppelt = invers. Vertikal mittig in der
+   aktiven Hälfte (top per JS gesetzt), reitet horizontal mit dem Inhalt mit. */
+.tab-swipe-chevron {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 6; /* über Seite + Snapshot, unter der Navi (7) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-family: var(--sans);
+  font-weight: 800;
+  font-size: 40vw;
+  line-height: 0.7;
+  letter-spacing: -0.05em;
+  color: var(--ink);
+  opacity: 0;
+  will-change: transform, opacity;
+}

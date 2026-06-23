@@ -90,20 +90,32 @@ function goToView(next: ViewId): void {
    goToView die echte Ansicht deckungsgleich → nahtlos. Kein zweites Live-Rendering. */
 let previewEl: HTMLDivElement | null = null;
 let previewPage: HTMLElement | null = null;
+let previewChevron: HTMLDivElement | null = null;
 let previewTarget: ViewId | null = null;
 let previewDir = 0; // 1 = nächster Tab (von rechts), -1 = voriger (von links)
+let swipeResetTimer = 0;
 
-function startEdgePreview(dir: number): void {
+/**
+ * Vorschau starten. Die Richtung ergibt sich aus Kante + vertikaler Hälfte:
+ * UNTERE 50 % (Höhe ohne Navi) = „direkter" Wisch (links=zurück, rechts=vor),
+ * OBERE 50 % = „inverser" Wisch (Gegenrichtung). Innen-Wische haben das nicht.
+ */
+function startEdgePreview(): void {
   const i = VIEW_ORDER.indexOf(state.view);
   if (i < 0) {
     return;
   }
-  previewDir = dir;
-  previewTarget = VIEW_ORDER[(i + dir + VIEW_ORDER.length) % VIEW_ORDER.length]!;
+  const navTop =
+    (root!.querySelector('.bottom-nav') as HTMLElement | null)?.getBoundingClientRect().top ??
+    window.innerHeight;
+  const split = navTop / 2; // Mitte des Inhalts OHNE die Navi-Leiste
+  const topHalf = swipeStartY < split; // obere Hälfte → inverser Wisch
+  const natural = swipeEdge; // links(-1)=zurück, rechts(+1)=vor
+  previewDir = topHalf ? -natural : natural;
+  previewTarget = VIEW_ORDER[(i + previewDir + VIEW_ORDER.length) % VIEW_ORDER.length]!;
   previewPage = root!.querySelector('.page');
-  // Snapshot-Zustand: Zielansicht, jetzt, ohne offene Formulare/Filter/Animation.
-  // mobileColumn wird ÜBERNOMMEN – so passt der Snapshot zur gerade sichtbaren
-  // Ansicht (BG-Tab ODER Termine-Karte), genau wie nach dem Commit.
+
+  // Snapshot der Zielansicht – mobileColumn übernommen (BG-Tab ODER Termine-Karte).
   const snap: AppState = {
     ...state,
     view: previewTarget,
@@ -121,8 +133,19 @@ function startEdgePreview(dir: number): void {
   previewEl = document.createElement('div');
   previewEl.className = `tab-swipe-layer${previewTarget === 'undone' ? ' tab-swipe-layer--undone' : ''}`;
   previewEl.innerHTML = buildPageHtml(snap);
-  previewEl.style.transform = `translateX(${dir > 0 ? w : -w}px)`; // wartet an der Gegenseite
+  previewEl.style.transform = `translateX(${previewDir > 0 ? w : -w}px)`; // wartet an der Gegenseite
   document.body.appendChild(previewEl);
+
+  // Sehr großes Chevron, vertikal mittig in der AKTIVEN Hälfte; einfach = direkt,
+  // doppelt = invers. Zeigt in Reise-Richtung (› vor, ‹ zurück), reitet mit dem Inhalt.
+  const glyph = previewDir > 0 ? '›' : '‹'; // › / ‹
+  const zoneCenter = topHalf ? split / 2 : split + (navTop - split) / 2;
+  previewChevron = document.createElement('div');
+  previewChevron.className = 'tab-swipe-chevron';
+  previewChevron.textContent = topHalf ? glyph + glyph : glyph;
+  previewChevron.style.top = `${zoneCenter}px`;
+  previewChevron.style.transform = 'translate(0, -50%)';
+  document.body.appendChild(previewChevron);
 }
 
 function moveEdgePreview(dx: number): void {
@@ -130,10 +153,14 @@ function moveEdgePreview(dx: number): void {
     return;
   }
   const w = window.innerWidth;
-  // Nur in die festgelegte Richtung ziehen (Gegenrichtung auf 0 klemmen).
-  const d = previewDir > 0 ? Math.min(0, dx) : Math.max(0, dx);
-  previewPage.style.transform = `translateX(${d}px)`;
-  previewEl.style.transform = `translateX(${(previewDir > 0 ? w : -w) + d}px)`;
+  const progress = Math.min(w, Math.abs(dx)); // Finger zieht stets nach innen
+  const offset = previewDir > 0 ? -progress : progress; // Inhalt-Versatz Richtung Ziel
+  previewPage.style.transform = `translateX(${offset}px)`;
+  previewEl.style.transform = `translateX(${(previewDir > 0 ? w : -w) + offset}px)`;
+  if (previewChevron) {
+    previewChevron.style.transform = `translate(${offset}px, -50%)`; // reitet mit dem Inhalt
+    previewChevron.style.opacity = String(Math.min(0.85, progress / (w * 0.3)));
+  }
 }
 
 function endEdgePreview(dx: number): void {
@@ -145,34 +172,57 @@ function endEdgePreview(dx: number): void {
   const ease = 'transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)';
   previewEl.style.transition = ease;
   previewPage.style.transition = ease;
+  if (previewChevron) {
+    previewChevron.style.transition = `${ease}, opacity 0.22s ease`;
+  }
   // genug gezogen? (mind. SWIPE_MIN_X, spätestens bei ~30 % Bildschirmbreite)
   const committed = Math.abs(dx) >= Math.min(80, w * 0.3);
   if (committed) {
-    previewPage.style.transform = `translateX(${previewDir > 0 ? -w : w}px)`;
+    const out = previewDir > 0 ? -w : w;
+    previewPage.style.transform = `translateX(${out}px)`;
     previewEl.style.transform = 'translateX(0)';
+    if (previewChevron) {
+      previewChevron.style.transform = `translate(${out}px, -50%)`;
+      previewChevron.style.opacity = '0';
+    }
     const target = previewTarget;
     window.setTimeout(() => {
-      goToView(target); // echtes Rendern an Position 0 – deckungsgleich zum Dummy
+      goToView(target); // echtes Rendern an Position 0 – deckungsgleich zum Snapshot
       teardownEdgePreview();
     }, 230);
   } else {
+    // Abgebrochen → zurückschnappen, und als Sicherheit nach 1,5 s sauber neu rendern.
     previewPage.style.transform = 'translateX(0)';
     previewEl.style.transform = `translateX(${previewDir > 0 ? w : -w}px)`;
+    if (previewChevron) {
+      previewChevron.style.transform = 'translate(0, -50%)';
+      previewChevron.style.opacity = '0';
+    }
     const page = previewPage;
     window.setTimeout(() => {
       page.style.transition = '';
       page.style.transform = '';
       teardownEdgePreview();
     }, 230);
+    scheduleSwipeReset();
   }
 }
 
 function teardownEdgePreview(): void {
   previewEl?.remove();
+  previewChevron?.remove();
   previewEl = null;
   previewPage = null;
+  previewChevron = null;
   previewTarget = null;
   previewDir = 0;
+}
+
+/** Sicherheits-Reset: nach einem abgebrochenen/gescheiterten Wisch die aktuelle
+    Ansicht nach 1,5 s sauber neu rendern (klärt hängende Transforms/Reste). */
+function scheduleSwipeReset(): void {
+  window.clearTimeout(swipeResetTimer);
+  swipeResetTimer = window.setTimeout(() => rerender(), 1500);
 }
 
 // Fehler erscheinen kurz als Overlay (Toast) statt dauerhaft inline. Der Toast lebt
@@ -1150,6 +1200,7 @@ root.addEventListener(
       swipeTracking = false;
       return;
     }
+    window.clearTimeout(swipeResetTimer); // neue Geste → evtl. anstehenden Reset abblasen
     const touch = event.touches[0];
     swipeTracking = true;
     swipeAxis = 'none';
@@ -1186,9 +1237,9 @@ root.addEventListener(
     if (swipeAxis === 'h') {
       event.preventDefault(); // waagerecht → Scroll sperren, der Wisch gehört uns
       if (swipeEdge !== 0) {
-        // Kanten-Wisch: Seite folgt dem Finger, Ziel-Tab schiebt sich als Dummy herein
+        // Kanten-Wisch: Richtung kommt aus Kante + vertikaler Hälfte (startEdgePreview).
         if (!previewEl) {
-          startEdgePreview(dx < 0 ? 1 : -1);
+          startEdgePreview();
         }
         moveEdgePreview(dx);
       }
