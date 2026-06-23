@@ -197,65 +197,71 @@ function endEdgePreview(dx: number): void {
   const committed = Math.abs(dx) >= Math.min(80, w * 0.3);
 
   if (committed && previewWrap) {
-    // Wrap-Animation: erst 15% Anlauf in Wischrichtung, dann Ziel einschwingen.
-    // previewDir ist bei Wrap invertiert → natürliche Richtung ist -previewDir.
-    const sign = -previewDir; // +1 = rechts, -1 = links
-    const kick = sign * w * 0.15;
-    const p1 = 0.09; // Anlauf-Phase
-    const p2 = 0.16; // Einschwing-Phase
-
-    // Nav-Tabs gestaffelt anstoßen: alle Zwischentabs in Reihenfolge kurz nudgen.
+    // „Flug über alle Tabs": die Zwischen-Ansichten fliegen – jede mit ihrem
+    // eigenen Header – nacheinander durchs Bild, bis das Ziel als Letztes liegen
+    // bleibt. Die Navi-Buttons bewegen sich dabei NICHT (nur Status-Wechsel am Ende).
+    const enterX = previewDir > 0 ? w : -w; // von dieser Seite kommen die Blätter herein
     const curIdx = VIEW_ORDER.indexOf(state.view);
     const tgtIdx = VIEW_ORDER.indexOf(previewTarget!);
-    // Richtung: rechts-wrap (sign=+1) → von curIdx-1 bis tgtIdx absteigend,
-    //           links-wrap (sign=-1) → von curIdx+1 bis tgtIdx aufsteigend.
-    const steps: number[] = [];
-    if (sign > 0) {
-      for (let k = curIdx - 1; k >= tgtIdx; k--) steps.push(k);
+    // Pfad der zu durchquerenden Ansichten (Zwischenstationen + Ziel), in Reihenfolge.
+    const path: ViewId[] = [];
+    if (tgtIdx < curIdx) {
+      for (let k = curIdx - 1; k >= tgtIdx; k--) path.push(VIEW_ORDER[k]!);
     } else {
-      for (let k = curIdx + 1; k <= tgtIdx; k++) steps.push(k);
+      for (let k = curIdx + 1; k <= tgtIdx; k++) path.push(VIEW_ORDER[k]!);
     }
-    const nudgePx = sign * Math.round(w * 0.15);
-    steps.forEach((idx, i) => {
-      const viewId = VIEW_ORDER[idx]!;
+
+    const stagger = 130; // ms Versatz zwischen den durchfliegenden Blättern
+    const slideSecs = 0.28;
+    const ease = `transform ${slideSecs}s cubic-bezier(0.22, 1, 0.36, 1)`;
+
+    // Einzel-Vorschau + Chevron weg – wir bauen die ganze Kette neu.
+    previewChevron?.remove();
+    previewChevron = null;
+    previewEl.remove();
+    previewEl = null;
+
+    // Aktuelle Seite zur Gegenseite rausschieben (Header reist mit).
+    previewPage.style.transition = ease;
+    previewPage.style.transform = `translateX(${-enterX}px)`;
+
+    const layers: HTMLDivElement[] = [];
+    path.forEach((viewId, i) => {
+      // Blatt erst im eigenen Zeitfenster bauen → Render-Last gestaffelt statt auf einmal.
       window.setTimeout(() => {
-        const el = root?.querySelector<HTMLElement>(`[data-action="switch-view"][data-view="${viewId}"]`);
-        if (!el) return;
-        el.style.setProperty('--nudge-x', `${nudgePx}px`);
-        el.classList.remove('tab--wrap-nudge');
-        void el.offsetWidth; // reflow um Animation neu zu starten
-        el.classList.add('tab--wrap-nudge');
-        el.addEventListener('animationend', () => el.classList.remove('tab--wrap-nudge'), { once: true });
-      }, i * 65);
+        const snap: AppState = {
+          ...state,
+          view: viewId,
+          periodOffset: 0,
+          columnAnim: null,
+          filterArea: null,
+          creatingTask: false,
+          creatingEvent: false,
+          editingTask: null,
+          editingEvent: null,
+          editing: null,
+          editingHabits: false,
+        };
+        const layer = document.createElement('div');
+        layer.className = `tab-swipe-layer${viewId === 'undone' ? ' tab-swipe-layer--undone' : ''}`;
+        layer.style.zIndex = String(3 + i); // späteres Blatt deckt das frühere (Ziel zuoberst)
+        layer.style.transform = `translateX(${enterX}px)`;
+        layer.innerHTML = buildPageHtml(snap);
+        document.body.appendChild(layer);
+        void layer.offsetWidth; // Reflow, damit die Start-Position sitzt, bevor animiert wird
+        layer.style.transition = ease;
+        layer.style.transform = 'translateX(0)';
+        layers.push(layer);
+      }, i * stagger);
     });
 
-    previewPage.style.transition = `transform ${p1}s ease-out`;
-    previewEl.style.transition = `transform ${p1}s ease-out`;
-    previewPage.style.transform = `translateX(${kick}px)`;
-    previewEl.style.transform = `translateX(${-sign * w + kick}px)`; // Ziel folgt mit
-    if (previewChevron) {
-      previewChevron.style.transition = `transform ${p1}s ease-out, opacity ${p1}s ease`;
-      previewChevron.style.transform = `translate(${kick}px, -50%)`;
-      previewChevron.style.opacity = '0';
-    }
-
+    const total = (path.length - 1) * stagger + slideSecs * 1000 + 40;
+    const target = previewTarget!;
     window.setTimeout(() => {
-      if (!previewEl || !previewPage) return;
-      const ease2 = `transform ${p2}s cubic-bezier(0.22, 1, 0.36, 1)`;
-      previewPage.style.transition = ease2;
-      previewEl.style.transition = ease2;
-      previewPage.style.transform = `translateX(${sign * w}px)`; // aktuelle Seite ab
-      previewEl.style.transform = 'translateX(0)'; // Ziel rein
-      if (previewChevron) {
-        previewChevron.style.transition = ease2;
-        previewChevron.style.transform = `translate(${sign * w}px, -50%)`;
-      }
-      const target = previewTarget!;
-      window.setTimeout(() => {
-        goToView(target);
-        teardownEdgePreview();
-      }, p2 * 1000 + 10);
-    }, p1 * 1000);
+      goToView(target); // echtes Rendern – deckungsgleich zum letzten Blatt
+      layers.forEach((l) => l.remove());
+      teardownEdgePreview();
+    }, total);
 
     return;
   }

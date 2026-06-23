@@ -2222,12 +2222,3 @@ body.drag-task .untag-drop {
   opacity: 0;
   will-change: transform, opacity;
 }
-
-@keyframes tab-wrap-nudge {
-  0%   { transform: translateX(0); }
-  40%  { transform: translateX(var(--nudge-x, 8px)); }
-  100% { transform: translateX(0); }
-}
-.tab--wrap-nudge {
-  animation: tab-wrap-nudge 0.15s ease-out both;
-}
