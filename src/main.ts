@@ -92,8 +92,29 @@ let previewEl: HTMLDivElement | null = null;
 let previewPage: HTMLElement | null = null;
 let previewChevron: HTMLDivElement | null = null;
 let previewTarget: ViewId | null = null;
-let previewDir = 0; // 1 = nächster Tab (von rechts), -1 = voriger (von links)
+let previewDir = 0; // Animationsrichtung: 1 = von rechts herein, -1 = von links
+let previewWrap = false; // am Reihen-Ende? dann „Rückspul"-Sprung ans andere Ende
 let swipeResetTimer = 0;
+let swipeNavTop = 0; // y-Oberkante der Navi beim Wisch-Start (= Inhalts-Unterkante)
+let swipeDividerEl: HTMLDivElement | null = null;
+
+/** Waagerechte Trennlinie an der Zonengrenze (50 % der Inhaltshöhe ohne Navi)
+    einblenden – macht obere (invers) / untere (direkt) Wisch-Zone sichtbar. */
+function showSwipeDivider(): void {
+  if (swipeDividerEl) {
+    return;
+  }
+  const navTop = swipeNavTop || window.innerHeight;
+  swipeDividerEl = document.createElement('div');
+  swipeDividerEl.className = 'tab-swipe-divider';
+  swipeDividerEl.style.top = `${navTop / 2}px`;
+  document.body.appendChild(swipeDividerEl);
+}
+
+function hideSwipeDivider(): void {
+  swipeDividerEl?.remove();
+  swipeDividerEl = null;
+}
 
 /**
  * Vorschau starten. Die Richtung ergibt sich aus Kante + vertikaler Hälfte:
@@ -105,14 +126,17 @@ function startEdgePreview(): void {
   if (i < 0) {
     return;
   }
-  const navTop =
-    (root!.querySelector('.bottom-nav') as HTMLElement | null)?.getBoundingClientRect().top ??
-    window.innerHeight;
+  const navTop = swipeNavTop || window.innerHeight;
   const split = navTop / 2; // Mitte des Inhalts OHNE die Navi-Leiste
   const topHalf = swipeStartY < split; // obere Hälfte → inverser Wisch
   const natural = swipeEdge; // links(-1)=zurück, rechts(+1)=vor
-  previewDir = topHalf ? -natural : natural;
-  previewTarget = VIEW_ORDER[(i + previewDir + VIEW_ORDER.length) % VIEW_ORDER.length]!;
+  const dir = topHalf ? -natural : natural; // gewünschte Tab-Richtung der Geste
+  // Am Rand der Tab-Reihe KEIN Endlosband: ans andere Ende springen, aber die
+  // ANIMATION umkehren (kommt von der Gegenseite, schneller) → „Rückspul"-Gefühl.
+  const rawIndex = i + dir;
+  previewWrap = rawIndex < 0 || rawIndex >= VIEW_ORDER.length;
+  previewDir = previewWrap ? -dir : dir; // steuert nur die Animationsrichtung
+  previewTarget = VIEW_ORDER[(rawIndex + VIEW_ORDER.length) % VIEW_ORDER.length]!;
   previewPage = root!.querySelector('.page');
 
   // Snapshot der Zielansicht – mobileColumn übernommen (BG-Tab ODER Termine-Karte).
@@ -159,7 +183,7 @@ function moveEdgePreview(dx: number): void {
   previewEl.style.transform = `translateX(${(previewDir > 0 ? w : -w) + offset}px)`;
   if (previewChevron) {
     previewChevron.style.transform = `translate(${offset}px, -50%)`; // reitet mit dem Inhalt
-    previewChevron.style.opacity = String(Math.min(0.85, progress / (w * 0.3)));
+    previewChevron.style.opacity = String(Math.min(1, progress / (w * 0.3)));
   }
 }
 
@@ -169,11 +193,13 @@ function endEdgePreview(dx: number): void {
     return;
   }
   const w = window.innerWidth;
-  const ease = 'transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)';
+  // Beim „Rückspul"-Sprung ans andere Ende schneller (kürzere Dauer).
+  const secs = previewWrap ? 0.14 : 0.22;
+  const ease = `transform ${secs}s cubic-bezier(0.22, 1, 0.36, 1)`;
   previewEl.style.transition = ease;
   previewPage.style.transition = ease;
   if (previewChevron) {
-    previewChevron.style.transition = `${ease}, opacity 0.22s ease`;
+    previewChevron.style.transition = `${ease}, opacity ${secs}s ease`;
   }
   // genug gezogen? (mind. SWIPE_MIN_X, spätestens bei ~30 % Bildschirmbreite)
   const committed = Math.abs(dx) >= Math.min(80, w * 0.3);
@@ -186,10 +212,13 @@ function endEdgePreview(dx: number): void {
       previewChevron.style.opacity = '0';
     }
     const target = previewTarget;
-    window.setTimeout(() => {
-      goToView(target); // echtes Rendern an Position 0 – deckungsgleich zum Snapshot
-      teardownEdgePreview();
-    }, 230);
+    window.setTimeout(
+      () => {
+        goToView(target); // echtes Rendern an Position 0 – deckungsgleich zum Snapshot
+        teardownEdgePreview();
+      },
+      secs * 1000 + 10,
+    );
   } else {
     // Abgebrochen → zurückschnappen, und als Sicherheit nach 1,5 s sauber neu rendern.
     previewPage.style.transform = 'translateX(0)';
@@ -216,6 +245,7 @@ function teardownEdgePreview(): void {
   previewChevron = null;
   previewTarget = null;
   previewDir = 0;
+  previewWrap = false;
 }
 
 /** Sicherheits-Reset: nach einem abgebrochenen/gescheiterten Wisch die aktuelle
@@ -1208,6 +1238,10 @@ root.addEventListener(
     swipeStartY = touch.clientY;
     const width = window.innerWidth;
     swipeEdge = touch.clientX <= EDGE_ZONE ? -1 : touch.clientX >= width - EDGE_ZONE ? 1 : 0;
+    // Inhalts-Unterkante (Oberkante der Navi) – für die obere/untere 50%-Trennlinie.
+    swipeNavTop =
+      (root.querySelector('.bottom-nav') as HTMLElement | null)?.getBoundingClientRect().top ??
+      window.innerHeight;
   },
   { passive: true },
 );
@@ -1236,6 +1270,7 @@ root.addEventListener(
     }
     if (swipeAxis === 'h') {
       event.preventDefault(); // waagerecht → Scroll sperren, der Wisch gehört uns
+      showSwipeDivider(); // Zonengrenze (oben invers / unten direkt) sichtbar machen
       if (swipeEdge !== 0) {
         // Kanten-Wisch: Richtung kommt aus Kante + vertikaler Hälfte (startEdgePreview).
         if (!previewEl) {
@@ -1251,6 +1286,7 @@ root.addEventListener(
 root.addEventListener(
   'touchend',
   (event) => {
+    hideSwipeDivider();
     if (!swipeTracking || swipeAxis !== 'h') {
       swipeTracking = false;
       if (previewEl) {
@@ -1264,8 +1300,11 @@ root.addEventListener(
       // Von der Kante: die Vorschau entscheidet Commit (Tab-Wechsel) vs. Zurückschnappen
       endEdgePreview(dx);
     } else if (swipeEdge === 0 && Math.abs(dx) >= SWIPE_MIN_X) {
-      // Von innen: links → Termine-Karte, rechts → Aufgaben
-      switchMobileColumn(dx < 0 ? 'side' : 'main');
+      // Von innen: untere Hälfte direkt (links → Termine-Karte, rechts → Aufgaben),
+      // obere Hälfte invers – dieselbe Trennlinie wie beim Kanten-Wisch.
+      const topHalf = swipeStartY < swipeNavTop / 2;
+      const toSide = dx < 0;
+      switchMobileColumn((topHalf ? !toSide : toSide) ? 'side' : 'main');
     }
   },
   { passive: true },
@@ -1274,6 +1313,7 @@ root.addEventListener(
 // Bricht iOS den Wisch ab (z. B. System-Zurück), Vorschau sauber aufräumen.
 root.addEventListener('touchcancel', () => {
   swipeTracking = false;
+  hideSwipeDivider();
   if (previewEl) {
     endEdgePreview(0);
   }
