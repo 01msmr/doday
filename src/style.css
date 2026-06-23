@@ -25,6 +25,9 @@
   --keycap-ink: #26251f;
   --keycap-shadow: rgb(38 37 31 / 0.75);
 
+  /* Markierungsfarbe für Wisch-Chevron + Trennlinie: voll Schwarz (hell) / Weiß (dunkel) */
+  --swipe-mark: #000;
+
   --serif: 'Iowan Old Style', 'Palatino Nova', Palatino, Georgia, serif;
   --sans: 'Avenir Next', Avenir, 'Helvetica Neue', system-ui, sans-serif;
 }
@@ -44,6 +47,7 @@
     --halo: rgb(143 174 135 / 0.22);
     --strike: rgb(232 229 221 / 0.25);
     --nav-bg: rgb(22 23 27 / 0.82);
+    --swipe-mark: #fff;
   }
 }
 
@@ -2176,10 +2180,24 @@ body.drag-task .untag-drop {
   z-index: 4; /* über der Seite (0), unter der Navi (7) */
   overflow: hidden;
   background: color-mix(in srgb, var(--pill) 17%, var(--bg));
+  /* weicher Tiefenschatten an den Kanten, damit der Snapshot als Blatt liest */
   box-shadow:
-    -0.5rem 0 1.2rem rgb(12 12 14 / 0.32),
-    0.5rem 0 1.2rem rgb(12 12 14 / 0.32);
+    -0.5rem 0 1.1rem rgb(12 12 14 / 0.3),
+    0.5rem 0 1.1rem rgb(12 12 14 / 0.3);
   will-change: transform;
+}
+
+/* Waagerechte Trennlinie zwischen den beiden Wisch-Zonen (obere = invers,
+   untere = direkt): feiner 1px-Strich an der 50%-Grenze (Höhe ohne Navi),
+   nur WÄHREND des Wischens sichtbar. */
+.tab-swipe-divider {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 1px;
+  z-index: 6;
+  background: var(--swipe-mark);
+  pointer-events: none;
 }
 
 .tab-swipe-layer--undone {
@@ -2198,12 +2216,11 @@ body.drag-task .untag-drop {
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  font-family: var(--sans);
-  font-weight: 800;
-  font-size: 40vw;
+  font-family: var(--serif); /* Serifenschrift wie die Monatsüberschrift */
+  font-weight: 600; /* etwas dicker als normal (semibold), nicht ultrafett */
+  font-size: 46vw; /* einen Tick größer als zuvor */
   line-height: 0.7;
-  letter-spacing: -0.05em;
-  color: var(--ink);
+  color: var(--swipe-mark); /* voll Schwarz bzw. Weiß, nicht grau */
   opacity: 0;
   will-change: transform, opacity;
 }
