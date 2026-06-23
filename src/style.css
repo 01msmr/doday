@@ -2163,3 +2163,30 @@ body.drag-task .untag-drop {
       0 0.34rem 1.53rem rgb(255 255 255 / 0.08);
   }
 }
+
+/* ---------- Kanten-Wisch-Vorschau (Dummy-Panel des Ziel-Tabs) ----------
+   Schiebt beim Kanten-Wisch von der Gegenseite herein, während die aktuelle Seite
+   dem Finger folgt. Gleiche HG-Farbe wie die jeweilige Ziel-Seite → beim Commit
+   ersetzt die echte Ansicht den Dummy nahtlos. */
+.tab-swipe-dummy {
+  position: fixed;
+  inset: 0;
+  z-index: 4; /* über der Seite (0), unter der Navi (7) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--pill) 17%, var(--bg));
+  will-change: transform;
+}
+
+.tab-swipe-dummy--undone {
+  background: #ffffff;
+}
+
+.tab-swipe-title {
+  font-family: var(--serif);
+  font-size: clamp(1.6rem, 8vw, 2.4rem);
+  font-weight: 500;
+  color: var(--ink);
+  opacity: 0.5;
+}
