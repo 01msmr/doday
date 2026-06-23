@@ -2185,10 +2185,3 @@ body.drag-task .untag-drop {
 .tab-swipe-layer--undone {
   background: #ffffff;
 }
-
-/* Der Snapshot leicht verschwommen: liest sich als Inhalt UND als
-   Bewegungs-Unschärfe; die echte Ansicht beim Commit ist dann „scharf gestellt". */
-.tab-swipe-inner {
-  height: 100%;
-  filter: blur(3px);
-}
