@@ -598,10 +598,10 @@ body {
   margin-top: 1.3rem;
 }
 
-.page--staged .col-main > .panel:first-child {
-  margin-top: 0;
-}
-
+/* Erstes Panel je Spalte mit gleichem oberen Abstand – damit der leere Hinweis
+   „noch keine Aufgaben" denselben Abstand unter dem Titel hat wie „noch keine
+   Termine" unter dem Termine-Badge in der Karte. */
+.page--staged .col-main > .panel:first-child,
 .page--staged .col-schedule > .panel:first-child,
 .page--staged .col-extras > .panel:first-child {
   margin-top: 0.4rem;
