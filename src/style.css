@@ -2484,15 +2484,12 @@ body.drag-task .untag-drop {
   color: var(--ink);
 }
 
-/* Hero-Intro nutzt den ECHTEN „DO DAY"-Keycap (Klon von Navi-Button 1), nur groß:
-   --keycap-size hoch + Schriftgrößen proportional (die sind fix in rem). */
+/* Hero-Intro nutzt den ECHTEN „DO DAY"-Keycap (Klon von Navi-Button 1). EXAKT die
+   Proportionen des echten Buttons: gleichmäßig per transform skaliert – KEINE
+   einzelnen Größen-Overrides (die würden die Verhältnisse verfälschen). */
 .demo-hero-keycap {
-  --keycap-size: min(9rem, 52vw);
+  transform: scale(2.4);
+  transform-origin: center;
+  margin: calc(var(--keycap-size) * 0.7); /* (2.4−1)/2 → Platz für die Vergrößerung */
   cursor: default;
-}
-.demo-hero-keycap .nav-do {
-  font-size: 2.4rem;
-}
-.demo-hero-keycap .nav-label {
-  font-size: 1.2rem;
 }
