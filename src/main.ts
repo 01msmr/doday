@@ -104,6 +104,7 @@ let demoActive = false;
 let demoTimers: number[] = [];
 let demoOverlayEl: HTMLDivElement | null = null;
 let demoCaptionEl: HTMLDivElement | null = null;
+let demoFingerEl: HTMLDivElement | null = null;
 let lastUndoneTap = 0;
 let undoneTapTimer = 0;
 // Zonengrenze bei 45 % der Inhaltshöhe (von oben) → obere Zone 45 %, untere 55 %.
@@ -994,7 +995,48 @@ function showDemoOverlay(): void {
   demoOverlayEl.appendChild(demoCaptionEl);
   demoOverlayEl.addEventListener('pointerdown', endGestureDemo);
   document.body.appendChild(demoOverlayEl);
+  // Finger-Kreis getrennt (über dem Backdrop), folgt den Gesten.
+  demoFingerEl = document.createElement('div');
+  demoFingerEl.className = 'demo-finger';
+  document.body.appendChild(demoFingerEl);
   requestAnimationFrame(() => demoOverlayEl?.classList.add('show'));
+}
+
+/** Finger-Kreis als Gesten-Hinweis: AUSSEN startet an der Kante, INNEN in der Mitte
+    (gleicher Vollkreis, anderer Startpunkt) und gleitet in Wisch-Richtung. */
+function showDemoFinger(kind: 'edge' | 'inside', leftward: boolean): void {
+  const el = demoFingerEl;
+  if (!el) {
+    return;
+  }
+  const w = window.innerWidth;
+  const navTop = navTopY();
+  const edgeInset = 22; // ~Radius → Kreis sitzt genau an der Kante
+  const y = kind === 'edge' ? navTop * 0.8 : navTop * 0.5;
+  const fromX = kind === 'edge' ? (leftward ? w - edgeInset : edgeInset) : w * 0.5;
+  const dist = kind === 'edge' ? w * 0.42 : w * 0.3;
+  const toX = leftward ? fromX - dist : fromX + dist;
+  el.style.transition = 'none';
+  el.style.top = `${y}px`;
+  el.style.left = `${fromX}px`;
+  el.style.opacity = '0';
+  void el.offsetWidth; // Reflow → Startposition sitzt, bevor animiert wird
+  const dur = 0.5;
+  el.style.transition = `left ${dur}s ease, opacity ${dur}s ease`;
+  el.style.left = `${toX}px`;
+  el.style.opacity = '0.9';
+  demoTimers.push(
+    window.setTimeout(() => {
+      el.style.transition = 'opacity 0.3s ease';
+      el.style.opacity = '0';
+    }, dur * 1000),
+  );
+}
+
+/** Inside-Wisch der Demo inkl. Finger-Hinweis. 'side' = nach links, 'main' = nach rechts. */
+function demoInside(next: 'main' | 'side'): void {
+  showDemoFinger('inside', next === 'side');
+  switchMobileColumn(next);
 }
 
 /** Einen Kanten-Wisch programmatisch auslösen (untere Zone = direkt; vorwärts =
@@ -1005,6 +1047,7 @@ function demoEdge(forward: boolean): void {
   swipeNavTop = navTop;
   swipeStartY = navTop * 0.8; // klar in der unteren Zone → direkter Wisch
   swipeEdge = forward ? 1 : -1; // rechts = vor, links = zurück
+  showDemoFinger('edge', forward); // Außengeste: Finger an der Kante, gleitet nach innen
   showSwipeDivider();
   startEdgePreview();
   endEdgePreview(100); // |100| ≥ Commit-Schwelle (48) → Tab-Wechsel
@@ -1031,8 +1074,8 @@ function buildDemoSteps(): DemoStep[] {
     { run: () => demoEdge(true), wait: edge }, // morrow → week
     { run: () => demoEdge(true), wait: edge }, // week → month
     { run: () => demoEdge(true), wait: edge }, // month → undone
-    { caption: t('demoInsideSwipe'), run: () => switchMobileColumn('side'), wait: col },
-    { run: () => switchMobileColumn('main'), wait: col },
+    { caption: t('demoInsideSwipe'), run: () => demoInside('side'), wait: col },
+    { run: () => demoInside('main'), wait: col },
     { caption: t('demoWrap'), run: () => demoEdge(true), wait: wrap }, // undone → Wrap → day
   ];
 }
@@ -1043,9 +1086,7 @@ function startGestureDemo(): void {
     return;
   }
   demoActive = true;
-  if (state.view !== 'day') {
-    goToView('day'); // direkt nach DO DAY, falls nicht ohnehin schon dort
-  }
+  goToView('day'); // IMMER direkt nach DO DAY springen (0s) – Demo beginnt dort
   showDemoOverlay();
   if (demoCaptionEl) {
     demoCaptionEl.textContent = t('demoEdgeSwipe'); // erste Beschriftung sofort (kein Leerstand)
@@ -1076,6 +1117,8 @@ function endGestureDemo(): void {
   if (previewEl) {
     endEdgePreview(0); // laufende Vorschau sauber zurückschnappen → teardown
   }
+  demoFingerEl?.remove();
+  demoFingerEl = null;
   const el = demoOverlayEl;
   demoOverlayEl = null;
   demoCaptionEl = null;
