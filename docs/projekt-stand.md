@@ -1,6 +1,6 @@
 # Do Day – Projektstand
 
-Stand: 25. Juni 2026 · `main` · 175 Tests grün · live auf https://do.msmr.co
+Stand: 26. Juni 2026 · `main` · 175 Tests grün · live auf https://do.msmr.co
 
 ## Erledigt
 
@@ -185,6 +185,24 @@ neuer fünfter Tab. `.page--day` heißt jetzt `.page--staged` (gilt für alle An
   (Schwelle ~48 px); Wrap am Reihen-Ende als „Flug über alle Tabs" (Zwischen-
   Ansichten fliegen durch, Navi-Buttons bleiben fix); Inside-Wisch auch auf
   Buttons (Aufgaben/Habits/Termine); Zonengrenze bei 40 %.
+
+### Phase 10 – Gesten-Demo (Doppeltipp auf „UN:DONE") (26.06.2026)
+Kompaktes Onboarding, das die Wisch-Gesten vorführt – ausgelöst durch **Doppeltipp
+auf „UN:DONE"** (nur mobil; Einzeltipp wechselt normal, kurz aufgeschoben zur
+Doppeltipp-Erkennung). **Keine Daten-Mutation** (nur Navigation/Animation), läuft
+einmal, **Tap = Abbruch**. Spec/Plan: `docs/superpowers/{specs,plans}/2026-06-26-gesten-demo*`.
+
+- **Antrieb:** verwendet die echte Gesten-Engine wieder (`startEdgePreview`/
+  `endEdgePreview`, `switchMobileColumn`) – programmatisch über synthetisierten
+  Wisch-Zustand; ein Schritt-Treiber (`buildDemoSteps` + `setTimeout`) taktet alles.
+- **Ablauf:** direkter 0s-**Jump nach DO DAY** → 1,5 s → **Hero-Titel** „DO DAY /
+  your autistic to do list" (3 s) → 1 s → Kanten-Wisch-Tour `day→…→undone`,
+  Inside-Wisch, Wrap-Flug zurück nach DO DAY → **Hero „DO"** als Abschluss.
+- **Hinweise:** erläuterndes **Overlay** (eine Zeile je Geste, DE/EN, außerhalb
+  `#app`); **Finger-Kreis** (Standard-Touchziel ≈ 44 px) erscheint **0,4 s vorab** –
+  Außengeste startet an der Kante, Innengeste mittig (gleicher Vollkreis, anderer
+  Startpunkt). Tempo an einem Regler `DEMO_PACE` (= 6, bewusst langsam).
+- **Nebenbei:** Toast im Dark Mode invertiert (dunkle Fläche, helle Schrift).
 
 ## Störungs-Lehren (13.06.2026) – wichtig fürs Deployment
 
