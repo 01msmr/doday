@@ -1016,11 +1016,16 @@ interface DemoStep {
   wait: number; // ms bis zum nächsten Schritt (≥ Animationsdauer)
 }
 
+// Bewusst langsames Tempo: Zeit zum Lesen/Sehen je Schritt (1/6 der ursprünglichen
+// Geschwindigkeit). Die Gesten-Animationen selbst bleiben normal schnell – hier wird
+// nur die VERWEILDAUER zwischen den Schritten gestreckt.
+const DEMO_PACE = 6;
+
 /** Skript: Kanten-Wisch-Tour (day→…→undone), Inside-Wisch, Wrap zurück nach day. */
 function buildDemoSteps(): DemoStep[] {
-  const edge = 320; // Commit-Animation (~230ms) + Puffer
-  const col = 480; // Spalten-Animation + Puffer
-  const wrap = 780; // Wrap-Flug (~710ms) + Puffer
+  const edge = 320 * DEMO_PACE; // Commit-Animation (~230ms) + langer Puffer
+  const col = 480 * DEMO_PACE; // Spalten-Animation + langer Puffer
+  const wrap = 780 * DEMO_PACE; // Wrap-Flug (~710ms) + langer Puffer
   return [
     { caption: t('demoEdgeSwipe'), run: () => demoEdge(true), wait: edge }, // day → morrow
     { run: () => demoEdge(true), wait: edge }, // morrow → week
@@ -1042,7 +1047,10 @@ function startGestureDemo(): void {
     goToView('day'); // direkt nach DO DAY, falls nicht ohnehin schon dort
   }
   showDemoOverlay();
-  let at = 320; // kurz warten, bis „day" gerendert + Overlay sichtbar ist
+  if (demoCaptionEl) {
+    demoCaptionEl.textContent = t('demoEdgeSwipe'); // erste Beschriftung sofort (kein Leerstand)
+  }
+  let at = 320 * DEMO_PACE; // erst lesen lassen, bevor die erste Geste läuft
   for (const step of buildDemoSteps()) {
     demoTimers.push(
       window.setTimeout(() => {
@@ -1054,7 +1062,7 @@ function startGestureDemo(): void {
     );
     at += step.wait;
   }
-  demoTimers.push(window.setTimeout(endGestureDemo, at + 200));
+  demoTimers.push(window.setTimeout(endGestureDemo, at + 200 * DEMO_PACE));
 }
 
 /** Abbruch/Abschluss: Timer stoppen, laufende Vorschau abräumen, Overlay weg. */
