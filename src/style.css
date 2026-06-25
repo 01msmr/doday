@@ -1534,7 +1534,7 @@ details[open] > summary .chevron {
   /* Reine Papierfarbe – keine Grau-Tönung mehr (die Unterscheidung trägt jetzt
      der inset-Schatten der aktiven Kachel + die gedämpfte Schrift der inaktiven). */
   background: var(--keycap);
-  border: 1px solid rgb(38 37 31 / 0.1);
+  border: 1px solid rgb(38 37 31 / 0.4); /* inaktive Kante deutlich sichtbar (war 0.1) */
   color: var(--keycap-ink);
   /* gerundete Schrift wie im Icon (SF Pro Rounded auf Apple-Geräten) */
   font-family: ui-rounded, 'SF Pro Rounded', 'Hiragino Maru Gothic ProN',
@@ -2253,16 +2253,43 @@ body.drag-task .untag-drop {
   will-change: transform;
 }
 
-/* Waagerechte Trennlinie an der 50%-Grenze (Höhe ohne Navi):
-   nur beim Kanten-Wisch sichtbar. */
+/* Zonengrenze als Doppellinie: zwei 1px-Striche mit 1px Abstand → 3px-Box
+   (border-box: 1px Rand · 1px Inhalt-Lücke · 1px Rand). PASSIV nur die schwarzen
+   End-Quadrate sichtbar; beim Wisch (`--active`) erscheinen die Linien dazwischen. */
 .tab-swipe-divider {
   position: fixed;
   left: 0;
   right: 0;
-  height: 1px;
+  box-sizing: border-box;
+  height: 3px;
   z-index: 6;
-  background: var(--swipe-mark);
   pointer-events: none;
+  border-top: 1px solid transparent;
+  border-bottom: 1px solid transparent;
+}
+
+/* schwarze 3×3-Quadrate an beiden Enden – IMMER sichtbar (passiver Hinweis) */
+.tab-swipe-divider::before,
+.tab-swipe-divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 3px;
+  height: 3px;
+  background: #000;
+  transform: translateY(-50%);
+}
+.tab-swipe-divider::before {
+  left: 0;
+}
+.tab-swipe-divider::after {
+  right: 0;
+}
+
+/* beim Wisch: die zwei Linien zwischen den Quadraten einblenden */
+.tab-swipe-divider--active {
+  border-top-color: var(--swipe-mark);
+  border-bottom-color: var(--swipe-mark);
 }
 
 .tab-swipe-layer--undone {
