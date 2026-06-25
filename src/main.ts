@@ -105,6 +105,7 @@ let demoTimers: number[] = [];
 let demoOverlayEl: HTMLDivElement | null = null;
 let demoCaptionEl: HTMLDivElement | null = null;
 let demoFingerEl: HTMLDivElement | null = null;
+let demoHeroEl: HTMLDivElement | null = null;
 let lastUndoneTap = 0;
 let undoneTapTimer = 0;
 // Zonengrenze bei 45 % der Inhaltshöhe (von oben) → obere Zone 45 %, untere 55 %.
@@ -1002,6 +1003,23 @@ function showDemoOverlay(): void {
   requestAnimationFrame(() => demoOverlayEl?.classList.add('show'));
 }
 
+/** Große Titelkarte (Intro/Schluss) im Overlay ein-/ausblenden. */
+function showDemoHero(html: string): void {
+  if (!demoOverlayEl) {
+    return;
+  }
+  if (!demoHeroEl) {
+    demoHeroEl = document.createElement('div');
+    demoHeroEl.className = 'demo-hero';
+    demoOverlayEl.appendChild(demoHeroEl);
+  }
+  demoHeroEl.innerHTML = html;
+  requestAnimationFrame(() => demoHeroEl?.classList.add('show'));
+}
+function hideDemoHero(): void {
+  demoHeroEl?.classList.remove('show');
+}
+
 /** Finger-Kreis als Gesten-Hinweis: AUSSEN startet an der Kante, INNEN in der Mitte
     (gleicher Vollkreis, anderer Startpunkt) und gleitet in Wisch-Richtung. */
 function showDemoFinger(kind: 'edge' | 'inside', leftward: boolean): void {
@@ -1033,12 +1051,6 @@ function showDemoFinger(kind: 'edge' | 'inside', leftward: boolean): void {
   );
 }
 
-/** Inside-Wisch der Demo inkl. Finger-Hinweis. 'side' = nach links, 'main' = nach rechts. */
-function demoInside(next: 'main' | 'side'): void {
-  showDemoFinger('inside', next === 'side');
-  switchMobileColumn(next);
-}
-
 /** Einen Kanten-Wisch programmatisch auslösen (untere Zone = direkt; vorwärts =
     rechte Kante). Zeigt die Trennlinie und nutzt exakt die echte Übergangs-/
     Wrap-Animation. dx-Betrag ≥ Schwelle committet; das Vorzeichen ist egal. */
@@ -1047,14 +1059,20 @@ function demoEdge(forward: boolean): void {
   swipeNavTop = navTop;
   swipeStartY = navTop * 0.8; // klar in der unteren Zone → direkter Wisch
   swipeEdge = forward ? 1 : -1; // rechts = vor, links = zurück
-  showDemoFinger('edge', forward); // Außengeste: Finger an der Kante, gleitet nach innen
   showSwipeDivider();
   startEdgePreview();
   endEdgePreview(100); // |100| ≥ Commit-Schwelle (48) → Tab-Wechsel
 }
 
+/** Inside-Wisch der Demo (Karte rein/raus) – Pendant zu demoEdge. Der Finger-Hinweis
+    läuft getrennt 0,4 s vorab (step.finger), daher hier nur die Geste selbst. */
+function demoInside(next: 'main' | 'side'): void {
+  switchMobileColumn(next);
+}
+
 interface DemoStep {
   caption?: string; // nur gesetzte Texte wechseln die Beschriftung
+  finger?: { kind: 'edge' | 'inside'; leftward: boolean }; // Hinweis-Kreis, 0,4 s vorab
   run: () => void;
   wait: number; // ms bis zum nächsten Schritt (≥ Animationsdauer)
 }
@@ -1069,14 +1087,20 @@ function buildDemoSteps(): DemoStep[] {
   const edge = 320 * DEMO_PACE; // Commit-Animation (~230ms) + langer Puffer
   const col = 480 * DEMO_PACE; // Spalten-Animation + langer Puffer
   const wrap = 780 * DEMO_PACE; // Wrap-Flug (~710ms) + langer Puffer
+  const edgeF = { kind: 'edge', leftward: true } as const; // vorwärts: rechte Kante → nach links
   return [
-    { caption: t('demoEdgeSwipe'), run: () => demoEdge(true), wait: edge }, // day → morrow
-    { run: () => demoEdge(true), wait: edge }, // morrow → week
-    { run: () => demoEdge(true), wait: edge }, // week → month
-    { run: () => demoEdge(true), wait: edge }, // month → undone
-    { caption: t('demoInsideSwipe'), run: () => demoInside('side'), wait: col },
-    { run: () => demoInside('main'), wait: col },
-    { caption: t('demoWrap'), run: () => demoEdge(true), wait: wrap }, // undone → Wrap → day
+    { caption: t('demoEdgeSwipe'), finger: edgeF, run: () => demoEdge(true), wait: edge }, // day → morrow
+    { finger: edgeF, run: () => demoEdge(true), wait: edge }, // morrow → week
+    { finger: edgeF, run: () => demoEdge(true), wait: edge }, // week → month
+    { finger: edgeF, run: () => demoEdge(true), wait: edge }, // month → undone
+    {
+      caption: t('demoInsideSwipe'),
+      finger: { kind: 'inside', leftward: true },
+      run: () => demoInside('side'),
+      wait: col,
+    },
+    { finger: { kind: 'inside', leftward: false }, run: () => demoInside('main'), wait: col },
+    { caption: t('demoWrap'), finger: edgeF, run: () => demoEdge(true), wait: wrap }, // undone → Wrap → day
   ];
 }
 
@@ -1088,11 +1112,27 @@ function startGestureDemo(): void {
   demoActive = true;
   goToView('day'); // IMMER direkt nach DO DAY springen (0s) – Demo beginnt dort
   showDemoOverlay();
-  if (demoCaptionEl) {
-    demoCaptionEl.textContent = t('demoEdgeSwipe'); // erste Beschriftung sofort (kein Leerstand)
-  }
-  let at = 320 * DEMO_PACE; // erst lesen lassen, bevor die erste Geste läuft
+
+  let at = 1500; // nach dem Jump 1,5 s DO DAY zeigen …
+  demoTimers.push(
+    window.setTimeout(
+      () =>
+        showDemoHero(
+          '<span class="demo-hero-title">DO DAY</span>' +
+            '<span class="demo-hero-sub">your autistic to do list</span>',
+        ),
+      at,
+    ),
+  );
+  at += 3000; // … Hero-Titel 3 s zeigen …
+  demoTimers.push(window.setTimeout(hideDemoHero, at));
+  at += 1000; // … 1 s Pause, dann die Gesten
+
   for (const step of buildDemoSteps()) {
+    if (step.finger) {
+      const f = step.finger;
+      demoTimers.push(window.setTimeout(() => showDemoFinger(f.kind, f.leftward), Math.max(0, at - 400)));
+    }
     demoTimers.push(
       window.setTimeout(() => {
         if (step.caption && demoCaptionEl) {
@@ -1103,7 +1143,18 @@ function startGestureDemo(): void {
     );
     at += step.wait;
   }
-  demoTimers.push(window.setTimeout(endGestureDemo, at + 200 * DEMO_PACE));
+
+  // Schluss: großes „DO"-Hero, dann Demo beenden.
+  demoTimers.push(
+    window.setTimeout(() => {
+      if (demoCaptionEl) {
+        demoCaptionEl.textContent = '';
+      }
+      showDemoHero('<span class="demo-hero-do">DO</span>');
+    }, at),
+  );
+  at += 1800;
+  demoTimers.push(window.setTimeout(endGestureDemo, at));
 }
 
 /** Abbruch/Abschluss: Timer stoppen, laufende Vorschau abräumen, Overlay weg. */
@@ -1122,6 +1173,7 @@ function endGestureDemo(): void {
   const el = demoOverlayEl;
   demoOverlayEl = null;
   demoCaptionEl = null;
+  demoHeroEl = null; // Kind des Overlays – wird mit ihm entfernt
   el?.classList.remove('show');
   window.setTimeout(() => el?.remove(), 260);
 }
