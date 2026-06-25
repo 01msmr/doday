@@ -2275,19 +2275,17 @@ body.drag-task .untag-drop {
   will-change: transform;
 }
 
-/* Zonengrenze als Doppellinie: zwei 1px-Striche mit 1px Abstand → 3px-Box
-   (border-box: 1px Rand · 1px Inhalt-Lücke · 1px Rand). PASSIV nur die schwarzen
-   End-Quadrate sichtbar; beim Wisch (`--active`) erscheinen die Linien dazwischen. */
+/* Zonengrenze als Doppellinie: zwei 1px-Striche mit 1px Abstand → 3px-Box.
+   PASSIV nur die End-Quadrate; beim Wisch (`--active`) erscheinen die zwei Linien
+   (eigene Spans, damit sie beim Ausblenden gegenläufig herausgleiten können). */
 .tab-swipe-divider {
   position: fixed;
   left: 0;
   right: 0;
-  box-sizing: border-box;
   height: 3px;
   z-index: 6;
   pointer-events: none;
-  border-top: 1px solid transparent;
-  border-bottom: 1px solid transparent;
+  overflow: hidden; /* herausgleitende Linien werden am Rand abgeschnitten */
 }
 
 /* 3×3-Quadrate an beiden Enden – IMMER sichtbar (passiver Hinweis), kontrastierend */
@@ -2300,6 +2298,7 @@ body.drag-task .untag-drop {
   height: 3px;
   background: var(--divider-mark);
   transform: translateY(-50%);
+  z-index: 1; /* über den Linien */
 }
 .tab-swipe-divider::before {
   left: 0;
@@ -2308,10 +2307,38 @@ body.drag-task .untag-drop {
   right: 0;
 }
 
-/* beim Wisch: die zwei Linien zwischen den Quadraten einblenden */
-.tab-swipe-divider--active {
-  border-top-color: var(--divider-mark);
-  border-bottom-color: var(--divider-mark);
+/* Die beiden Linien: passiv unsichtbar, oben bzw. unten in der 3px-Box. */
+.tab-swipe-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--divider-mark);
+  opacity: 0;
+}
+.tab-swipe-line--top {
+  top: 0;
+}
+.tab-swipe-line--bottom {
+  bottom: 0;
+}
+
+/* beim Wisch: Linien sofort sichtbar, in Position */
+.tab-swipe-divider--active .tab-swipe-line {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Ausblenden: Linien schnell herausschieben – OBEN nach links, UNTEN nach rechts. */
+.tab-swipe-divider--exit .tab-swipe-line {
+  opacity: 1;
+  transition: transform 0.14s ease-in;
+}
+.tab-swipe-divider--exit .tab-swipe-line--top {
+  transform: translateX(-100%);
+}
+.tab-swipe-divider--exit .tab-swipe-line--bottom {
+  transform: translateX(100%);
 }
 
 .tab-swipe-layer--undone {

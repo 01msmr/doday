@@ -98,6 +98,7 @@ let previewWrap = false; // am Reihen-Ende? dann „Rückspul"-Sprung ans andere
 let swipeResetTimer = 0;
 let swipeNavTop = 0; // y-Oberkante der Navi beim Wisch-Start (= Inhalts-Unterkante)
 let swipeDividerEl: HTMLDivElement | null = null;
+let swipeDividerExitTimer = 0;
 // Zonengrenze bei 45 % der Inhaltshöhe (von oben) → obere Zone 45 %, untere 55 %.
 const ZONE_SPLIT = 0.45;
 
@@ -121,6 +122,11 @@ function ensureSwipeDivider(): void {
   if (!swipeDividerEl) {
     swipeDividerEl = document.createElement('div');
     swipeDividerEl.className = 'tab-swipe-divider';
+    // Zwei eigene Linien-Spans (oben/unten) – getrennt, damit sie beim Ausblenden
+    // gegenläufig herausgleiten können.
+    swipeDividerEl.innerHTML =
+      '<span class="tab-swipe-line tab-swipe-line--top"></span>' +
+      '<span class="tab-swipe-line tab-swipe-line--bottom"></span>';
     document.body.appendChild(swipeDividerEl);
   }
   swipeDividerEl.style.top = `${zoneSplitY()}px`;
@@ -128,11 +134,24 @@ function ensureSwipeDivider(): void {
 
 function showSwipeDivider(): void {
   ensureSwipeDivider();
+  window.clearTimeout(swipeDividerExitTimer);
+  swipeDividerEl?.classList.remove('tab-swipe-divider--exit');
   swipeDividerEl?.classList.add('tab-swipe-divider--active');
 }
 
+/** Linien NICHT hart ausschalten, sondern schnell herausschieben (oben→links,
+    unten→rechts); danach die Exit-Klasse wieder entfernen (passiver Zustand). */
 function hideSwipeDivider(): void {
-  swipeDividerEl?.classList.remove('tab-swipe-divider--active');
+  const el = swipeDividerEl;
+  if (!el || !el.classList.contains('tab-swipe-divider--active')) {
+    return;
+  }
+  el.classList.remove('tab-swipe-divider--active');
+  el.classList.add('tab-swipe-divider--exit');
+  window.clearTimeout(swipeDividerExitTimer);
+  swipeDividerExitTimer = window.setTimeout(() => {
+    el.classList.remove('tab-swipe-divider--exit');
+  }, 170);
 }
 
 /**
