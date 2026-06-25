@@ -2333,14 +2333,13 @@ body.drag-task .untag-drop {
    nach rechts, damit man sie einzeln verschwinden sieht. */
 .tab-swipe-divider--exit .tab-swipe-line {
   opacity: 1;
-  transition: transform 0.225s ease-in;
+  transition: transform 0.18s ease-in;
 }
 .tab-swipe-divider--exit .tab-swipe-line--top {
   transform: translateX(-100%);
 }
 .tab-swipe-divider--exit .tab-swipe-line--bottom {
   transform: translateX(100%);
-  transition-delay: 0.1s; /* einen Tick nach der oberen Linie */
 }
 
 .tab-swipe-layer--undone {
