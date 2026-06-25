@@ -783,6 +783,23 @@ body {
   color: var(--ink-soft);
 }
 
+/* Löschen: bewusst abgesetzt – nach ganz rechts geschoben und in reinem Rot,
+   damit es sich klar von Speichern/Abbrechen abhebt. Bei Hover zusätzlich fett. */
+.btn-danger {
+  margin-left: auto;
+  padding: 0;
+  background: none;
+  border: none;
+  color: #ff0000; /* reines Rot */
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.btn-danger:hover {
+  font-weight: 700;
+}
+
 /* ---------- Termine (Zeitleiste) ---------- */
 
 .timeline {
@@ -1032,6 +1049,36 @@ details[open] > summary .chevron {
 .task-list--done {
   width: fit-content;
   margin-left: auto;
+}
+
+/* Beim Bearbeiten einer erledigten Aufgabe: Einrückung aufheben, damit das
+   Inline-Formular wie bei offenen Aufgaben volle Breite einnimmt. */
+.task-list--done.task-list--editing {
+  width: auto;
+  margin-left: 0;
+}
+
+/* Gruppierung in UN:DONE: Wochen-/Monats-Abschnitte mit Überschrift. */
+.task-group + .task-group {
+  margin-top: 1.1rem;
+}
+
+.task-group-head {
+  margin: 0 0 0.2rem;
+  font-family: var(--serif); /* Datum in der Serifenschrift (wie die Überschriften) */
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ink-soft);
+}
+
+/* Kalenderwoche bewusst zurückgenommen – das Datum bleibt die Hauptinformation:
+   Sans-Schrift, leichter und gedämpft, deutlich abgesetzt. */
+.task-group-week {
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  font-weight: 400;
+  opacity: 0.5;
 }
 
 .task {
@@ -1827,6 +1874,16 @@ details[open] > summary .chevron {
 .columns--undone .col-main .task,
 .columns--undone .col-main .task .task-title {
   color: #26251f;
+}
+
+/* Gruppen-Überschriften: dunkel auf der hellen Offen-Spalte … */
+.columns--undone .col-main .task-group-head {
+  color: #26251f;
+}
+
+/* … und hell auf der dunklen Erledigt-Karte. */
+.columns--undone .col-side .task-group-head {
+  color: #f3f0e9;
 }
 
 .columns--undone .col-main .edit-pen {

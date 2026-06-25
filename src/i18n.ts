@@ -27,10 +27,11 @@ export function otherLang(): Lang {
   return current === 'de' ? 'en' : 'de';
 }
 
-/** Intl-Locale zur aktiven Sprache – steuert Monats-/Wochentagsnamen und Zeitformat.
-    en-GB: Tag-vor-Monat und 24-Stunden-Zeit (wie im Deutschen). */
+/** Intl-Locale zur aktiven Sprache – steuert Monats-/Wochentagsnamen und Datumsreihenfolge.
+    Reale Schreibweise: de-DE (Tag vor Monat), en-US (Monat vor Tag, „June 22").
+    Uhrzeiten formatiert timeOf passend dazu: de 24h, en 12h mit AM/PM. */
 export function locale(): string {
-  return current === 'de' ? 'de-DE' : 'en-GB';
+  return current === 'de' ? 'de-DE' : 'en-US';
 }
 
 export function setLang(lang: Lang): void {

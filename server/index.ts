@@ -145,6 +145,7 @@ app.get('/api/v1/agenda', async (c) => {
           title: cleanText,
           tags,
           completed: todo.completed,
+          completedAt: todo.completedAt,
           due: todo.due,
         });
       }
@@ -223,6 +224,16 @@ app.post('/api/v1/tasks/update', async (c) => {
     }
     throw error;
   }
+});
+
+/** Aufgabe löschen – entfernt das VTODO aus der Nextcloud */
+app.post('/api/v1/tasks/delete', async (c) => {
+  const { href } = (await c.req.json()) as { href?: string };
+  if (!href) {
+    return c.json({ error: 'href fehlt' }, 400);
+  }
+  await caldav.deleteObject(href);
+  return c.json({ ok: true });
 });
 
 /** Neuer Termin direkt im Nextcloud-Kalender (synct von dort auf alle Geräte) */

@@ -17,6 +17,8 @@ export interface ParsedTodo {
   summary: string;
   due?: string;
   completed: boolean;
+  /** Zeitpunkt der Erledigung (ISO), aus dem COMPLETED-Feld */
+  completedAt?: string;
 }
 
 export interface DavObject {
@@ -100,11 +102,13 @@ export function parseTodo(ics: string): ParsedTodo | null {
   }
   const due = getProp(block, 'DUE');
   const status = getProp(block, 'STATUS')?.value;
+  const completed = getProp(block, 'COMPLETED');
   return {
     uid: getProp(block, 'UID')?.value ?? '',
     summary: unescapeText(getProp(block, 'SUMMARY')?.value ?? ''),
     due: due ? stampToIso(due.value).slice(0, 10) : undefined,
     completed: status === 'COMPLETED',
+    completedAt: completed ? stampToIso(completed.value) : undefined,
   };
 }
 

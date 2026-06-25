@@ -11,7 +11,11 @@
   "asIcs": { "de": "als .ics", "en": "as .ics" },
   "done": { "de": "Erledigt", "en": "Done" },
   "open": { "de": "Offen", "en": "Open" },
+  "unplanned": { "de": "Ungeplant", "en": "Unplanned" },
+  "weekAbbr": { "de": "KW", "en": "W" },
   "edit": { "de": "Bearbeiten", "en": "Edit" },
+  "delete": { "de": "Löschen", "en": "Delete" },
+  "confirmDeleteTask": { "de": "Aufgabe „{title}“ löschen?", "en": "Delete task “{title}”?" },
   "noEvents": { "de": "noch keine Termine", "en": "no events yet" },
   "noTasks": { "de": "Keine Aufgaben für diesen Tag.", "en": "No tasks for this day." },
   "noHabits": {
@@ -126,6 +130,10 @@
   "taskSaveFailed": {
     "de": "Aufgabe konnte nicht gespeichert werden.",
     "en": "Could not save the task."
+  },
+  "taskDeleteFailed": {
+    "de": "Aufgabe konnte nicht gelöscht werden.",
+    "en": "Could not delete the task."
   },
   "eventExtChanged": {
     "de": "Termin wurde extern geändert – bitte neu laden und erneut bearbeiten.",

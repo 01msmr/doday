@@ -1,6 +1,7 @@
 // Datums-Helfer. Wichtig: bewusst LOKALE Zeitzone, nicht UTC –
 // new Date().toISOString() würde nachts um 00:30 noch den Vortag liefern.
 import type { ISODate } from '../models/types';
+import { getLang } from '../i18n';
 
 /** Datum als ISO-String in lokaler Zeit, z. B. "2026-06-12" */
 export function isoDate(date: Date = new Date()): ISODate {
@@ -15,18 +16,36 @@ function hasZone(isoDateTime: string): boolean {
   return /Z$|[+-]\d{2}:?\d{2}$/.test(isoDateTime);
 }
 
-/**
- * Uhrzeit "H:MM" OHNE führende Null bei der Stunde (z. B. "9:00", "0:30") –
- * lokale Zeitstempel werden geschnitten, UTC-Zeitstempel aus CalDAV in die
- * lokale Uhrzeit umgerechnet. Die Minute bleibt immer zweistellig.
- */
-export function timeOf(isoDateTime: string): string {
+/** Stunde + zweistellige Minute eines Zeitstempels in LOKALER Zeit ermitteln. */
+function localHourMinute(isoDateTime: string): { hour: number; minute: string } {
   if (hasZone(isoDateTime)) {
     const local = new Date(isoDateTime);
-    return `${local.getHours()}:${String(local.getMinutes()).padStart(2, '0')}`;
+    return { hour: local.getHours(), minute: String(local.getMinutes()).padStart(2, '0') };
   }
   const [hour, minute] = isoDateTime.slice(11, 16).split(':');
-  return `${Number(hour)}:${minute}`;
+  return { hour: Number(hour), minute: minute ?? '00' };
+}
+
+/**
+ * ANZEIGE-Uhrzeit, real-weltlich nach Sprache:
+ *   Deutsch  → 24h ohne führende Null bei der Stunde, z. B. "9:00", "13:05".
+ *   Englisch → 12h mit AM/PM (US), z. B. "9:00 AM", "1:05 PM".
+ * UTC-Zeitstempel aus CalDAV werden in die lokale Uhrzeit umgerechnet.
+ */
+export function timeOf(isoDateTime: string): string {
+  const { hour, minute } = localHourMinute(isoDateTime);
+  if (getLang() === 'en') {
+    const period = hour < 12 ? 'AM' : 'PM';
+    const h12 = hour % 12 === 0 ? 12 : hour % 12;
+    return `${h12}:${minute} ${period}`;
+  }
+  return `${hour}:${minute}`;
+}
+
+/** Uhrzeit für <input type="time">: IMMER 24h, zweistellig ("09:00") – sprachunabhängig. */
+export function timeInputValue(isoDateTime: string): string {
+  const { hour, minute } = localHourMinute(isoDateTime);
+  return `${String(hour).padStart(2, '0')}:${minute}`;
 }
 
 /** Lokales Datum ("YYYY-MM-DD") eines Zeitstempels – UTC wird umgerechnet */

@@ -20,7 +20,15 @@ import {
 import type { InMemoryTagRegistry } from '../services/tagRegistry';
 import { eventsOn, filterByArea, tasksDueOn, withCanonicalTags } from '../services/selectors';
 import { groupByArea, type AreaGroup, type GroupedDay } from './grouping';
-import { isoDate, localDateOf, shiftDays, startOfWeek, timeOf } from '../utils/dates';
+import {
+  isoDate,
+  isoWeek,
+  localDateOf,
+  shiftDays,
+  startOfWeek,
+  timeInputValue,
+  timeOf,
+} from '../utils/dates';
 import { safeColor } from '../utils/colors';
 import { renderCockpitParts } from './cockpitView';
 import { t, getLang, locale } from '../i18n';
@@ -196,6 +204,8 @@ export function renderTaskEditForm(task: Task): string {
       <div class="event-form-actions">
         <button type="submit" class="btn-primary">${t('save')}</button>
         <button type="button" class="btn-quiet" data-action="cancel-edit">${t('cancel')}</button>
+        <button type="button" class="btn-danger" data-action="delete-task"
+          data-id="${escapeHtml(task.id)}">${t('delete')}</button>
       </div>
     </form>`;
 }
@@ -204,9 +214,9 @@ export function renderTaskEditForm(task: Task): string {
 export function renderEventEditForm(event: CalendarEvent): string {
   const times = event.allDay
     ? ''
-    : `<input type="time" data-field="start" value="${timeOf(event.start)}" aria-label="${t('fieldStart')}" required />
+    : `<input type="time" data-field="start" value="${timeInputValue(event.start)}" aria-label="${t('fieldStart')}" required />
         <span class="event-form-sep">&ndash;</span>
-        <input type="time" data-field="end" value="${timeOf(event.end)}" aria-label="${t('fieldEnd')}" required />`;
+        <input type="time" data-field="end" value="${timeInputValue(event.end)}" aria-label="${t('fieldEnd')}" required />`;
   return `
     <form class="event-form" data-event-edit-form data-id="${escapeHtml(event.id)}">
       <input type="text" data-field="title" value="${escapeHtml(event.rawText)}"
@@ -351,9 +361,120 @@ export function renderTaskLists(tasks: Task[], editingId: string | null, fromPat
   const open = tasks.filter((task) => !task.completed);
   const done = tasks.filter((task) => task.completed);
   const row = (task: Task): string => renderTask(task, editingId, fromPath);
+  // Wird gerade eine ERLEDIGTE Aufgabe bearbeitet, heben wir die Rechts-Einrückung
+  // des Erledigt-Blocks auf → das Formular sitzt wie bei offenen Aufgaben (volle Breite).
+  const editingDone = editingId !== null && done.some((task) => task.id === editingId);
+  const doneClass = `task-list task-list--done${editingDone ? ' task-list--editing' : ''}`;
   return `
     ${open.length > 0 ? `<ul class="task-list">${open.map(row).join('')}</ul>` : ''}
-    ${done.length > 0 ? `<ul class="task-list task-list--done">${done.map(row).join('')}</ul>` : ''}`;
+    ${done.length > 0 ? `<ul class="${doneClass}">${done.map(row).join('')}</ul>` : ''}`;
+}
+
+/* ---------- Gruppierung für die UN:DONE-Ansicht ---------- */
+
+interface TaskGroup {
+  key: string;
+  /** Sichtbare Überschrift (bereits fertiges HTML) */
+  labelHtml: string;
+  tasks: Task[];
+}
+
+/**
+ * Datumsspanne „Tag/Monat–Tag/Monat" – die EINE Stelle, die alle Wochen-Spannen
+ * formatiert (UN:DONE-Gruppen wie Cockpit-Kopf): de „22.–28. Juni", en „June 22–28"
+ * bzw. „June 29–July 5". formatRange übernimmt Reihenfolge, Punkt und Monats-
+ * Deduplizierung locale-korrekt; die Leerzeichen, die en-US um den Strich setzt,
+ * ziehen wir auf das kompakte deutsche Format herunter (kein Abstand um den Strich).
+ */
+export function dayMonthRange(start: Date, end: Date): string {
+  return new Intl.DateTimeFormat(locale(), { day: 'numeric', month: 'long' })
+    .formatRange(start, end)
+    .replace(/\s*[–—-]\s*/g, '–');
+}
+
+/** Datumsspanne der Woche ab einem Montag (Mo–So). */
+function weekRangeLabel(monday: Date): string {
+  return dayMonthRange(monday, shiftDays(monday, 6));
+}
+
+/** Offene Aufgaben nach geplanter Woche (Fälligkeit); undatierte als „Ungeplant" ans Ende.
+    Überschrift: Datumsspanne deutlich, Kalenderwoche dahinter visuell gedämpft. */
+function groupOpenByWeek(tasks: Task[]): TaskGroup[] {
+  const byWeek = new Map<string, Task[]>();
+  const undated: Task[] = [];
+  for (const task of tasks) {
+    if (!task.due) {
+      undated.push(task);
+      continue;
+    }
+    const key = isoDate(startOfWeek(new Date(`${task.due}T00:00:00`)));
+    const list = byWeek.get(key);
+    if (list) {
+      list.push(task);
+    } else {
+      byWeek.set(key, [task]);
+    }
+  }
+  const groups: TaskGroup[] = [...byWeek.keys()]
+    .sort() // ISO-Datum aufsteigend → nächste Woche zuerst
+    .map((key) => {
+      const monday = new Date(`${key}T00:00:00`);
+      const labelHtml = `${escapeHtml(weekRangeLabel(monday))}<span class="task-group-week"> · ${t('weekAbbr')} ${isoWeek(monday)}</span>`;
+      return { key, labelHtml, tasks: byWeek.get(key)! };
+    });
+  if (undated.length > 0) {
+    groups.push({ key: 'undated', labelHtml: escapeHtml(t('unplanned')), tasks: undated });
+  }
+  return groups;
+}
+
+/** Erledigte Aufgaben nach Erledigungsmonat – neuester Monat zuerst. */
+function groupDoneByMonth(tasks: Task[]): TaskGroup[] {
+  const byMonth = new Map<string, Task[]>();
+  const undated: Task[] = [];
+  for (const task of tasks) {
+    if (!task.completedAt) {
+      undated.push(task);
+      continue;
+    }
+    const key = localDateOf(task.completedAt).slice(0, 7); // YYYY-MM
+    const list = byMonth.get(key);
+    if (list) {
+      list.push(task);
+    } else {
+      byMonth.set(key, [task]);
+    }
+  }
+  const groups: TaskGroup[] = [...byMonth.keys()]
+    .sort()
+    .reverse() // neuester Monat zuerst
+    .map((key) => {
+      const [year, month] = key.split('-').map(Number);
+      const label = new Intl.DateTimeFormat(locale(), { month: 'long', year: 'numeric' }).format(
+        new Date(year!, month! - 1, 1),
+      );
+      return { key, labelHtml: escapeHtml(label), tasks: byMonth.get(key)! };
+    });
+  if (undated.length > 0) {
+    groups.push({ key: 'nodate', labelHtml: escapeHtml(t('done')), tasks: undated });
+  }
+  return groups;
+}
+
+/** Gruppen mit Überschrift rendern (UN:DONE). Leer → dezenter Strich. */
+function renderTaskGroups(groups: TaskGroup[], editingId: string | null): string {
+  if (groups.length === 0) {
+    return `<p class="empty">–</p>`;
+  }
+  return groups
+    .map(
+      (group) => `
+      <div class="task-group">
+        <h3 class="task-group-head">${group.labelHtml}</h3>
+        <ul class="task-list">${group.tasks.map((task) => renderTask(task, editingId)).join('')}</ul>
+      </div>`,
+    )
+    .join('');
 }
 
 /** Objekte ohne Tag – bewusst ganz unten und zurückhaltend gestaltet */
@@ -784,22 +905,21 @@ export function buildPageHtml(state: AppState): string {
     // invertiert/dunkel). Abhaken nutzt toggle-task → wandert in die andere Spalte.
     const undone = state.data.tasks.filter((task) => !task.completed);
     const done = state.data.tasks.filter((task) => task.completed);
-    const list = (tasks: Task[]): string =>
-      tasks.length > 0
-        ? `<ul class="task-list">${tasks.map((task) => renderTask(task)).join('')}</ul>`
-        : `<p class="empty">–</p>`;
+    // Offene nach geplanter Woche, erledigte nach Erledigungsmonat gruppiert.
+    const openGroups = groupOpenByWeek(undone);
+    const doneGroups = groupDoneByMonth(done);
     // Top-Bar wie die anderen: „UN" links, „DONE" rechts, „OFFEN"-Badge mittig
     // (= col-main-Label, das auf Mobil in den Kopf wandert).
     mastheadHtml = renderMasthead('UN', 'DONE', '', busy, t('open'));
     mainHtml = `
       <section class="panel">
         <h2 class="section-label"><span class="label-badge">${t('open')}</span></h2>
-        ${list(undone)}
+        ${renderTaskGroups(openGroups, state.editingTask)}
       </section>`;
     scheduleHtml = `
       <section class="panel">
         <h2 class="section-label"><span class="label-badge">${t('done')}</span></h2>
-        ${list(done)}
+        ${renderTaskGroups(doneGroups, state.editingTask)}
       </section>`;
     extrasHtml = '';
   } else {

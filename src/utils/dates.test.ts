@@ -1,6 +1,7 @@
 // Tests zuerst (TDD): Datums-Helfer.
-import { describe, it, expect } from 'vitest';
-import { isoDate, timeOf, shiftDays, startOfWeek, localDateOf, isoWeek } from './dates';
+import { describe, it, expect, afterEach } from 'vitest';
+import { isoDate, timeOf, timeInputValue, shiftDays, startOfWeek, localDateOf, isoWeek } from './dates';
+import { setLang } from '../i18n';
 
 describe('isoDate', () => {
   it('formatiert ein Datum als YYYY-MM-DD mit führenden Nullen', () => {
@@ -8,7 +9,10 @@ describe('isoDate', () => {
   });
 });
 
-describe('timeOf', () => {
+// Sprache nach jedem Test zurücksetzen, damit die Reihenfolge egal bleibt.
+afterEach(() => setLang('de'));
+
+describe('timeOf (Deutsch, 24h)', () => {
   it('liest die Uhrzeit H:MM (ohne führende Null) aus einem lokalen ISO-Zeitstempel', () => {
     expect(timeOf('2026-06-12T09:30:00')).toBe('9:30');
     expect(timeOf('2026-06-12T00:30:00')).toBe('0:30');
@@ -20,6 +24,25 @@ describe('timeOf', () => {
     const local = new Date(utc);
     const expected = `${local.getHours()}:${String(local.getMinutes()).padStart(2, '0')}`;
     expect(timeOf(utc)).toBe(expected);
+  });
+});
+
+describe('timeOf (Englisch, 12h AM/PM)', () => {
+  it('formatiert im US-Format mit AM/PM, inkl. Mitternacht/Mittag', () => {
+    setLang('en');
+    expect(timeOf('2026-06-12T09:30:00')).toBe('9:30 AM');
+    expect(timeOf('2026-06-12T00:30:00')).toBe('12:30 AM');
+    expect(timeOf('2026-06-12T12:00:00')).toBe('12:00 PM');
+    expect(timeOf('2026-06-12T13:05:00')).toBe('1:05 PM');
+  });
+});
+
+describe('timeInputValue', () => {
+  it('liefert IMMER 24h, zweistellig – sprachunabhängig (für <input type=time>)', () => {
+    expect(timeInputValue('2026-06-12T09:30:00')).toBe('09:30');
+    expect(timeInputValue('2026-06-12T13:05:00')).toBe('13:05');
+    setLang('en');
+    expect(timeInputValue('2026-06-12T09:30:00')).toBe('09:30');
   });
 });
 
