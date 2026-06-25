@@ -2288,6 +2288,16 @@ body.drag-task .untag-drop {
   overflow: hidden; /* herausgleitende Linien werden am Rand abgeschnitten */
 }
 
+/* In UN:DONE haben die Spalten FESTE Farben (unabhängig vom Theme): die Marke
+   folgt daher der aktiven Spalte, nicht Hell/Dunkel – sonst ist sie z. B. im
+   Dark Mode (weiße Marke) auf der weißen Aufgaben-Card unsichtbar. */
+.tab-swipe-divider--on-light {
+  --divider-mark: rgb(0 0 0 / 0.75); /* dunkle Marke auf weißer Aufgaben-Card */
+}
+.tab-swipe-divider--on-dark {
+  --divider-mark: rgb(255 255 255 / 0.25); /* helle Marke auf dunkler Erledigt-Card */
+}
+
 /* 3×3-Quadrate an beiden Enden – IMMER sichtbar (passiver Hinweis), kontrastierend */
 .tab-swipe-divider::before,
 .tab-swipe-divider::after {
