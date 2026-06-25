@@ -1060,7 +1060,11 @@ function demoEdge(forward: boolean): void {
   swipeEdge = forward ? 1 : -1; // rechts = vor, links = zurück
   showSwipeDivider();
   startEdgePreview();
-  endEdgePreview(100); // |100| ≥ Commit-Schwelle (48) → Tab-Wechsel
+  // Reflow erzwingen: schreibt die Start-Position der einfliegenden Seite (außerhalb
+  // des Schirms) fest, damit endEdgePreview von DORT animiert – sonst springt die
+  // neue Seite ohne „Von"-Zustand rein. In echt sorgen die touchmove-Frames dafür.
+  void document.body.offsetWidth;
+  endEdgePreview(100); // |100| ≥ Commit-Schwelle (48) → echter, animierter Tab-Wechsel
 }
 
 /** Inside-Wisch der Demo (Karte rein/raus) – Pendant zu demoEdge. Der Finger-Hinweis
