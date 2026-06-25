@@ -2423,6 +2423,11 @@ body.drag-task .untag-drop {
   text-align: center;
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.3);
 }
+/* Solange noch kein Text gesetzt ist (vor der ersten Geste, beim Hero), die leere
+   Karte NICHT als weißen Block zeigen. */
+.demo-caption:empty {
+  display: none;
+}
 
 /* Demo-Finger: kontrastierender, gefüllter Kreis in Standard-Touchzielgröße (≈44px)
    als Finger-Symbol. IMMER Vollkreis – außen/innen werden über den Startpunkt
