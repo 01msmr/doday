@@ -106,8 +106,7 @@ let demoOverlayEl: HTMLDivElement | null = null;
 let demoCaptionEl: HTMLDivElement | null = null;
 let demoFingerEl: HTMLDivElement | null = null;
 let demoHeroEl: HTMLDivElement | null = null;
-let lastUndoneTap = 0;
-let undoneTapTimer = 0;
+let lastDayTap = 0;
 // Zonengrenze bei 45 % der Inhaltshöhe (von oben) → obere Zone 45 %, untere 55 %.
 const ZONE_SPLIT = 0.45;
 
@@ -1194,21 +1193,17 @@ root.addEventListener('click', (event) => {
   const { action, id, view, path } = trigger.dataset;
 
   if (action === 'switch-view' && view) {
-    // Doppeltipp auf „UN:DONE" (mobil) startet die Gesten-Demo statt nur zu wechseln.
-    // Der Einzeltipp-Wechsel wird kurz aufgeschoben, damit beim Doppeltipp KEIN
-    // Zwischensprung nach UN:DONE aufblitzt – die Demo geht direkt nach DO DAY.
-    if (view === 'undone' && singleColumn.matches) {
+    // Doppeltipp auf „DO DAY" (mobil) startet die Gesten-Demo statt nur zu wechseln.
+    // Kein Aufschub nötig: Einzeltipp UND Demo landen beide auf DO DAY → der erste
+    // Tipp wechselt normal hin, der zweite startet die Demo (kein Flash, keine Latenz).
+    if (view === 'day' && singleColumn.matches) {
       const now = Date.now();
-      if (now - lastUndoneTap < 350) {
-        lastUndoneTap = 0;
-        window.clearTimeout(undoneTapTimer);
+      if (now - lastDayTap < 350) {
+        lastDayTap = 0;
         startGestureDemo();
         return;
       }
-      lastUndoneTap = now;
-      window.clearTimeout(undoneTapTimer);
-      undoneTapTimer = window.setTimeout(() => goToView('undone'), 350);
-      return;
+      lastDayTap = now;
     }
     goToView(view as ViewId);
   }
