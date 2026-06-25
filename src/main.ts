@@ -98,25 +98,41 @@ let previewWrap = false; // am Reihen-Ende? dann „Rückspul"-Sprung ans andere
 let swipeResetTimer = 0;
 let swipeNavTop = 0; // y-Oberkante der Navi beim Wisch-Start (= Inhalts-Unterkante)
 let swipeDividerEl: HTMLDivElement | null = null;
-// Zonengrenze bei 40 % der Inhaltshöhe → obere Zone 40 %, untere Zone 60 %.
-const ZONE_SPLIT = 0.4;
+// Zonengrenze bei 44 % der Inhaltshöhe (von oben) → obere Zone 44 %, untere 56 %.
+const ZONE_SPLIT = 0.44;
 
-/** Waagerechte Trennlinie an der Zonengrenze (40 % der Inhaltshöhe ohne Navi)
-    einblenden – macht obere (invers) / untere (direkt) Wisch-Zone sichtbar. */
-function showSwipeDivider(): void {
-  if (swipeDividerEl) {
+/** y der Zonengrenze (oberhalb der Navi-Leiste). */
+function zoneSplitY(): number {
+  const navTop =
+    (root?.querySelector('.bottom-nav') as HTMLElement | null)?.getBoundingClientRect().top ??
+    window.innerHeight;
+  return navTop * ZONE_SPLIT;
+}
+
+/** Persistente Doppellinie an der Zonengrenze. PASSIV: nur die schwarzen End-
+    Quadrate (3×3 px) als dezenter Hinweis; BEIM WISCH (`--active`): zusätzlich die
+    zwei Linien dazwischen. Nur im Ein-Spalten-Layout sinnvoll. */
+function ensureSwipeDivider(): void {
+  if (!singleColumn.matches) {
+    swipeDividerEl?.remove();
+    swipeDividerEl = null;
     return;
   }
-  const navTop = swipeNavTop || window.innerHeight;
-  swipeDividerEl = document.createElement('div');
-  swipeDividerEl.className = 'tab-swipe-divider';
-  swipeDividerEl.style.top = `${navTop * ZONE_SPLIT}px`;
-  document.body.appendChild(swipeDividerEl);
+  if (!swipeDividerEl) {
+    swipeDividerEl = document.createElement('div');
+    swipeDividerEl.className = 'tab-swipe-divider';
+    document.body.appendChild(swipeDividerEl);
+  }
+  swipeDividerEl.style.top = `${zoneSplitY()}px`;
+}
+
+function showSwipeDivider(): void {
+  ensureSwipeDivider();
+  swipeDividerEl?.classList.add('tab-swipe-divider--active');
 }
 
 function hideSwipeDivider(): void {
-  swipeDividerEl?.remove();
-  swipeDividerEl = null;
+  swipeDividerEl?.classList.remove('tab-swipe-divider--active');
 }
 
 /**
@@ -768,6 +784,22 @@ function readForm(form: HTMLElement, names: string[]): Record<string, string> {
 }
 
 /** Termin in den Nextcloud-Kalender schreiben */
+/** Start < Ende? Sonst native Validierungs-Blase am Ende-Feld und false.
+    "HH:MM" ist zweistellig → lexikografischer Vergleich = chronologischer. */
+function validEventTimes(form: HTMLElement): boolean {
+  const startEl = form.querySelector<HTMLInputElement>('[data-field="start"]');
+  const endEl = form.querySelector<HTMLInputElement>('[data-field="end"]');
+  if (!startEl || !endEl || !startEl.value || !endEl.value) {
+    return true; // ganztägig / Zeiten fehlen → hier nichts zu prüfen
+  }
+  const ok = startEl.value < endEl.value;
+  endEl.setCustomValidity(ok ? '' : t('endBeforeStart'));
+  if (!ok) {
+    endEl.reportValidity();
+  }
+  return ok;
+}
+
 async function submitEventForm(form: HTMLElement): Promise<void> {
   const { date, start, end } = readForm(form, ['date', 'start', 'end']);
   const title = normalizeText(readForm(form, ['title']).title);
@@ -778,6 +810,9 @@ async function submitEventForm(form: HTMLElement): Promise<void> {
     return;
   }
   if (!date || !start || !end) {
+    return;
+  }
+  if (!validEventTimes(form)) {
     return;
   }
   registerTitleTags(title);
@@ -830,6 +865,9 @@ async function submitEventEditForm(form: HTMLElement): Promise<void> {
   const title = normalizeText(readForm(form, ['title']).title);
   const { date, start, end } = readForm(form, ['date', 'start', 'end']);
   if (!event?.href || !title || !date || (!event.allDay && (!start || !end))) {
+    return;
+  }
+  if (!event.allDay && !validEventTimes(form)) {
     return;
   }
   registerTitleTags(title);
@@ -1435,4 +1473,10 @@ initDragDrop(root, (info) => {
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncThemeColor);
 
 rerender(); // Lade-Ansicht sofort zeigen …
+ensureSwipeDivider(); // persistente Zonen-Doppellinie (Mobil) aufsetzen/positionieren
 void boot(); // … und die echten Daten holen
+
+// Doppellinie an Layoutänderungen (Drehen/Resize/Spaltenwechsel) anpassen.
+window.addEventListener('resize', ensureSwipeDivider);
+window.addEventListener('orientationchange', ensureSwipeDivider);
+singleColumn.addEventListener('change', ensureSwipeDivider);

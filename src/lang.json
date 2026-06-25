@@ -142,5 +142,9 @@
   "eventSaveFailed": {
     "de": "Termin konnte nicht gespeichert werden.",
     "en": "Could not save the event."
+  },
+  "endBeforeStart": {
+    "de": "Ende muss nach dem Beginn liegen.",
+    "en": "End must be after the start."
   }
 }

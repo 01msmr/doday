@@ -1,6 +1,6 @@
 # Do Day – Projektstand
 
-Stand: 21. Juni 2026 · `main` · 173 Tests grün · live auf https://do.msmr.co
+Stand: 25. Juni 2026 · `main` · 175 Tests grün · live auf https://do.msmr.co
 
 ## Erledigt
 
@@ -160,6 +160,32 @@ neuer fünfter Tab. `.page--day` heißt jetzt `.page--staged` (gilt für alle An
   wiederkehrende Nextcloud-Tasks** (RRULE behält keine Tages-Historie → Streak/
   Monatsbilanz nicht rekonstruierbar; „3×/Woche" nicht abbildbar).
 
+### Phase 9 – UN:DONE-Gruppierung, reale Datums-/Zeitformate & Navi-Tiefe (25.06.2026)
+- **UN:DONE gruppiert:** offene Aufgaben nach **geplanter Woche** (Fälligkeit,
+  nächste zuerst; undatierte als „Ungeplant" unten), erledigte nach
+  **Erledigungsmonat** (neuester zuerst). Erledigungszeitpunkt: Server parst
+  VTODO `COMPLETED` (`ical.ts`) → Agenda; beim Abhaken lokal gesetzt. Überschrift:
+  Datum in Serif (prominent), KW/„W"-Nummer dahinter gedämpft (`dayMonthRange`,
+  eine Stelle für alle Wochen-Spannen, auch der Cockpit-Kopf).
+- **Reale Schreibweise statt en-GB:** `locale()` jetzt `de-DE`/`en-US` (Monat vor
+  Tag, „June 22"). Zeit sprachabhängig: DE 24 h, EN 12 h mit AM/PM (`timeOf`);
+  separater `timeInputValue` (immer 24 h) für `<input type=time>`. Datumsspannen
+  ohne Abstand um den Strich (de „22.–28. Juni", en „June 22–28"). DE-Wochendatum
+  in Terminzeilen „Sa., 22." (Punkt + Komma).
+- **Navi-Kacheln neu:** keine Grau-Tönung mehr (reine Papierfarbe), inaktive
+  Schrift gedämpft; **Tiefe nach innen verlegt** – aktiv = voll versenkt
+  (`inset` 7/14), Hover = angedeutet (`inset` 4/9, −25 %), Werte aus den alten
+  Außenschatten. „UN DONE" behält seine eigene Grau-Logik.
+- **Aufgabe löschen:** roter „Löschen"-Button im Bearbeiten-Formular (mit
+  Rückfrage) → `POST /api/v1/tasks/delete` → `caldav.deleteObject` (CalDAV DELETE,
+  404 = Erfolg). Bearbeiten-Formular einer erledigten Aufgabe sitzt jetzt bündig
+  (Einrückung des Erledigt-Blocks beim Edit aufgehoben).
+- **Feinschliff:** leerer Aufgaben-Hinweis „noch keine Aufgaben" mit gleichem
+  Abstand wie „noch keine Termine"; kürzere Kanten-Wische zünden zuverlässiger
+  (Schwelle ~48 px); Wrap am Reihen-Ende als „Flug über alle Tabs" (Zwischen-
+  Ansichten fliegen durch, Navi-Buttons bleiben fix); Inside-Wisch auch auf
+  Buttons (Aufgaben/Habits/Termine); Zonengrenze bei 40 %.
+
 ## Störungs-Lehren (13.06.2026) – wichtig fürs Deployment
 
 - **Dockerfile musste `COPY src ./src` bekommen** – das Backend importiert
@@ -291,7 +317,7 @@ flowchart TD
   cd --> ic
   cd --> wd
 
-  idx -.- R["Routen:<br/>GET /health · GET+PUT /achievements · GET+PUT /tags<br/>GET /agenda · POST /tasks · /tasks/toggle · /tasks/update<br/>POST /events · /events/update"]
+  idx -.- R["Routen:<br/>GET /health · GET+PUT /achievements · GET+PUT /tags<br/>GET /agenda · POST /tasks · /tasks/toggle · /tasks/update · /tasks/delete<br/>POST /events · /events/update"]
 ```
 
 ### Ablauf „Aufgabe bearbeiten" (typisch für alle Schreibwege)
