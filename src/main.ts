@@ -102,12 +102,17 @@ let swipeDividerExitTimer = 0;
 // Zonengrenze bei 45 % der Inhaltshöhe (von oben) → obere Zone 45 %, untere 55 %.
 const ZONE_SPLIT = 0.45;
 
+/** y-Oberkante der Navi-Leiste (= Inhalts-Unterkante). */
+function navTopY(): number {
+  return (
+    (root?.querySelector('.bottom-nav') as HTMLElement | null)?.getBoundingClientRect().top ??
+    window.innerHeight
+  );
+}
+
 /** y der Zonengrenze (oberhalb der Navi-Leiste). */
 function zoneSplitY(): number {
-  const navTop =
-    (root?.querySelector('.bottom-nav') as HTMLElement | null)?.getBoundingClientRect().top ??
-    window.innerHeight;
-  return navTop * ZONE_SPLIT;
+  return navTopY() * ZONE_SPLIT;
 }
 
 /** Persistente Doppellinie an der Zonengrenze. PASSIV: nur die schwarzen End-
