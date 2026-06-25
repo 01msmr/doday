@@ -137,15 +137,18 @@ function ensureSwipeDivider(): void {
     FESTE Farben (col-main weiß, col-side dunkel) – unabhängig vom Theme. Damit die
     Marke dort sichtbar bleibt, richtet sie sich nach der aktiven Spalte statt nach
     Hell/Dunkel: weiße Aufgaben-Card → dunkle Marke, dunkle Erledigt-Card → helle. */
-function updateDividerSurface(): void {
+function updateDividerSurface(
+  view: ViewId = state.view,
+  column: 'main' | 'side' = state.mobileColumn,
+): void {
   const el = swipeDividerEl;
   if (!el) {
     return;
   }
   el.classList.remove('tab-swipe-divider--on-light', 'tab-swipe-divider--on-dark');
-  if (state.view === 'undone') {
+  if (view === 'undone') {
     el.classList.add(
-      state.mobileColumn === 'main' ? 'tab-swipe-divider--on-light' : 'tab-swipe-divider--on-dark',
+      column === 'main' ? 'tab-swipe-divider--on-light' : 'tab-swipe-divider--on-dark',
     );
   }
 }
@@ -252,6 +255,14 @@ function endEdgePreview(dx: number): void {
   // genug gezogen? Bewusst kurz gehalten – eingeübte (knappe) Kanten-Wische
   // sollen sicher zünden, nicht abbrechen. ~12 % Breite, höchstens 48 px.
   const committed = Math.abs(dx) >= Math.min(48, w * 0.12);
+
+  // Beim Tab-Wechsel die Trennlinien-Marke schon JETZT auf die ZIEL-Ansicht stellen,
+  // damit sie während der (Wrap-)Animation zu den einfliegenden Tabs passt – nicht zur
+  // Start-Ansicht. Sonst bleibt z. B. von UN:DONE (col-main) die dunkle Marke und
+  // liegt falschrum auf den theme-gefärbten anderen Tabs (Dark wie Light Mode).
+  if (committed) {
+    updateDividerSurface(previewTarget!);
+  }
 
   if (committed && previewWrap) {
     // „Flug über alle Tabs": die Zwischen-Ansichten fliegen – jede mit ihrem
