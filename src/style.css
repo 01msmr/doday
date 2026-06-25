@@ -19,14 +19,17 @@
   --strike: rgb(38 37 31 / 0.3); /* Durchstreichung erledigter Aufgaben */
   --nav-bg: rgb(243 240 233 / 0.82);
 
-  /* Navi-Tasten = Mini-App-Icons: bewusst KONSTANT (auch im Dunkelmodus),
-     damit sie 1:1 wie das Homescreen-Icon aussehen (Papier + dunkle Tinte). */
+  /* Navi-Tasten = Mini-App-Icons. Hell: Papier + dunkle Tinte (wie das Icon);
+     im Dunkelmodus INVERTIERT (siehe @media unten). */
   --keycap: #f1ede3;
   --keycap-ink: #26251f;
   --keycap-shadow: rgb(38 37 31 / 0.75);
+  --keycap-edge: rgb(38 37 31 / 0.4); /* sichtbare Kante inaktiver Kacheln */
 
-  /* Markierungsfarbe für Wisch-Chevron + Trennlinie: voll Schwarz (hell) / Weiß (dunkel) */
+  /* Wisch-Chevron: voll Schwarz (hell) / Weiß (dunkel). */
   --swipe-mark: #000;
+  /* Zonen-Trennlinie + End-Quadrate: gedämpft – 75 % Schwarz (hell) / 25 % Weiß (dunkel). */
+  --divider-mark: rgb(0 0 0 / 0.75);
 
   --serif: 'Iowan Old Style', 'Palatino Nova', Palatino, Georgia, serif;
   --sans: 'Avenir Next', Avenir, 'Helvetica Neue', system-ui, sans-serif;
@@ -48,6 +51,13 @@
     --strike: rgb(232 229 221 / 0.25);
     --nav-bg: rgb(22 23 27 / 0.82);
     --swipe-mark: #fff;
+    --divider-mark: rgb(255 255 255 / 0.25);
+    /* DO-Kacheln invertiert: dunkle Kachel, helle Tinte/Kante, schwarzer Tiefenschatten.
+       Die hellen Kontrast-Objekte (Tinte + Kante) um 25 % abgedunkelt (#f1ede3 ×0.75). */
+    --keycap: #26251f;
+    --keycap-ink: #b5b2aa;
+    --keycap-shadow: rgb(0 0 0 / 0.75);
+    --keycap-edge: rgb(181 178 170 / 0.4);
   }
 }
 
@@ -1534,7 +1544,7 @@ details[open] > summary .chevron {
   /* Reine Papierfarbe – keine Grau-Tönung mehr (die Unterscheidung trägt jetzt
      der inset-Schatten der aktiven Kachel + die gedämpfte Schrift der inaktiven). */
   background: var(--keycap);
-  border: 1px solid rgb(38 37 31 / 0.4); /* inaktive Kante deutlich sichtbar (war 0.1) */
+  border: 1px solid var(--keycap-edge); /* inaktive Kante deutlich sichtbar; im Dark Mode hell */
   color: var(--keycap-ink);
   /* gerundete Schrift wie im Icon (SF Pro Rounded auf Apple-Geräten) */
   font-family: ui-rounded, 'SF Pro Rounded', 'Hiragino Maru Gothic ProN',
@@ -1569,6 +1579,18 @@ details[open] > summary .chevron {
   box-shadow:
     inset 0 7px 14px var(--keycap-shadow),
     inset 0 1px 3px rgb(38 37 31 / 0.45);
+}
+
+/* Dark Mode: auf der dunklen, invertierten Kachel wäre ein schwarzer inset
+   unsichtbar → die Vertiefung als WEISSER inset-Glow, 25 % schwächer als hell
+   (0.75→0.56 bzw. 0.45→0.34). Steht NACH der Basisregel → gewinnt im Dunkeln. */
+@media (prefers-color-scheme: dark) {
+  .nav-item.active,
+  .nav-item.active:hover {
+    box-shadow:
+      inset 0 7px 14px rgb(255 255 255 / 0.56),
+      inset 0 1px 3px rgb(255 255 255 / 0.34);
+  }
 }
 
 /* INAKTIVE Kacheln: Schrift gedämpft (Tinte zur Kachelfarbe gemischt), damit die
@@ -2268,7 +2290,7 @@ body.drag-task .untag-drop {
   border-bottom: 1px solid transparent;
 }
 
-/* schwarze 3×3-Quadrate an beiden Enden – IMMER sichtbar (passiver Hinweis) */
+/* 3×3-Quadrate an beiden Enden – IMMER sichtbar (passiver Hinweis), kontrastierend */
 .tab-swipe-divider::before,
 .tab-swipe-divider::after {
   content: '';
@@ -2276,7 +2298,7 @@ body.drag-task .untag-drop {
   top: 50%;
   width: 3px;
   height: 3px;
-  background: #000;
+  background: var(--divider-mark);
   transform: translateY(-50%);
 }
 .tab-swipe-divider::before {
@@ -2288,8 +2310,8 @@ body.drag-task .untag-drop {
 
 /* beim Wisch: die zwei Linien zwischen den Quadraten einblenden */
 .tab-swipe-divider--active {
-  border-top-color: var(--swipe-mark);
-  border-bottom-color: var(--swipe-mark);
+  border-top-color: var(--divider-mark);
+  border-bottom-color: var(--divider-mark);
 }
 
 .tab-swipe-layer--undone {

@@ -98,8 +98,8 @@ let previewWrap = false; // am Reihen-Ende? dann „Rückspul"-Sprung ans andere
 let swipeResetTimer = 0;
 let swipeNavTop = 0; // y-Oberkante der Navi beim Wisch-Start (= Inhalts-Unterkante)
 let swipeDividerEl: HTMLDivElement | null = null;
-// Zonengrenze bei 44 % der Inhaltshöhe (von oben) → obere Zone 44 %, untere 56 %.
-const ZONE_SPLIT = 0.44;
+// Zonengrenze bei 45 % der Inhaltshöhe (von oben) → obere Zone 45 %, untere 55 %.
+const ZONE_SPLIT = 0.45;
 
 /** y der Zonengrenze (oberhalb der Navi-Leiste). */
 function zoneSplitY(): number {
