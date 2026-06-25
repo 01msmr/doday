@@ -283,7 +283,10 @@ function endEdgePreview(dx: number): void {
         };
         const layer = document.createElement('div');
         layer.className = `tab-swipe-layer${viewId === 'undone' ? ' tab-swipe-layer--undone' : ''}`;
-        layer.style.zIndex = String(3 + i); // späteres Blatt deckt das frühere (Ziel zuoberst)
+        // späteres Blatt deckt das frühere (Ziel zuoberst); bewusst UNTER der
+        // Trennlinie (z-index 6), damit diese während des Wrap-Flugs konsistent
+        // oben stehen bleibt und nicht kurz überdeckt wird → erst am Ende ausgleitet.
+        layer.style.zIndex = String(2 + i);
         layer.style.transform = `translateX(${enterX}px)`;
         layer.innerHTML = buildPageHtml(snap);
         document.body.appendChild(layer);
