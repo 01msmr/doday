@@ -130,6 +130,24 @@ function ensureSwipeDivider(): void {
     document.body.appendChild(swipeDividerEl);
   }
   swipeDividerEl.style.top = `${zoneSplitY()}px`;
+  updateDividerSurface();
+}
+
+/** Die Trennlinie liegt über der aktiven Spalte. In UN:DONE haben die Spalten
+    FESTE Farben (col-main weiß, col-side dunkel) – unabhängig vom Theme. Damit die
+    Marke dort sichtbar bleibt, richtet sie sich nach der aktiven Spalte statt nach
+    Hell/Dunkel: weiße Aufgaben-Card → dunkle Marke, dunkle Erledigt-Card → helle. */
+function updateDividerSurface(): void {
+  const el = swipeDividerEl;
+  if (!el) {
+    return;
+  }
+  el.classList.remove('tab-swipe-divider--on-light', 'tab-swipe-divider--on-dark');
+  if (state.view === 'undone') {
+    el.classList.add(
+      state.mobileColumn === 'main' ? 'tab-swipe-divider--on-light' : 'tab-swipe-divider--on-dark',
+    );
+  }
 }
 
 function showSwipeDivider(): void {
@@ -421,6 +439,7 @@ function rerender(): void {
   closeSuggest(); // ein Neuaufbau des DOM würde das Dropdown sonst verwaisen lassen
   renderApp(root!, state);
   syncThemeColor();
+  updateDividerSurface(); // Marke an aktive Spalte/View anpassen (UN:DONE-Festfarben)
   // Nur beim NEUEN Auftreten eines Fehlers den Toast zeigen (nicht bei jedem Render)
   if (state.syncError && state.syncError !== lastToastError) {
     showToast(state.syncError);
