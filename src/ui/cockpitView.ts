@@ -40,7 +40,7 @@ import {
   yearOf,
   type AppState,
 } from './dayView';
-import { t, locale } from '../i18n';
+import { t, getLang, locale } from '../i18n';
 
 /** Lokales Date-Objekt zu einem ISO-Tag – mittags, damit nichts verrutscht */
 function dateAt(day: string): Date {
@@ -236,6 +236,13 @@ function weekdayShortOf(date: Date): string {
   return new Intl.DateTimeFormat(locale(), { weekday: 'short' }).format(date);
 }
 
+/** Wochentag + Tag für die Termin-Zeile: DE „Sa., 22." (Punkt + Komma), EN „Sat 22". */
+function weekdayDayOf(date: Date): string {
+  return getLang() === 'de'
+    ? `${weekdayShortOf(date)}.,&nbsp;${dayNum(date)}`
+    : `${weekdayShortOf(date)}&nbsp;${dayNum(date)}`;
+}
+
 /** Termine: eine schmale Zeile pro Tag (nur Tage mit Terminen) */
 function renderRangeEvents(
   days: DayEvents[],
@@ -263,7 +270,7 @@ function renderRangeEvents(
       const allPast = day.events.length > 0 && day.events.every(isPast);
       return `
       <li class="day-events-row${day.date === today ? ' today' : ''}${allPast ? ' day-events-row--past' : ''}">
-        <span class="day-events-date">${weekdayShortOf(date)}&nbsp;${dayNum(date)}</span>
+        <span class="day-events-date">${weekdayDayOf(date)}</span>
         <div class="day-events-list">${entries}</div>
       </li>`;
     })
