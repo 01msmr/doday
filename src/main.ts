@@ -336,6 +336,9 @@ function teardownEdgePreview(): void {
   previewTarget = null;
   previewDir = 0;
   previewWrap = false;
+  // Trennlinie erst JETZT (am Ende des Tab-Wechsels bzw. Zurückschnappens) ausblenden,
+  // nicht schon beim touchend – die Linie begleitet die ganze Animation.
+  hideSwipeDivider();
 }
 
 /** Sicherheits-Reset: nach einem abgebrochenen/gescheiterten Wisch die aktuelle
@@ -1430,22 +1433,27 @@ root.addEventListener(
 root.addEventListener(
   'touchend',
   (event) => {
-    hideSwipeDivider();
     if (!swipeTracking || swipeAxis !== 'h') {
       swipeTracking = false;
       if (previewEl) {
-        endEdgePreview(0); // sicher zurückschnappen
+        endEdgePreview(0); // sicher zurückschnappen – Linie bleibt bis zum Ende (teardown)
+      } else {
+        hideSwipeDivider(); // kein laufender Tab-Wechsel → Linie sofort weg
       }
       return;
     }
     swipeTracking = false;
     const dx = (event.changedTouches[0]?.clientX ?? swipeStartX) - swipeStartX;
     if (swipeEdge !== 0 && previewEl) {
-      // Von der Kante: die Vorschau entscheidet Commit (Tab-Wechsel) vs. Zurückschnappen
+      // Von der Kante: die Vorschau entscheidet Commit (Tab-Wechsel) vs. Zurückschnappen.
+      // Die Trennlinie wird erst in teardownEdgePreview ausgeblendet – nach der Animation.
       endEdgePreview(dx);
-    } else if (swipeEdge === 0 && Math.abs(dx) >= SWIPE_MIN_X) {
+    } else {
       // Von innen: links → Termine-Karte, rechts → Aufgaben (immer direkt, keine Zonen).
-      switchMobileColumn(dx < 0 ? 'side' : 'main');
+      if (swipeEdge === 0 && Math.abs(dx) >= SWIPE_MIN_X) {
+        switchMobileColumn(dx < 0 ? 'side' : 'main');
+      }
+      hideSwipeDivider(); // kein Tab-Wechsel → Linie sofort weg
     }
   },
   { passive: true },
@@ -1454,9 +1462,10 @@ root.addEventListener(
 // Bricht iOS den Wisch ab (z. B. System-Zurück), Vorschau sauber aufräumen.
 root.addEventListener('touchcancel', () => {
   swipeTracking = false;
-  hideSwipeDivider();
   if (previewEl) {
-    endEdgePreview(0);
+    endEdgePreview(0); // Linie bleibt bis zum Ende des Zurückschnappens (teardown)
+  } else {
+    hideSwipeDivider();
   }
 });
 
