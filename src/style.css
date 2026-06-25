@@ -1531,8 +1531,9 @@ details[open] > summary .chevron {
   position: relative; /* DO + Wort werden absolut platziert – Abstände wie im Icon */
   padding: 0;
   overflow: hidden;
-  /* Innen-Tönung: 50% Grau mit 15% Deckkraft über der Papierfarbe */
-  background: linear-gradient(rgb(128 128 128 / 0.15), rgb(128 128 128 / 0.15)), var(--keycap);
+  /* Reine Papierfarbe – keine Grau-Tönung mehr (die Unterscheidung trägt jetzt
+     der inset-Schatten der aktiven Kachel + die gedämpfte Schrift der inaktiven). */
+  background: var(--keycap);
   border: 1px solid rgb(38 37 31 / 0.1);
   color: var(--keycap-ink);
   /* gerundete Schrift wie im Icon (SF Pro Rounded auf Apple-Geräten) */
@@ -1541,31 +1542,39 @@ details[open] > summary .chevron {
   /* zarter Präge-Effekt der Buchstaben + Rand-Vignette wie im Icon */
   text-shadow: 0 1px 0 rgb(255 255 255 / 0.5);
   cursor: pointer;
-  /* INAKTIV = erhaben: deutlich sichtbarer Schatten (nicht gedrückt) */
-  box-shadow:
-    0 4px 9px var(--keycap-shadow),
-    0 1px 3px rgb(38 37 31 / 0.45),
-    inset 0 0 14px rgb(38 37 31 / 0.05);
+  /* INAKTIV = flach/neutral: kein Schatten (die aktive Kachel ist die eingedrückte) */
+  box-shadow: none;
   transition:
     box-shadow 0.15s ease,
     transform 0.15s ease;
 }
 
+/* HOVER: die Vertiefung nur ANDEUTEN – die FLACHERE der beiden früheren
+   Außenschatten-Stufen (4/9), jetzt als inset und um 25 % abgeschwächt
+   (Deckkraft 0.75→0.56 bzw. 0.45→0.34). */
 .nav-item:hover {
-  transform: translateY(-1px);
+  transform: none;
   box-shadow:
-    0 7px 14px var(--keycap-shadow),
-    0 1px 3px rgb(38 37 31 / 0.45),
-    inset 0 0 14px rgb(38 37 31 / 0.05);
+    inset 0 4px 9px color-mix(in srgb, var(--keycap-shadow) 75%, transparent),
+    inset 0 1px 3px rgb(38 37 31 / 0.34);
 }
 
-/* AKTIV = gedrückt/flach: KEIN Schatten, leicht abgesenkt */
+/* AKTIV = HINEIN gedrückt: die TIEFERE der beiden früheren Außenschatten-Stufen
+   (7/14, vormals Hover), jetzt als inset. KEINE Verschiebung. */
 .nav-item.active,
 .nav-item.active:hover {
-  box-shadow: none;
-  transform: translateY(2px);
+  transform: none;
   border-color: rgb(38 37 31 / 0.18);
   background: var(--keycap); /* aktive Kachel ohne Grau-Tönung – hell/hervorgehoben */
+  box-shadow:
+    inset 0 7px 14px var(--keycap-shadow),
+    inset 0 1px 3px rgb(38 37 31 / 0.45);
+}
+
+/* INAKTIVE Kacheln: Schrift gedämpft (Tinte zur Kachelfarbe gemischt), damit die
+   AKTIVE Ansicht klar hervortritt. Gilt nicht für „UN DONE" (eigene Grau-Logik). */
+.nav-item:not(.active):not(.nav-item--plain) {
+  color: color-mix(in srgb, var(--keycap-ink) 48%, var(--keycap));
 }
 
 /* „UN DONE" INAKTIV: RAHMENLOS – keine Kachel/Schatten/Tönung, Schrift in reinem
