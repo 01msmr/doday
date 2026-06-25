@@ -1002,17 +1002,49 @@ function showDemoOverlay(): void {
   requestAnimationFrame(() => demoOverlayEl?.classList.add('show'));
 }
 
-/** Große Titelkarte (Intro/Schluss) im Overlay ein-/ausblenden. */
-function showDemoHero(html: string): void {
+/** Hero-Container sicherstellen (leer) und nach dem Befüllen einblenden. */
+function ensureDemoHero(): HTMLDivElement | null {
   if (!demoOverlayEl) {
-    return;
+    return null;
   }
   if (!demoHeroEl) {
     demoHeroEl = document.createElement('div');
     demoHeroEl.className = 'demo-hero';
     demoOverlayEl.appendChild(demoHeroEl);
   }
-  demoHeroEl.innerHTML = html;
+  demoHeroEl.innerHTML = '';
+  return demoHeroEl;
+}
+
+/** Große Titelkarte (Schluss „DO") aus HTML. */
+function showDemoHero(html: string): void {
+  const hero = ensureDemoHero();
+  if (!hero) {
+    return;
+  }
+  hero.innerHTML = html;
+  requestAnimationFrame(() => demoHeroEl?.classList.add('show'));
+}
+
+/** Intro-Hero: der ECHTE „DO DAY"-Keycap (Klon von Navi-Button 1), groß, mit
+    Subheadline darunter. */
+function showDemoIntroHero(): void {
+  const hero = ensureDemoHero();
+  if (!hero) {
+    return;
+  }
+  const keycap = root?.querySelector('.nav-item[data-view="day"]');
+  if (keycap) {
+    const clone = keycap.cloneNode(true) as HTMLElement;
+    clone.classList.add('demo-hero-keycap');
+    clone.removeAttribute('data-action'); // nicht klickbar
+    clone.removeAttribute('aria-current');
+    hero.appendChild(clone);
+  }
+  const sub = document.createElement('span');
+  sub.className = 'demo-hero-sub';
+  sub.textContent = 'your autistic to do list';
+  hero.appendChild(sub);
   requestAnimationFrame(() => demoHeroEl?.classList.add('show'));
 }
 function hideDemoHero(): void {
@@ -1117,16 +1149,7 @@ function startGestureDemo(): void {
   showDemoOverlay();
 
   let at = 1500; // nach dem Jump 1,5 s DO DAY zeigen …
-  demoTimers.push(
-    window.setTimeout(
-      () =>
-        showDemoHero(
-          '<span class="demo-hero-title">DO DAY</span>' +
-            '<span class="demo-hero-sub">your autistic to do list</span>',
-        ),
-      at,
-    ),
-  );
+  demoTimers.push(window.setTimeout(showDemoIntroHero, at));
   at += 3000; // … Hero-Titel 3 s zeigen …
   demoTimers.push(window.setTimeout(hideDemoHero, at));
   at += 1000; // … 1 s Pause, dann die Gesten
