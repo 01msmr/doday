@@ -2375,3 +2375,35 @@ body.drag-task .untag-drop {
   opacity: 0;
   will-change: transform, opacity;
 }
+
+/* Gesten-Demo: dezenter Backdrop (lässt die Animationen durchscheinen) plus eine
+   opake Beschriftungs-Karte oben. Lebt außerhalb von #app (wie der Toast). */
+.demo-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20; /* über Navi (7), Trennlinie (6), Wisch-Layern */
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: rgb(0 0 0 / 0.18);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+}
+.demo-overlay.show {
+  opacity: 1;
+}
+.demo-caption {
+  margin-top: 22vh;
+  max-width: 80%;
+  padding: 0.8rem 1.1rem;
+  border-radius: 0.8rem;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  line-height: 1.3;
+  text-align: center;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.3);
+}
