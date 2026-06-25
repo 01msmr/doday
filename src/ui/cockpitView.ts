@@ -23,6 +23,7 @@ import { safeColor } from '../utils/colors';
 import {
   areaColor,
   dayMonthOf,
+  dayMonthRange,
   dayNum,
   escapeHtml,
   eventPen,
@@ -66,11 +67,8 @@ function renderPeriodMasthead(
         : offset === -1
           ? t('lastWeek')
           : t('weekNum', { n: isoWeek(start) });
-    // Englisch ohne Ordnungspunkt vor dem Bindestrich („5–14 June" statt „5.–14.")
-    big =
-      start.getMonth() === end.getMonth()
-        ? `${dayNum(start)}&ndash;${dayMonthOf(end)}`
-        : `${dayMonthOf(start)} &ndash; ${dayMonthOf(end)}`;
+    // Eine gemeinsame, locale-korrekte Spanne (Reihenfolge/Punkt/Dedup automatisch).
+    big = dayMonthRange(start, end);
   } else {
     label =
       offset === 0

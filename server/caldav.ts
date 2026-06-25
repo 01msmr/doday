@@ -165,4 +165,12 @@ export class CalDavClient {
       throw new Error(`CalDAV CREATE ${filename} fehlgeschlagen: ${res.status}`);
     }
   }
+
+  /** Objekt löschen – 404 gilt als Erfolg (bereits weg ist auch weg) */
+  async deleteObject(href: string): Promise<void> {
+    const res = await fetch(this.url(href), { method: 'DELETE', headers: this.headers() });
+    if (!res.ok && res.status !== 404) {
+      throw new Error(`CalDAV DELETE ${href} fehlgeschlagen: ${res.status}`);
+    }
+  }
 }

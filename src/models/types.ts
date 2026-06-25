@@ -55,6 +55,8 @@ export interface Task {
   /** Tag-Pfade ohne "#", z. B. ["Zuhause.Aufräumen"] */
   tags: string[];
   completed: boolean;
+  /** Zeitpunkt der Erledigung (CalDAV COMPLETED) – steuert die Monatsgruppierung */
+  completedAt?: ISODateTime;
   /** Fälligkeitsdatum, falls gesetzt */
   due?: ISODate;
   /** CalDAV-Pfad der Aufgabe in der Nextcloud – nötig zum Abhaken */

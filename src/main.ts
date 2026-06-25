@@ -13,6 +13,7 @@ import {
   ApiConflictError,
   createEvent,
   createTask,
+  deleteTask,
   loadAchievements,
   loadAgenda,
   loadTagRegistry,
@@ -976,6 +977,33 @@ root.addEventListener('click', (event) => {
     rerender();
   }
 
+  if (action === 'delete-task' && id) {
+    const task = state.data.tasks.find((t) => t.id === id);
+    if (task && window.confirm(t('confirmDeleteTask', { title: task.title }))) {
+      const href = task.href;
+      // Optimistisch entfernen – die Nextcloud zieht im Hintergrund nach.
+      state.data.tasks = state.data.tasks.filter((t) => t.id !== id);
+      state.editingTask = null;
+      rerender();
+      if (href) {
+        queue(async () => {
+          try {
+            await deleteTask(href);
+          } catch {
+            // Fehlgeschlagen: ehrlichen Stand aus der Nextcloud holen
+            try {
+              await reloadAgenda();
+            } catch {
+              /* Agenda nicht erreichbar – Hinweis reicht */
+            }
+            state.syncError = t('taskDeleteFailed');
+            rerender();
+          }
+        });
+      }
+    }
+  }
+
   if (action === 'event-ics') {
     // Alternative zum NC-Speichern: .ics herunterladen → Geräte-Kalender importiert
     const form = trigger.closest<HTMLElement>('[data-event-form]');
@@ -1033,6 +1061,9 @@ root.addEventListener('click', (event) => {
     const task = state.data.tasks.find((t) => t.id === id);
     if (task) {
       task.completed = !task.completed;
+      // Erledigungszeitpunkt lokal mitführen → sofortige Monatsgruppierung in UN:DONE,
+      // ohne auf den nächsten Agenda-Reload zu warten.
+      task.completedAt = task.completed ? new Date().toISOString() : undefined;
       rerender();
       // In Nextcloud Tasks zurückschreiben (VTODO via CalDAV)
       const href = task.href;

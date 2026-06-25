@@ -99,6 +99,11 @@ export function toggleTask(href: string, completed: boolean): Promise<{ ok: bool
   return postJson('tasks/toggle', { href, completed });
 }
 
+/** Aufgabe löschen (per CalDAV-Pfad) */
+export function deleteTask(href: string): Promise<{ ok: boolean }> {
+  return postJson('tasks/delete', { href });
+}
+
 /** Termin direkt im Nextcloud-Kalender anlegen (Zeiten als Epoch-Millisekunden) */
 export function createEvent(
   title: string,
