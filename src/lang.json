@@ -17,7 +17,7 @@
   "delete": { "de": "Löschen", "en": "Delete" },
   "confirmDeleteTask": { "de": "Aufgabe „{title}“ löschen?", "en": "Delete task “{title}”?" },
   "noEvents": { "de": "noch keine Termine", "en": "no events yet" },
-  "noTasks": { "de": "Keine Aufgaben für diesen Tag.", "en": "No tasks for this day." },
+  "noTasks": { "de": "noch keine Aufgaben", "en": "no tasks yet" },
   "noHabits": {
     "de": "noch keine Gewohnheiten – über das Zahnrad anlegen.",
     "en": "no habits yet – add via the gear."
