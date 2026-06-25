@@ -99,6 +99,12 @@ let swipeResetTimer = 0;
 let swipeNavTop = 0; // y-Oberkante der Navi beim Wisch-Start (= Inhalts-Unterkante)
 let swipeDividerEl: HTMLDivElement | null = null;
 let swipeDividerExitTimer = 0;
+// Gesten-Demo (Doppeltipp auf „UN:DONE")
+let demoActive = false;
+let demoTimers: number[] = [];
+let demoOverlayEl: HTMLDivElement | null = null;
+let demoCaptionEl: HTMLDivElement | null = null;
+let lastUndoneTap = 0;
 // Zonengrenze bei 45 % der Inhaltshöhe (von oben) → obere Zone 45 %, untere 55 %.
 const ZONE_SPLIT = 0.45;
 
@@ -976,6 +982,96 @@ async function submitTaskForm(form: HTMLElement): Promise<void> {
   rerender();
 }
 
+/* ---------- Kompakte Gesten-Demo (Doppeltipp auf „UN:DONE") ---------- */
+
+/** Halbtransparentes Overlay mit Beschriftungs-Karte; Tap bricht ab. */
+function showDemoOverlay(): void {
+  demoOverlayEl = document.createElement('div');
+  demoOverlayEl.className = 'demo-overlay';
+  demoCaptionEl = document.createElement('div');
+  demoCaptionEl.className = 'demo-caption';
+  demoOverlayEl.appendChild(demoCaptionEl);
+  demoOverlayEl.addEventListener('pointerdown', endGestureDemo);
+  document.body.appendChild(demoOverlayEl);
+  requestAnimationFrame(() => demoOverlayEl?.classList.add('show'));
+}
+
+/** Einen Kanten-Wisch programmatisch auslösen (untere Zone = direkt; vorwärts =
+    rechte Kante). Zeigt die Trennlinie und nutzt exakt die echte Übergangs-/
+    Wrap-Animation. dx-Betrag ≥ Schwelle committet; das Vorzeichen ist egal. */
+function demoEdge(forward: boolean): void {
+  const navTop = navTopY();
+  swipeNavTop = navTop;
+  swipeStartY = navTop * 0.8; // klar in der unteren Zone → direkter Wisch
+  swipeEdge = forward ? 1 : -1; // rechts = vor, links = zurück
+  showSwipeDivider();
+  startEdgePreview();
+  endEdgePreview(100); // |100| ≥ Commit-Schwelle (48) → Tab-Wechsel
+}
+
+interface DemoStep {
+  caption?: string; // nur gesetzte Texte wechseln die Beschriftung
+  run: () => void;
+  wait: number; // ms bis zum nächsten Schritt (≥ Animationsdauer)
+}
+
+/** Skript: Kanten-Wisch-Tour (day→…→undone), Inside-Wisch, Wrap zurück nach day. */
+function buildDemoSteps(): DemoStep[] {
+  const edge = 320; // Commit-Animation (~230ms) + Puffer
+  const col = 480; // Spalten-Animation + Puffer
+  const wrap = 780; // Wrap-Flug (~710ms) + Puffer
+  return [
+    { caption: t('demoEdgeSwipe'), run: () => demoEdge(true), wait: edge }, // day → morrow
+    { run: () => demoEdge(true), wait: edge }, // morrow → week
+    { run: () => demoEdge(true), wait: edge }, // week → month
+    { run: () => demoEdge(true), wait: edge }, // month → undone
+    { caption: t('demoInsideSwipe'), run: () => switchMobileColumn('side'), wait: col },
+    { run: () => switchMobileColumn('main'), wait: col },
+    { caption: t('demoWrap'), run: () => demoEdge(true), wait: wrap }, // undone → Wrap → day
+  ];
+}
+
+/** Demo starten: nach DO DAY springen, Overlay zeigen, Schritte takten. */
+function startGestureDemo(): void {
+  if (demoActive || !singleColumn.matches) {
+    return;
+  }
+  demoActive = true;
+  goToView('day');
+  showDemoOverlay();
+  let at = 320; // kurz warten, bis „day" gerendert + Overlay sichtbar ist
+  for (const step of buildDemoSteps()) {
+    demoTimers.push(
+      window.setTimeout(() => {
+        if (step.caption && demoCaptionEl) {
+          demoCaptionEl.textContent = step.caption;
+        }
+        step.run();
+      }, at),
+    );
+    at += step.wait;
+  }
+  demoTimers.push(window.setTimeout(endGestureDemo, at + 200));
+}
+
+/** Abbruch/Abschluss: Timer stoppen, laufende Vorschau abräumen, Overlay weg. */
+function endGestureDemo(): void {
+  if (!demoActive) {
+    return;
+  }
+  demoActive = false;
+  demoTimers.forEach((id) => window.clearTimeout(id));
+  demoTimers = [];
+  if (previewEl) {
+    endEdgePreview(0); // laufende Vorschau sauber zurückschnappen → teardown
+  }
+  const el = demoOverlayEl;
+  demoOverlayEl = null;
+  demoCaptionEl = null;
+  el?.classList.remove('show');
+  window.setTimeout(() => el?.remove(), 260);
+}
+
 root.addEventListener('click', (event) => {
   const target = event.target as HTMLElement;
 
@@ -992,6 +1088,16 @@ root.addEventListener('click', (event) => {
   const { action, id, view, path } = trigger.dataset;
 
   if (action === 'switch-view' && view) {
+    // Doppeltipp auf „UN:DONE" (mobil) startet die Gesten-Demo statt nur zu wechseln.
+    if (view === 'undone' && singleColumn.matches) {
+      const now = Date.now();
+      if (now - lastUndoneTap < 350) {
+        lastUndoneTap = 0;
+        startGestureDemo();
+        return;
+      }
+      lastUndoneTap = now;
+    }
     goToView(view as ViewId);
   }
 
