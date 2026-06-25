@@ -146,5 +146,17 @@
   "endBeforeStart": {
     "de": "Ende muss nach dem Beginn liegen.",
     "en": "End must be after the start."
+  },
+  "demoEdgeSwipe": {
+    "de": "Von der Kante wischen wechselt den Tab.",
+    "en": "Swipe from the edge to change tab."
+  },
+  "demoInsideSwipe": {
+    "de": "Innen wischen schiebt die rechte Karte rein und raus.",
+    "en": "Swipe inside to slide the right card in and out."
+  },
+  "demoWrap": {
+    "de": "Am Reihenende fliegt es über alle Tabs zurück.",
+    "en": "At the row’s end it flies back across all tabs."
   }
 }
