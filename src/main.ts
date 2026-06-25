@@ -151,7 +151,7 @@ function hideSwipeDivider(): void {
   window.clearTimeout(swipeDividerExitTimer);
   swipeDividerExitTimer = window.setTimeout(() => {
     el.classList.remove('tab-swipe-divider--exit');
-  }, 220);
+  }, 290);
 }
 
 /**
