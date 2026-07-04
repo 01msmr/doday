@@ -147,6 +147,7 @@ body {
   justify-content: space-between;
   gap: 0.8rem;
   margin-bottom: 0.5rem;
+  user-select: none; /* kein Textmarkierungs-Flackern beim Doppeltipp/-klick (Reload) */
 }
 
 .weekday {

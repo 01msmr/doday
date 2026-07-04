@@ -44,6 +44,7 @@ const state: AppState = {
   data: { events: [], tasks: [], habits: [], achievements: [] },
   registry: new InMemoryTagRegistry(),
   loading: true,
+  syncing: false,
   syncError: null,
   view: 'day',
   periodOffset: 0,
@@ -107,6 +108,7 @@ let demoCaptionEl: HTMLDivElement | null = null;
 let demoFingerEl: HTMLDivElement | null = null;
 let demoHeroEl: HTMLDivElement | null = null;
 let lastDayTap = 0;
+let lastMastheadTap = 0; // Doppeltipp auf den Header → manueller Reload
 // Zonengrenze bei 45 % der Inhaltshöhe (von oben) → obere Zone 45 %, untere 55 %.
 const ZONE_SPLIT = 0.45;
 
@@ -632,6 +634,16 @@ async function boot(showLoading = true): Promise<void> {
     state.syncError = t('errorLoad');
   }
   state.loading = false;
+  rerender();
+}
+
+/** Doppeltipp auf den Header: alles neu laden, OHNE die Seite auszublenden
+    (anders als `boot(true)` beim App-Start – nur der Header-Spinner zeigt sich). */
+async function manualReload(): Promise<void> {
+  state.syncing = true;
+  rerender();
+  await boot(false);
+  state.syncing = false;
   rerender();
 }
 
@@ -1218,6 +1230,20 @@ root.addEventListener('click', (event) => {
     return;
   }
   const { action, id, view, path } = trigger.dataset;
+
+  if (action === 'reload-all') {
+    // Doppeltipp auf den Header (Wochentag/Datum) – extern geänderte Inhalte
+    // (z. B. nach einem manuellen Eingriff in Nextcloud) neu laden, ohne dass
+    // die Seite dafür komplett geschlossen/neu geöffnet werden muss.
+    const now = Date.now();
+    if (now - lastMastheadTap < 350) {
+      lastMastheadTap = 0;
+      void manualReload();
+    } else {
+      lastMastheadTap = now;
+    }
+    return;
+  }
 
   if (action === 'switch-view' && view) {
     // Doppeltipp auf „DO DAY" (mobil) startet die Gesten-Demo statt nur zu wechseln.

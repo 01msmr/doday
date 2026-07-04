@@ -42,6 +42,9 @@ export interface AppState {
   registry: InMemoryTagRegistry;
   /** Erste Daten werden noch aus der Nextcloud geladen */
   loading: boolean;
+  /** Manueller Reload (Doppeltipp auf den Header) läuft – anders als `loading`
+      blendet das NICHT die Seite aus, nur der Header-Spinner zeigt sich */
+  syncing: boolean;
   /** Letzter Lade-/Speicherfehler – null = alles in Ordnung */
   syncError: string | null;
   /** Aktive Ansicht der unteren Navigation */
@@ -139,7 +142,7 @@ export function renderMasthead(
   // Mit center-Label: drei Spalten (Tag links · Label mittig · Datum rechts).
   const centerEl = center ? `<p class="masthead-center">${center}</p>` : '';
   return `
-    <header class="masthead${center ? ' masthead--triple' : ''}">
+    <header class="masthead${center ? ' masthead--triple' : ''}" data-action="reload-all">
       <p class="weekday">${spinner}${small}</p>
       ${centerEl}
       <h1 class="day-date">${big} <span class="day-year">${year}</span></h1>
@@ -848,7 +851,7 @@ export function buildPageHtml(state: AppState): string {
 
   // Der Fehlertext wird nicht mehr inline gezeigt, sondern als kurzes Overlay
   // (Toast in main.ts). Der Lade-Spinner im Kopf signalisiert den Zustand dauerhaft.
-  const busy = state.loading || Boolean(state.syncError);
+  const busy = state.loading || state.syncing || Boolean(state.syncError);
 
   // ALLE Ansichten teilen sich jetzt dieselbe Karten-Bühne: Aufgaben als
   // Hintergrund, Termine + Gewohnheiten + Ziele als Karte darüber. Day/Morrow und
