@@ -19,8 +19,9 @@
   --strike: rgb(38 37 31 / 0.3); /* Durchstreichung erledigter Aufgaben */
   --nav-bg: rgb(243 240 233 / 0.82);
 
-  /* Navi-Tasten = Mini-App-Icons. Hell: Papier + dunkle Tinte (wie das Icon);
-     im Dunkelmodus INVERTIERT (siehe @media unten). */
+  /* Navi-Tasten = Mini-App-Icons. Bleiben IMMER hell (Papier + dunkle Tinte
+     wie das Icon) – auch im Dark Mode, bewusst NICHT invertiert. Nur die
+     Navileiste drumherum (--nav-bg) folgt dem Dark Mode. */
   --keycap: #f1ede3;
   --keycap-ink: #26251f;
   --keycap-shadow: rgb(38 37 31 / 0.75);
@@ -58,12 +59,9 @@
     --divider-mark: rgb(255 255 255 / 0.25);
     --demo-finger: rgb(232 229 221 / 0.55);
     --demo-finger-ring: rgb(232 229 221 / 0.3);
-    /* DO-Kacheln invertiert: dunkle Kachel, helle Tinte/Kante, schwarzer Tiefenschatten.
-       Die hellen Kontrast-Objekte (Tinte + Kante) um 25 % abgedunkelt (#f1ede3 ×0.75). */
-    --keycap: #26251f;
-    --keycap-ink: #b5b2aa;
-    --keycap-shadow: rgb(0 0 0 / 0.75);
-    --keycap-edge: rgb(181 178 170 / 0.4);
+    /* --keycap/--keycap-ink/--keycap-shadow/--keycap-edge bewusst NICHT
+       überschrieben – die Navi-Tasten bleiben hell (siehe Kommentar bei der
+       Definition oben). */
   }
 }
 
@@ -1596,18 +1594,6 @@ details[open] > summary .chevron {
   box-shadow:
     inset 0 7px 14px var(--keycap-shadow),
     inset 0 1px 3px rgb(38 37 31 / 0.45);
-}
-
-/* Dark Mode: auf der dunklen, invertierten Kachel wäre ein schwarzer inset
-   unsichtbar → die Vertiefung als WEISSER inset-Glow, 25 % schwächer als hell
-   (0.75→0.56 bzw. 0.45→0.34). Steht NACH der Basisregel → gewinnt im Dunkeln. */
-@media (prefers-color-scheme: dark) {
-  .nav-item.active,
-  .nav-item.active:hover {
-    box-shadow:
-      inset 0 7px 14px rgb(255 255 255 / 0.56),
-      inset 0 1px 3px rgb(255 255 255 / 0.34);
-  }
 }
 
 /* INAKTIVE Kacheln: Schrift gedämpft (Tinte zur Kachelfarbe gemischt), damit die
