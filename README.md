@@ -18,7 +18,7 @@ Das App-Passwort bleibt im Backend (ENV) und erreicht nie den Browser.
 
 ```bash
 npm install
-cp .env.example .env   # Nextcloud-Zugang eintragen
+cp .env.example .env   # danach eigene Nextcloud-URL, Nutzername & App-Passwort eintragen
 
 # Terminal 1: Backend (Port 3000)
 npm run dev:server
