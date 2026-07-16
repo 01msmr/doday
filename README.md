@@ -12,17 +12,30 @@ Browser ── /api/v1/… ──► Hono-Backend (server/) ── WebDAV/CalDAV
    └── statisches Frontend ◄──┘ (im Container aus dist/)
 ```
 
-Das App-Passwort bleibt im Backend (ENV) und erreicht nie den Browser.
+Das App-Passwort bleibt im Backend (Config-Datei) und erreicht nie den Browser.
 
 ## Entwicklung
 
 ```bash
 npm install
-cp .env.example .env   # danach eigene Nextcloud-URL, Nutzername & App-Passwort eintragen
+cp .env.example .env
 
 # Terminal 1: Backend (Port 3000)
 npm run dev:server
+```
 
+Beim allerersten Start ohne `data/doday-config.json` läuft der Server im
+Setup-Modus: Terminal 1 loggt einen Setup-Token, unter
+http://localhost:3000/setup trägst du Nextcloud-URL, -Nutzername,
+App-Passwort und ein App-Login-Passwort ein. Nach dem Speichern beendet
+sich der Prozess einmal selbst – `npm run dev:server` einfach erneut
+starten.
+
+Schneller für wiederholte lokale Checkouts: `data/doday-config.example.json`
+nach `data/doday-config.json` kopieren und ausfüllen, dann startet der
+Server direkt im Normalbetrieb.
+
+```bash
 # Terminal 2: Frontend mit Proxy auf /api (Port 5173)
 npm run dev
 ```

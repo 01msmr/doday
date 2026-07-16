@@ -1,24 +1,22 @@
 # Service-Block für die bestehende docker-compose.yml auf dem Docker-Rechner.
 # Werte (Netzwerk "traefik", certresolver "letsencrypt", entrypoint "websecure")
-# entsprechen dem vorhandenen Setup der anderen Dienste (z. B. deine-nextcloud.example.com).
+# entsprechen dem vorhandenen Setup der anderen Dienste.
 #
-# Wichtig: Der /dav-Rewrite aus dem ursprünglichen Konzept entfällt!
-# Das Backend spricht serverseitig mit der Nextcloud – der Browser nur mit /api.
+# Nextcloud-Zugangsdaten werden NICHT mehr per ENV gesetzt: beim ersten Start
+# ohne data/doday-config.json läuft doday im Setup-Modus (Token in den
+# Container-Logs, `docker compose logs doday`) – Formular unter /setup.
 services:
   doday:
     # Variante A: lokal bauen     → docker compose up -d --build doday
     build: ./doday
     # Variante B: später via GHCR → image: ghcr.io/<github-user>/doday:latest
     restart: unless-stopped
-    env_file: ./doday/.env # NEXTCLOUD_URL, NEXTCLOUD_USER, NEXTCLOUD_APP_PASSWORD, …
+    env_file: ./doday/.env # nur noch PORT
+    volumes:
+      # Persistiert die Config-Datei, die der Setup-Assistent schreibt.
+      - ./doday-data:/app/data
     networks:
       - traefik
-    # Backend ruft serverseitig deine-nextcloud.example.com auf. Damit ein wackeliger Heim-DNS
-    # (split-horizon: deine-nextcloud.example.com → ucloud.fritz.box → LAN-IP) die App nicht
-    # lahmlegt, die IP fest verdrahten – das TLS-Zertifikat bleibt für
-    # deine-nextcloud.example.com gültig (verbunden wird nur per IP, SNI/Host unverändert):
-    extra_hosts:
-      - "deine-nextcloud.example.com:10.0.10.100" # LAN-IP des Servers (Traefik/Nextcloud)
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.doday.rule=Host(`do.msmr.co`)"
@@ -28,11 +26,6 @@ services:
       # Port IM Container (doday-Backend lauscht auf 3000 – kein ports:-Mapping nötig)
       - "traefik.http.services.doday.loadbalancer.server.port=3000"
       - "traefik.docker.network=traefik"
-      # Zugriffsschutz: KEIN Basic Auth mehr. Das Backend bringt einen Cookie-Login
-      # mit (Login-Seite + langlebiges Cookie) – setze dazu DODAY_PASSWORD in der
-      # ./doday/.env. Vorteil ggü. Basic Auth: iOS fragt beim PWA-Start nicht mehr
-      # ständig nach, und das PWA-Icon/Manifest lädt ohne Sonderrouter.
-      # (Falls von einer älteren Version Basic-Auth-Labels existieren: entfernen.)
 
 # Nur nötig, falls die Datei eigenständig genutzt wird – in der bestehenden
 # Compose-Datei ist das Netzwerk "traefik" bereits deklariert.

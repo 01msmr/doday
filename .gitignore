@@ -4,3 +4,5 @@ dist/
 .DS_Store
 # Zugangsdaten bleiben lokal – nie committen!
 .env
+# Von echten Zugangsdaten geschriebene Config – die *.example.json bleibt getrackt
+data/doday-config.json

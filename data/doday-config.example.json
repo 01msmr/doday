@@ -1,0 +1,10 @@
+{
+  "nextcloudUrl": "https://deine-nextcloud.example.com",
+  "nextcloudUser": "dein-nutzername",
+  "appPassword": "xxxxx-xxxxx-xxxxx-xxxxx-xxxxx",
+  "dataDir": "/Notes/DoDay",
+  "auth": {
+    "password": "ein-langes-app-login-passwort",
+    "secret": "beliebiger-langer-zufallsstring"
+  }
+}
