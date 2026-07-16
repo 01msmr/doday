@@ -84,6 +84,12 @@ function goToView(next: ViewId): void {
   refreshAgenda(); // Zeitfenster hat sich geändert → passende Daten holen
 }
 
+/** Nachbar-Tab in VIEW_ORDER; null am Rand (kein Umlauf, anders als der Telefon-Kanten-Wisch). */
+function neighborView(current: ViewId, direction: 1 | -1): ViewId | null {
+  const index = VIEW_ORDER.indexOf(current);
+  return VIEW_ORDER[index + direction] ?? null;
+}
+
 /* ---------- Kanten-Wisch-Vorschau („billiges" Finger-Follow-Paging) ----------
    Die aktuelle Seite (Live-DOM) folgt per transform dem Finger; von der Gegenseite
    schiebt ein STATISCHER Snapshot der Zielansicht herein (einmal beim Wisch-Start
@@ -1789,6 +1795,108 @@ root.addEventListener('touchcancel', () => {
     endEdgePreview(0); // Linie bleibt bis zum Ende des Zurückschnappens (teardown)
   } else {
     hideSwipeDivider();
+  }
+});
+
+// Tab-Wechsel per Wisch, unabhängig von der Telefon-Kanten-Wisch-Geste oben:
+// aktiv außerhalb des einspaltigen Layouts (iPad & Desktop-Touch), reagiert
+// überall auf dem Bildschirm (dort gibt es keine konkurrierende Spalten-Geste),
+// kein Vorschau-Mitziehen, kein Umlauf an den Rändern.
+const TAB_AXIS_LOCK = 8; // px, wie AXIS_LOCK oben
+const TAB_SWIPE_MIN_X = 36; // px, wie SWIPE_MIN_X oben
+let tabSwipeTracking = false;
+let tabSwipeStartX = 0;
+let tabSwipeStartY = 0;
+let tabSwipeAxis: 'none' | 'h' | 'v' = 'none';
+
+root.addEventListener(
+  'touchstart',
+  (event) => {
+    const target = event.target as HTMLElement;
+    if (
+      event.touches.length !== 1 ||
+      singleColumn.matches ||
+      target.closest('[data-drag], input, textarea, select')
+    ) {
+      tabSwipeTracking = false;
+      return;
+    }
+    const touch = event.touches[0];
+    tabSwipeTracking = true;
+    tabSwipeAxis = 'none';
+    tabSwipeStartX = touch.clientX;
+    tabSwipeStartY = touch.clientY;
+  },
+  { passive: true },
+);
+
+root.addEventListener(
+  'touchmove',
+  (event) => {
+    if (!tabSwipeTracking) {
+      return;
+    }
+    const touch = event.touches[0];
+    if (!touch) {
+      return;
+    }
+    const dx = touch.clientX - tabSwipeStartX;
+    const dy = touch.clientY - tabSwipeStartY;
+    if (tabSwipeAxis === 'none') {
+      if (Math.abs(dx) < TAB_AXIS_LOCK && Math.abs(dy) < TAB_AXIS_LOCK) {
+        return;
+      }
+      tabSwipeAxis = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+      if (tabSwipeAxis === 'v') {
+        tabSwipeTracking = false; // senkrecht → normales Scrollen der Liste
+        return;
+      }
+    }
+    if (tabSwipeAxis === 'h') {
+      event.preventDefault(); // waagerecht → der Wisch gehört uns, nicht dem Scroll
+    }
+  },
+  { passive: false },
+);
+
+root.addEventListener(
+  'touchend',
+  (event) => {
+    if (!tabSwipeTracking || tabSwipeAxis !== 'h') {
+      tabSwipeTracking = false;
+      return;
+    }
+    tabSwipeTracking = false;
+    const dx = (event.changedTouches[0]?.clientX ?? tabSwipeStartX) - tabSwipeStartX;
+    if (Math.abs(dx) < TAB_SWIPE_MIN_X) {
+      return;
+    }
+    const next = neighborView(state.view, dx < 0 ? 1 : -1);
+    if (next) {
+      goToView(next);
+    }
+  },
+  { passive: true },
+);
+
+root.addEventListener('touchcancel', () => {
+  tabSwipeTracking = false;
+});
+
+// Desktop-Pfeiltasten: auf document statt root, damit es auch ohne vorherigen
+// Klick in die App greift (ohne Fokus liegt der Bubbling-Ursprung auf <body>,
+// das kein Vorfahre von #app ist – root bekäme das Event sonst nicht).
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+    return;
+  }
+  const active = document.activeElement;
+  if (active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)) {
+    return;
+  }
+  const next = neighborView(state.view, event.key === 'ArrowRight' ? 1 : -1);
+  if (next) {
+    goToView(next);
   }
 });
 
