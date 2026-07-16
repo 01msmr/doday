@@ -1224,7 +1224,9 @@ details[open] > summary .chevron {
 
 .habit.done .habit-dot {
   background: var(--hc, var(--accent));
-  border-color: var(--hc, var(--accent));
+  /* Rand wie beim inaktiven Kreis (var(--ink-faint)) statt Habit-Farbe –
+     sonst verschwimmt die Kante mit der Füllfarbe (weniger Kontrast). */
+  border-color: var(--ink-faint);
   /* leiser Schein in der Habit-Farbe statt Konfetti */
   box-shadow: 0 0 1.4rem color-mix(in srgb, var(--hc, var(--accent)) 30%, transparent);
 }
