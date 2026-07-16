@@ -204,6 +204,50 @@ einmal, **Tap = Abbruch**. Spec/Plan: `docs/superpowers/{specs,plans}/2026-06-26
   Startpunkt). Tempo an einem Regler `DEMO_PACE` (= 6, bewusst langsam).
 - **Nebenbei:** Toast im Dark Mode invertiert (dunkle Fläche, helle Schrift).
 
+### Phase 11 – Setup-Assistent für Fremd-Deployments (16.07.2026)
+doday soll auch anderen zur Verfügung gestellt werden (jede*r hostet die
+eigene Instanz gegen die eigene Nextcloud – Single-Tenant, kein gemeinsamer
+Server). Statt manuell editierter `.env` konfiguriert sich die App jetzt über
+ein Web-Formular beim ersten Start. Spec/Plan:
+`docs/superpowers/{specs,plans}/2026-07-16-setup-assistent*`.
+
+- **Config-Store:** `server/config.ts` liest/schreibt `data/doday-config.json`
+  (nicht im Git-Repo) statt ENV-Variablen zu parsen. `AppConfig` bündelt
+  Nextcloud-Zugang, Cookie-Login-Passwort (jetzt Pflicht statt optional) und
+  die Kalendernamen (`eventsCalendar`/`tasksCalendar`, vorher `process.env`
+  direkt in `server/index.ts`).
+- **Setup-Modus:** Fehlt die Config-Datei beim Boot, läuft nur
+  `server/setupRoutes.ts` (`GET /setup`-Formular, `POST /api/setup/test`,
+  `POST /api/setup`) – ein beim Boot generierter, in den Docker-Logs
+  sichtbarer Zufalls-Token schützt die Routen (timing-safe verglichen über
+  `checkPassword` aus `server/auth.ts`). Alle anderen Pfade leiten auf
+  `/setup` um.
+- **Verbindungstest vor dem Speichern:** `server/setupConnectionTest.ts`
+  prüft die eingegebenen Zugangsdaten per echtem WebDAV-`ensureFolder`-Aufruf,
+  bevor irgendetwas gespeichert wird – Tippfehler kommen sofort als
+  Klartext-Fehler zurück.
+- **Selbst-Neustart:** Nach erfolgreichem Speichern beendet sich der Prozess
+  (`process.exit`), Docker (`restart: unless-stopped`) startet neu und bootet
+  jetzt im Normalbetrieb.
+- **Lokale Entwicklung:** `data/doday-config.example.json` zum Kopieren als
+  Schnellweg (Setup-Assistent entfällt dann), `.env` liefert nur noch `PORT`.
+- **Deploy-Lehre (Server, 16.07.2026):** Nach dem Force-Push der
+  Git-Historie-Bereinigung (siehe unten) musste der Server-Klon per
+  `git fetch && git reset --hard origin/main` neu ausgerichtet werden (nicht
+  `git pull` – divergierte Historie durch Rewrite). Beim ersten Speichern im
+  Setup-Formular schlug das Schreiben von `data/doday-config.json` mit
+  `EACCES` fehl: Das gebindete Host-Volume (`/srv/doday-data`) gehörte
+  `root:root` auf einem **SELinux**-Host (erkennbar am Punkt hinter den
+  Rechten in `ls -la`, z. B. `drwxr-xr-x.`) – Fix war `:Z` am Volume-Eintrag
+  in der echten `docker-compose.yml` (`./doday-data:/app/data:Z`), nicht ein
+  reines Unix-Rechte-Problem.
+- **Sicherheits-Review (16.07.2026):** Externe Zweitmeinung eingeholt
+  (XSS/CSRF/SSRF/Docker-Härtung). Ergebnis: `escapeHtml()`
+  (`src/ui/dayView.ts`) escapte `'` (einfaches Anführungszeichen) nicht –
+  ergänzt, aktuell nicht ausnutzbar (nur doppelt gequotete Attribute im Code),
+  aber billige Absicherung. Weitere Punkte bewusst zurückgestellt, siehe
+  „Offene Punkte" unten.
+
 ## Störungs-Lehren (13.06.2026) – wichtig fürs Deployment
 
 - **Dockerfile musste `COPY src ./src` bekommen** – das Backend importiert
@@ -248,10 +292,13 @@ einmal, **Tap = Abbruch**. Spec/Plan: `docs/superpowers/{specs,plans}/2026-06-26
 | Blättern in die ZUKUNFT (Week/Month) | bewusst weggelassen (YAGNI) – Cockpits zeigen jetzt + Vergangenheit |
 | Ziel-Historie | Ziele zeigen immer den aktuellen Stand, auch in Vorzeiträumen (keine Historie gespeichert) |
 | Termine-Umzug iCloud → Nextcloud | Nutzer-Aufgabe, noch offen |
-| ExApp-Stufe (Nextcloud AppAPI) | Konzept-Option, alles dafür vorbereitet (ENV, /api/v1, keine lokale DB) |
+| ExApp-Stufe (Nextcloud AppAPI) | Konzept-Option, alles dafür vorbereitet (Config-Datei statt ENV seit Phase 11, /api/v1, keine lokale DB) |
 | Kosmetik Cockpit/Stifte | nach Sichtprüfung ggf. Feinschliff (Punktgrößen, Abstände, max. 8 Tag-Treffer) |
 | Server-Nebenbefunde | `srv-bluespice-bluespice-1` und `portainer_edge_agent` in Restart-Schleifen, `unhole` unhealthy – unabhängig von Do Day |
 | Bewusste Architektur-Eigenheit | Ringimport `dayView ↔ cockpitView` (nur Laufzeit-Aufrufe, unkritisch); Deploy bewusst per `git pull` statt GHCR/Actions |
+| Docker-Container non-root | bewusst zurückgestellt (16.07.) – Prozess läuft aktuell als root; Wechsel bräuchte vorher ein `chown`/Rechte-Konzept für `/srv/doday-data` (SELinux-Host), sonst reißt es die gerade gelöste `EACCES`-Problematik wieder auf |
+| Content-Security-Policy (CSP) | bewusst zurückgestellt (16.07.) – sinnvolle Tiefenverteidigung, aber kein konkreter Befund dahinter |
+| CSRF-Custom-Header für `/api/*` | bewusst nicht umgesetzt (16.07.) – `SameSite=Lax` auf dem Auth-Cookie verhindert bereits, dass er bei cross-site-POSTs mitgeschickt wird; Header wäre nur zusätzliche Tiefenverteidigung |
 
 ## Architektur (Mermaid)
 
