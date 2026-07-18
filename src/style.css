@@ -1233,6 +1233,14 @@ details[open] > summary .chevron {
   gap: 1.4rem;
 }
 
+/* Schmal (Smartphone): etwas enger, damit alle 5 Gewohnheiten-Kreise (Day) in
+   EINER Reihe passen statt dass der fünfte umbricht. */
+@media (max-width: 40.999rem) {
+  .habit-row {
+    gap: 1rem;
+  }
+}
+
 .habit {
   display: flex;
   flex-direction: column;
