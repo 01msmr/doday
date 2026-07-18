@@ -9,9 +9,9 @@ Fünf Ansichten über die untere Navigation (Do Day, Do Morrow, Do Week, Do Mont
 * Termine
    * ──► Nextcloud-Termine
 * Gewohnheiten
-   * 
+   * …
 * Ziele
-   * 
+   * …
 
 ### Tags
 z. B. `Keller entrümpeln #Zuhause.Aufräumen`). 
