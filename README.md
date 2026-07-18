@@ -1,8 +1,10 @@
 # doday
 
-Minimalistische Tagesansicht-PWA mit Nextcloud als Datenbasis: Aufgaben,
-Termine, Gewohnheiten und Ziele – gruppiert über hierarchische `#Tags`
-im Klartext (z. B. `Keller entrümpeln #Zuhause.Aufräumen`).
+Minimalistische Planer-PWA mit Nextcloud als Datenbasis: Aufgaben, Termine,
+Gewohnheiten und Ziele – gruppiert über hierarchische `#Tags` im Klartext
+(z. B. `Keller entrümpeln #Zuhause.Aufräumen`). Fünf Ansichten über die
+untere Navigation (Do Day, Do Morrow, Do Week, Do Month, UN:DONE), per
+Wisch oder Pfeiltasten wechselbar; Oberfläche auf Deutsch/Englisch.
 
 ## Architektur
 
@@ -59,12 +61,13 @@ docker build -t doday .
 
 ## Ordnerstruktur
 
-| Pfad            | Inhalt                                              |
-| --------------- | --------------------------------------------------- |
-| `src/models`    | Datenmodelle (Habit, Achievement, Task, …)           |
-| `src/services`  | Logik: Tags, Registry, Auswahl, ICS, Mock-Daten      |
-| `src/ui`        | Rendering: Tagesansicht, Gruppierung                 |
-| `src/utils`     | Helfer: Datum, Farb-Validierung                      |
-| `server/`       | Hono-Backend + WebDAV-Client                         |
-| `deploy/`       | Compose-Vorlage für Traefik                          |
-| `docs/`         | Konzepte (z. B. Verschieben per Drag & Drop)         |
+| Pfad                           | Inhalt                                                      |
+| ------------------------------ | ----------------------------------------------------------- |
+| `src/models`                   | Datenmodelle (Habit, Achievement, Task, …)                  |
+| `src/services`                 | Logik: Tags, Registry, Auswahl, ICS, Nextcloud-API-Client   |
+| `src/ui`                       | Rendering: Tagesansicht, Wochen/Monats-Cockpit, Drag & Drop |
+| `src/utils`                    | Helfer: Datum, Farb-Validierung                             |
+| `src/i18n.ts`, `src/lang.json` | Deutsch/Englisch-Umschaltung                                |
+| `server/`                      | Hono-Backend + WebDAV-Client                                |
+| `deploy/`                      | Compose-Vorlage für Traefik                                 |
+| `docs/`                        | Konzepte (z. B. Verschieben per Drag & Drop)                |
