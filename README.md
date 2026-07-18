@@ -5,9 +5,13 @@ Minimalistische Planer-PWA mit Nextcloud als Datenbasis – gruppiert über hier
 Fünf Ansichten über die untere Navigation (Do Day, Do Morrow, Do Week, Do Month, UN:DONE), per Wisch oder Pfeiltasten wechselbar; Oberfläche auf Deutsch/Englisch.
 
 * Aufgaben
+   * ──► Nextcloud-Tasks
 * Termine
+   * ──► Nextcloud-Termine
 * Gewohnheiten
+   * 
 * Ziele
+   * 
 
 ### Tags
 z. B. `Keller entrümpeln #Zuhause.Aufräumen`). 
@@ -58,7 +62,8 @@ npm run lint    # ESLint (src + server)
 npm run build   # Typprüfung + Produktions-Build
 ```
 
-## Deployment (do.msmr.co)
+## Deployment
+auf eigenem server docker-Installation verfügbar machen.
 
 ```bash
 docker build -t doday .
