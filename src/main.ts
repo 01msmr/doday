@@ -84,10 +84,10 @@ function goToView(next: ViewId): void {
   refreshAgenda(); // Zeitfenster hat sich geändert → passende Daten holen
 }
 
-/** Nachbar-Tab in VIEW_ORDER; null am Rand (kein Umlauf, anders als der Telefon-Kanten-Wisch). */
-function neighborView(current: ViewId, direction: 1 | -1): ViewId | null {
+/** Nachbar-Tab in VIEW_ORDER, mit Umlauf (iPad-/Desktop-Wisch und Pfeiltasten). */
+function neighborView(current: ViewId, direction: 1 | -1): ViewId {
   const index = VIEW_ORDER.indexOf(current);
-  return VIEW_ORDER[index + direction] ?? null;
+  return VIEW_ORDER[(index + direction + VIEW_ORDER.length) % VIEW_ORDER.length]!;
 }
 
 /* ---------- Kanten-Wisch-Vorschau („billiges" Finger-Follow-Paging) ----------
@@ -1871,10 +1871,7 @@ root.addEventListener(
     if (Math.abs(dx) < TAB_SWIPE_MIN_X) {
       return;
     }
-    const next = neighborView(state.view, dx < 0 ? 1 : -1);
-    if (next) {
-      goToView(next);
-    }
+    goToView(neighborView(state.view, dx < 0 ? 1 : -1));
   },
   { passive: true },
 );
@@ -1894,10 +1891,7 @@ document.addEventListener('keydown', (event) => {
   if (active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)) {
     return;
   }
-  const next = neighborView(state.view, event.key === 'ArrowRight' ? 1 : -1);
-  if (next) {
-    goToView(next);
-  }
+  goToView(neighborView(state.view, event.key === 'ArrowRight' ? 1 : -1));
 });
 
 // Drag & Drop: Greifer/Ziele erkennt die Engine selbst, wir verarbeiten nur das Ergebnis
