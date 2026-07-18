@@ -51,6 +51,7 @@ const state: AppState = {
   filterArea: null,
   editing: null,
   editingHabits: false,
+  editingHabitColor: null,
   creatingEvent: false,
   creatingTask: false,
   editingTask: null,
@@ -80,6 +81,8 @@ function goToView(next: ViewId): void {
   }
   state.view = next;
   state.periodOffset = 0; // Tab-Wechsel landet immer im Jetzt
+  state.editingHabits = false; // Gewohnheiten-Editor gehört nur zu Do Day
+  state.editingHabitColor = null;
   rerender(); // sofort zeigen – die frischen Daten folgen gleich
   refreshAgenda(); // Zeitfenster hat sich geändert → passende Daten holen
 }
@@ -232,6 +235,7 @@ function startEdgePreview(): void {
     editingEvent: null,
     editing: null,
     editingHabits: false,
+    editingHabitColor: null,
   };
   const w = window.innerWidth;
   previewEl = document.createElement('div');
@@ -330,6 +334,7 @@ function endEdgePreview(dx: number): void {
           editingEvent: null,
           editing: null,
           editingHabits: false,
+          editingHabitColor: null,
         };
         const layer = document.createElement('div');
         layer.className = `tab-swipe-layer${viewId === 'undone' ? ' tab-swipe-layer--undone' : ''}`;
@@ -1235,7 +1240,7 @@ root.addEventListener('click', (event) => {
   if (!trigger) {
     return;
   }
-  const { action, id, view, path } = trigger.dataset;
+  const { action, id, view, path, color } = trigger.dataset;
 
   if (action === 'reload-all') {
     // Doppeltipp auf den Header (Wochentag/Datum) – extern geänderte Inhalte
@@ -1301,6 +1306,12 @@ root.addEventListener('click', (event) => {
 
   if (action === 'toggle-habit-editor') {
     state.editingHabits = !state.editingHabits;
+    state.editingHabitColor = null;
+    rerender();
+  }
+
+  if (action === 'toggle-habit-color-picker' && id) {
+    state.editingHabitColor = state.editingHabitColor === id ? null : id;
     rerender();
   }
 
@@ -1418,6 +1429,16 @@ root.addEventListener('click', (event) => {
     queue(persistAchievements);
   }
 
+  if (action === 'set-habit-color' && id && color) {
+    const habit = state.data.habits.find((h) => h.id === id);
+    if (habit) {
+      habit.color = color;
+      state.editingHabitColor = null;
+      rerender();
+      queue(persistAchievements);
+    }
+  }
+
   if (action === 'delete-habit' && id) {
     const habit = state.data.habits.find((h) => h.id === id);
     if (habit && window.confirm(`Gewohnheit "${habit.title}" löschen?`)) {
@@ -1518,6 +1539,7 @@ root.addEventListener('change', (event) => {
   }
   if (edit === 'color' && field instanceof HTMLInputElement) {
     habit.color = field.value;
+    state.editingHabitColor = null;
   }
   if (edit === 'title' && field instanceof HTMLInputElement && field.value.trim()) {
     habit.title = field.value.trim();

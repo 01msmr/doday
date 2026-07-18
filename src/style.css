@@ -1,8 +1,5 @@
-/* Do Day – „stilles Journal":
-   Helle Welt = warmes Papier, dunkle Welt = warmes Dunkelgrau.
-   Der Modus folgt automatisch der Geräte-Einstellung (prefers-color-scheme).
-   Alle Komponenten nutzen NUR die Token unten – dadurch funktioniert
-   jedes Bauteil in beiden Welten, ohne doppelt gepflegt zu werden. */
+/* Do Day – „stilles Journal": Token unten steuern hell/dunkel automatisch
+   (prefers-color-scheme); Komponenten nutzen NUR diese Token. */
 
 :root {
   /* Helle Welt: Tinte auf Papier */
@@ -35,6 +32,15 @@
   /* Demo-Finger: kontrastierender, halbtransparenter Kreis (Inhalt scheint durch). */
   --demo-finger: rgb(38 37 31 / 0.5);
   --demo-finger-ring: rgb(38 37 31 / 0.3);
+
+  /* UN:DONE-Karten: feste Farben, invertieren NICHT mit dem Dark Mode
+     (die offene Spalte bleibt papierweiß, die Erledigt-Karte dunkel). */
+  --undone-paper: #ffffff;
+  --undone-ink: #26251f;
+  --undone-ink-soft: #6b675c;
+  --undone-cream: #f3f0e9;
+  --undone-badge-bg: #000;
+  --undone-badge-ink: #fff;
 
   --serif: 'Iowan Old Style', 'Palatino Nova', Palatino, Georgia, serif;
   --sans: 'Avenir Next', Avenir, 'Helvetica Neue', system-ui, sans-serif;
@@ -294,10 +300,8 @@ body {
 }
 
 /* ---------- Spalten-Layout & mobile Karten-Bühne ----------
-   Schmal (iPhone): Aufgaben sind der Hintergrund, Termine + Gewohnheiten
-   liegen als verschiebbare Karte darüber (Griff = Oberleiste mit Icon).
-   Breit (ab 41rem): klassisch zwei Spalten nebeneinander, keine Karte.
-   Alle „Stellschrauben" hier zentral: */
+   Schmal: Aufgaben als Hintergrund, Karte (Termine+Gewohnheiten) darüber.
+   Breit (ab 41rem): klassische zwei Spalten. Stellschrauben zentral hier: */
 :root {
   --card-radius: 1.4rem; /* große Radien der Karte */
   --card-top: -0.3rem; /* Oberkante 0.3rem höher (= 15 % kleinerer Schatten-Blur) */
@@ -554,9 +558,7 @@ body {
 }
 
 /* ---------- Untere Aktions-Pillen (mobil) ----------
-   „+ Aufgabe" gehört zum Hintergrund und liegt VOR der Karte (aber hinter der
-   Navi). „+ Termin" sitzt IN der Karte und gleitet beim Wechsel mit ihr.
-   Beide schweben direkt über der Navi-Leiste. */
+   „+ Aufgabe" vor der Karte, „+ Termin" in der Karte (gleitet mit). */
 .hg-action,
 .card-action {
   left: 0;
@@ -724,12 +726,10 @@ body {
   background: var(--pill-red);
 }
 
-/* „Gewohnheiten"-Kopf: kleines Zahnrad DIREKT hinter dem Badge (eng, nicht am Rand) */
-.section-label--gear {
-  gap: 0.4rem;
-}
-
+/* „Gewohnheiten"-Kopf: Zahnrad ans Zeilenende (hinter die Haarlinie), wie das
+   ＋ bei anderen Sektionen – statt eng neben dem Badge. */
 .section-label--gear .habit-gear {
+  order: 1;
   width: 1.6rem;
   height: 1.6rem;
   margin: 0;
@@ -1385,20 +1385,75 @@ details[open] > summary .chevron {
   cursor: pointer;
 }
 
-.habit-editor input[type='color'] {
-  width: 1.7rem;
-  height: 1.7rem;
-  padding: 0;
-  background: none;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-}
-
 .habit-editor-hint {
   margin: 0;
   font-size: 0.75rem;
   color: var(--ink-faint);
+}
+
+/* Farbkreis in der Editor-Zeile: öffnet das Popover statt direkt die native
+   Farbwahl (sonst tippt man beim Bedienen der Zeile leicht versehentlich rein). */
+.habit-color-cell {
+  position: relative;
+}
+
+.habit-color-trigger {
+  width: 1.7rem;
+  height: 1.7rem;
+  padding: 0;
+  background: var(--hc, var(--accent));
+  border: 1.5px solid var(--ink-faint);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+/* Popover: Farbvorschläge + native Farbwahl für Eigenes */
+.habit-color-popover {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.6rem 0.7rem;
+  background: var(--glow);
+  border: 1px solid var(--hairline);
+  border-radius: 0.9rem;
+  box-shadow: 0 0.5rem 1.5rem rgb(38 37 31 / 0.18);
+}
+
+.habit-color-swatches {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.habit-color-swatch {
+  width: 1.3rem;
+  height: 1.3rem;
+  padding: 0;
+  background: var(--sc);
+  border: 1.5px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.habit-color-swatch.active {
+  border-color: var(--ink);
+}
+
+/* Eigene Farbe: kleiner Trenner, dann die native Farbwahl */
+.habit-color-popover input[type='color'] {
+  width: 1.3rem;
+  height: 1.3rem;
+  padding: 0;
+  margin-right: 0.15rem;
+  background: none;
+  border: none;
+  border-right: 1px solid var(--hairline);
+  border-radius: 0;
+  padding-right: 0.65rem;
+  cursor: pointer;
 }
 
 /* ---------- Achievements ---------- */
@@ -1921,67 +1976,61 @@ details[open] > summary .chevron {
 }
 
 /* ---------- UN DONE (gleiches Karten-Gerüst wie Tabs 1–4) ----------
-   Nur der Karten-Inhalt unterscheidet sich: die KARTE selbst ist dunkel, die
-   erledigten Aufgaben sitzen ohne eigene Item-Fläche darauf (heller Text).
-   FESTE Farben (nicht --ink/--bg) → der Dunkelmodus invertiert NICHT erneut.
-   Layout/Rahmen/Swipe kommen 1:1 aus den .page--staged-Regeln. */
-/* Linke Spalte (offen): fest helle Fläche mit dunklem Text – FESTE Farben, damit
-   der Dunkelmodus NICHT invertiert (Gegenstück zur dunklen rechten Karte). */
+   Nur die Karte ist dunkel. Feste Farben (nicht --ink/--bg), damit Dark
+   Mode nicht doppelt invertiert. */
 .columns--undone .col-main {
-  background: #ffffff;
+  background: var(--undone-paper);
 }
 
 .columns--undone .col-main .task,
 .columns--undone .col-main .task .task-title {
-  color: #26251f;
+  color: var(--undone-ink);
 }
 
 /* Gruppen-Überschriften: dunkel auf der hellen Offen-Spalte … */
 .columns--undone .col-main .task-group-head {
-  color: #26251f;
+  color: var(--undone-ink);
 }
 
 /* … und hell auf der dunklen Erledigt-Karte. */
 .columns--undone .col-side .task-group-head {
-  color: #f3f0e9;
+  color: var(--undone-cream);
 }
 
 .columns--undone .col-main .edit-pen {
-  background: rgb(38 37 31 / 0.1);
-  color: #6b675c;
+  background: color-mix(in srgb, var(--undone-ink) 10%, transparent);
+  color: var(--undone-ink-soft);
 }
 
 .columns--undone .col-side {
-  background: #26251f;
+  background: var(--undone-ink);
 }
 
-/* Header in UN:DONE INVERS statt farbig: passend zur Spaltenfläche – „Offen"
-   schwarz auf der weißen Spalte, „Erledigt" weiß auf der dunklen Karte.
-   (Gilt auch fürs mittige Kopf-Badge auf Mobil und das Karten-Griff-Label.) */
+/* Header in UN:DONE INVERS statt farbig: passend zur Spaltenfläche. */
 .columns--undone .col-main .label-badge,
 .page--undone .masthead-center {
-  background: #000;
-  color: #fff;
+  background: var(--undone-badge-bg);
+  color: var(--undone-badge-ink);
 }
 
 .columns--undone .col-side .label-badge,
 .columns--undone .card-handle-label {
-  background: #fff;
-  color: #000;
+  background: var(--undone-badge-ink);
+  color: var(--undone-badge-bg);
 }
 
 .columns--undone .col-side .task,
 .columns--undone .col-side .task .task-title {
-  color: #f3f0e9;
+  color: var(--undone-cream);
 }
 
 .columns--undone .col-side .task.done .check {
-  background: #f3f0e9;
-  border-color: #f3f0e9;
+  background: var(--undone-cream);
+  border-color: var(--undone-cream);
 }
 
 .columns--undone .col-side .task.done .check::after {
-  color: #26251f;
+  color: var(--undone-ink);
 }
 
 /* Erledigte Aufgaben sind nicht editierbar → Stift in der Karte entfernen */

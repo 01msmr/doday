@@ -57,6 +57,8 @@ export interface AppState {
   editing: string | null;
   /** Zahnrad-Panel zum Bearbeiten der Gewohnheiten offen? */
   editingHabits: boolean;
+  /** Farbwahl-Popover einer Gewohnheit offen (id) – null = keine */
+  editingHabitColor: string | null;
   /** Formular "Termin anlegen" offen? */
   creatingEvent: boolean;
   /** Formular "Aufgabe anlegen" offen? */
@@ -579,7 +581,7 @@ function renderTaskProgress(stats: { done: number; total: number }): string {
 }
 
 /** Gewohnheiten als schlichte Kreise – erledigt = gefüllt mit Haken, jede in eigener Farbe */
-function renderHabits(habits: Habit[], editing: boolean): string {
+function renderHabits(habits: Habit[], editing: boolean, editingColorId: string | null): string {
   const today = isoDate();
   const items = habits
     .map((habit) => {
@@ -595,7 +597,7 @@ function renderHabits(habits: Habit[], editing: boolean): string {
       </button>`;
     })
     .join('');
-  // Zahnrad rechts in der „Gewohnheiten"-Kopfzeile (klein) öffnet den Editor.
+  // Zahnrad am Ende der „Gewohnheiten"-Kopfzeile öffnet den Editor.
   const gear = `
       <button type="button" class="habit-gear${editing ? ' active' : ''}"
         data-action="toggle-habit-editor" aria-expanded="${editing}"
@@ -612,19 +614,54 @@ function renderHabits(habits: Habit[], editing: boolean): string {
       <h2 class="section-label section-label--gear"><span class="label-badge">${t('habits')}</span>${gear}</h2>
       <div class="habit-row">${items}</div>
       ${emptyHint}
-      ${editing ? renderHabitEditor(habits) : ''}
+      ${editing ? renderHabitEditor(habits, editingColorId) : ''}
     </section>`;
 }
 
+/** Farbvorschläge im Stil der App (gedeckt, aber etwas satter als --accent/--pill/--pill-red) */
+const HABIT_COLOR_PRESETS: { key: Parameters<typeof t>[0]; hex: string }[] = [
+  { key: 'colorSage', hex: '#57844b' },
+  { key: 'colorBlue', hex: '#5373a2' },
+  { key: 'colorBrick', hex: '#ae5144' },
+  { key: 'colorOchre', hex: '#c18d33' },
+  { key: 'colorTeal', hex: '#43847e' },
+  { key: 'colorPlum', hex: '#874f83' },
+  { key: 'colorTaupe', hex: '#967c57' },
+];
+
+/** Popover: Farbvorschläge + native Farbwahl für Eigenes – öffnet sich erst
+    auf Klick, damit man beim Bedienen der Zeile nicht versehentlich draufklickt. */
+function renderColorPopover(habit: Habit): string {
+  const current = (habit.color ?? DEFAULT_HABIT_COLOR).toLowerCase();
+  const swatches = HABIT_COLOR_PRESETS.map(
+    ({ key, hex }) => `
+      <button type="button" class="habit-color-swatch${hex.toLowerCase() === current ? ' active' : ''}"
+        style="--sc:${hex}" data-action="set-habit-color" data-id="${habit.id}" data-color="${hex}"
+        aria-label="${t('ariaColorSwatch', { color: t(key) })}"></button>`,
+  ).join('');
+  return `
+    <div class="habit-color-popover">
+      <input type="color" value="${escapeHtml(current)}"
+        data-edit="color" data-id="${habit.id}"
+        aria-label="${t('ariaColorOf', { name: escapeHtml(habit.title) })}" />
+      <div class="habit-color-swatches">${swatches}</div>
+    </div>`;
+}
+
 /** Editor-Panel: pro Gewohnheit Farbe, Name, Zeitraum, Ziel – plus Anlegen/Löschen */
-function renderHabitEditor(habits: Habit[]): string {
+function renderHabitEditor(habits: Habit[], editingColorId: string | null): string {
   const rows = habits
-    .map(
-      (habit) => `
+    .map((habit) => {
+      const open = editingColorId === habit.id;
+      const color = safeColor(habit.color) ?? DEFAULT_HABIT_COLOR;
+      return `
       <div class="habit-editor-row">
-        <input type="color" value="${escapeHtml(habit.color ?? DEFAULT_HABIT_COLOR)}"
-          data-edit="color" data-id="${habit.id}"
-          aria-label="${t('ariaColorOf', { name: escapeHtml(habit.title) })}" />
+        <div class="habit-color-cell">
+          <button type="button" class="habit-color-trigger" style="--hc:${color}"
+            data-action="toggle-habit-color-picker" data-id="${habit.id}" aria-expanded="${open}"
+            aria-label="${t('ariaColorOf', { name: escapeHtml(habit.title) })}"></button>
+          ${open ? renderColorPopover(habit) : ''}
+        </div>
         <input type="text" value="${escapeHtml(habit.title)}"
           data-edit="title" data-id="${habit.id}" aria-label="${t('habitName')}" />
         <select data-edit="schedule" data-id="${habit.id}" aria-label="${t('period')}">
@@ -635,8 +672,8 @@ function renderHabitEditor(habits: Habit[]): string {
           data-edit="target" data-id="${habit.id}" aria-label="${t('ariaTargetField')}" />
         <button type="button" class="habit-delete" data-action="delete-habit" data-id="${habit.id}"
           aria-label="${t('ariaDeleteHabit', { name: escapeHtml(habit.title) })}">&times;</button>
-      </div>`,
-    )
+      </div>`;
+    })
     .join('');
   return `
     <div class="habit-editor">
@@ -880,7 +917,7 @@ export function buildPageHtml(state: AppState): string {
     });
     extrasHtml =
       state.view === 'day'
-        ? `${renderHabits(state.data.habits, state.editingHabits)}${renderAchievements(state.data.achievements, state.data.habits, taskStats)}`
+        ? `${renderHabits(state.data.habits, state.editingHabits, state.editingHabitColor)}${renderAchievements(state.data.achievements, state.data.habits, taskStats)}`
         : '';
   } else if (state.view === 'undone') {
     // „UN DONE": GLEICHES Karten-Gerüst wie Tabs 1–4 – offene Aufgaben im
