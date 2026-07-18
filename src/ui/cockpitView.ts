@@ -78,7 +78,8 @@ function renderPeriodMasthead(
           : t('monthsAgo', { n: -offset });
     big = monthOf(start);
   }
-  // Die ‹ › wandern in den linken Masthead-Slot, damit Monat + Jahr ganz rechts bleiben.
+  // ‹ › sitzen fest rechtsbündig in der Wochentag-Spalte (per CSS absolut positioniert,
+  // siehe .period-nav) – dadurch springen sie nicht mit der Länge des Zeitraum-Worts.
   const nav = `
     <span class="period-nav">
       <button type="button" class="period-btn" data-action="switch-period" data-dir="-1"
