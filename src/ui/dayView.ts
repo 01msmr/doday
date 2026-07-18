@@ -756,25 +756,6 @@ export function renderAchievements(
     </section>`;
 }
 
-/** Eine Zeile mit allem, was heute schon geschafft ist: Aufgaben + vergangene Termine */
-function renderDoneLine(tasks: Task[], events: CalendarEvent[]): string {
-  const now = new Date();
-  const doneTitles = [
-    ...tasks.filter((task) => task.completed).map((task) => task.title),
-    // Vergangene Termine: Date-Vergleich versteht UTC (CalDAV) wie lokale Stempel
-    ...events
-      .filter((event) => !event.allDay && new Date(event.end) <= now)
-      .map((event) => event.title),
-  ];
-  if (doneTitles.length === 0) {
-    return '';
-  }
-  const items = doneTitles
-    .map((title) => `<span class="done-item">${escapeHtml(title)}</span>`)
-    .join('<span class="done-sep"> · </span>');
-  return `<p class="done-line"><span class="done-label">${t('done')}</span> ${items}</p>`;
-}
-
 /* ---------- Untere Navigation ---------- */
 
 const VIEWS: { id: ViewId; label: string }[] = [
@@ -861,7 +842,6 @@ export function buildPageHtml(state: AppState): string {
   let mainHtml: string; // Hintergrund: Aufgaben
   let scheduleHtml: string; // Karte: Termine
   let extrasHtml: string; // Karte: Gewohnheiten + Ziele
-  let doneLine = '';
   let filterChip = '';
 
   if (state.view === 'day' || state.view === 'morrow') {
@@ -891,7 +871,6 @@ export function buildPageHtml(state: AppState): string {
     };
 
     mastheadHtml = renderMasthead(small, dayMonthOf(date), yearOf(date), busy, t('tasks'));
-    doneLine = state.view === 'day' ? renderDoneLine(dayTasks, dayEvents) : '';
     filterChip = renderFilterChip(state);
     mainHtml = renderAreas(grouped, state, { creating: state.creatingTask, dateIso });
     scheduleHtml = renderSchedule(events, state.registry, {
@@ -986,7 +965,6 @@ export function buildPageHtml(state: AppState): string {
 
   const content = `
       ${mastheadHtml}
-      ${doneLine}
       ${filterChip}
       <div class="columns${animClass}${isUndone ? ' columns--undone' : ''}" data-mobile="${state.mobileColumn}">
         <div class="col-main">${mainHtml}${hgAction}</div>

@@ -346,17 +346,12 @@ body {
      höher steigt und nah an den „Aufgaben"-Schriftzug heranrückt. */
   .page--staged > .masthead,
   .page--staged > .sync-note,
-  .page--staged > .done-line,
   .page--staged > .filter-chip {
     flex: none;
   }
 
   .page--staged > .masthead {
     margin-bottom: 0.1rem;
-  }
-
-  .page--staged > .done-line {
-    margin-top: 0.25rem;
   }
 
   /* Die Bühne: HG (Aufgaben) und Karte liegen hier übereinander */
@@ -1498,31 +1493,6 @@ details[open] > summary .chevron {
   flex: none;
   font-size: 1.26rem; /* 75 % größer als die ursprünglichen 0.72rem */
   color: var(--ink-soft);
-}
-
-/* "Erledigt"-Zeile unter dem Datum: heute geschaffte Aufgaben + vergangene Termine */
-.done-line {
-  margin: 1rem 0 0;
-  font-size: 0.85rem;
-  color: var(--ink-faint);
-}
-
-.done-label {
-  margin-right: 0.5rem;
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-
-.done-item {
-  text-decoration: line-through;
-  text-decoration-color: var(--strike);
-}
-
-.done-sep {
-  color: var(--ink-faint);
 }
 
 /* ---------- Untere Navigation ---------- */
