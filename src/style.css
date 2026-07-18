@@ -126,14 +126,9 @@ body {
   }
 }
 
-/* Breit (iPad quer, Desktop): dasselbe Prinzip – das Dokument selbst darf nie
-   wippen/scrollen (sonst zeigt gerade das iPad ein Gummiband, obwohl der Inhalt
-   eigentlich passt). Anders als mobil gibt es hier aber KEINE eigene Innen-
-   Scrollzone pro Spalte, also übernimmt .page selbst das (contained) Scrollen –
-   nur falls Inhalt wirklich mal höher als der Bildschirm ist.
-   touch-action: pan-y überlässt waagerechte Gesten bewusst dem JS-Wisch (Tab-
-   Wechsel) statt der nativen Scroll-Erkennung – sonst gewinnt bei einer echten
-   Scrollfläche manchmal der Browser das Wettrennen ums preventDefault(). */
+/* Breit (iPad quer, Desktop): dasselbe Prinzip, aber .page selbst scrollt
+   (contained) statt einzelner Spalten. touch-action:pan-y überlässt waagerechte
+   Gesten dem JS-Wisch statt der nativen Scroll-Erkennung. */
 @media (min-width: 41rem) {
   html,
   body {
@@ -149,8 +144,7 @@ body {
   }
 
   .page {
-    /* dvh statt % – #app selbst hat keine feste Höhe, eine %-Höhe würde also
-       ins Leere greifen (Kind bliebe bei auto-Höhe, siehe .page--staged mobil) */
+    /* dvh statt % – #app hat keine feste Höhe, % würde ins Leere greifen */
     height: 100dvh;
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -245,17 +239,13 @@ body {
   min-width: 0;
 }
 
-/* Cockpit (Woche/Monat): Platz für die ‹›-Knöpfe rechts in DERSELBEN Spalte wie
-   das Zeitraum-Wort reservieren – .period-nav sitzt absolut (siehe unten), daher
-   braucht das Wort selbst hier den Rand, um nicht darunter zu verschwinden. */
+/* Platz für die absolut positionierten ‹›-Knöpfe (.period-nav) reservieren */
 .weekday:has(.period-nav) {
   padding-right: 3.5rem;
 }
 
-/* Breit (ab 41rem): dieselbe Spaltenaufteilung wie .columns (1.35fr : 1fr,
-   gleicher column-gap) – dadurch landet der rechte Rand der Wochentag-Spalte
-   PIXELGENAU auf dem rechten Rand des Farb-Divs (col-main) darunter. Weder
-   Zeitraum-Wort noch Datum (unterschiedlich breite Monatsnamen) verschieben das. */
+/* Breit: gleiche Spaltenaufteilung wie .columns (1.35fr : 1fr), damit der
+   rechte Rand der Wochentag-Spalte auf dem Rand des Farb-Divs darunter landet. */
 @media (min-width: 41rem) {
   .masthead--triple:has(.period-nav) {
     display: grid;
@@ -264,9 +254,7 @@ body {
   }
 
   .masthead--triple .weekday:has(.period-nav) {
-    /* überschreibt justify-self:start oben – die Spalte muss die volle 1.35fr-
-       Breite ausfüllen, sonst landet .period-nav (right:0) nicht am Spaltenrand */
-    justify-self: stretch;
+    justify-self: stretch; /* volle Spaltenbreite statt justify-self:start oben */
     min-width: 0;
   }
 }
@@ -1227,18 +1215,13 @@ details[open] > summary .chevron {
 
 /* ---------- Gewohnheiten ---------- */
 
+/* Grid statt Flex: Spaltenbreite richtet sich nach dem Kreis, nicht nach dem
+   Namen darunter – Kreise bleiben gleichmäßig verteilt, egal wie lang der
+   Name ist, und umgebrochene Zeilen fluchten spaltengenau. */
 .habit-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.4rem;
-}
-
-/* Schmal (Smartphone): etwas enger, damit alle 5 Gewohnheiten-Kreise (Day) in
-   EINER Reihe passen statt dass der fünfte umbricht. */
-@media (max-width: 40.999rem) {
-  .habit-row {
-    gap: 1rem;
-  }
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(3.1rem, 1fr));
+  gap: 0.9rem;
 }
 
 .habit {
@@ -1302,6 +1285,10 @@ details[open] > summary .chevron {
 .habit-name {
   font-size: 0.78rem;
   color: var(--ink-soft);
+  /* bricht bei Bedarf um, statt die Spalte zu verbreitern */
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
 }
 
 .habit.done .habit-name {
@@ -1735,9 +1722,8 @@ details[open] > summary .chevron {
 
 /* ---------- Cockpit (Do Week / Do Month) ---------- */
 
-/* ‹ › sitzen rechtsbündig fest am rechten Rand DERSELBEN Spalte wie das Zeitraum-
-   Wort (.weekday, position:relative) – absolut positioniert, damit sie weder mit
-   der Textlänge springen noch (über die Zeilenhöhe) die Karte darunter verschieben. */
+/* Absolut positioniert: springen nicht mit der Textlänge, verschieben nicht
+   die Zeilenhöhe. */
 .period-nav {
   position: absolute;
   right: 0;
