@@ -4,14 +4,24 @@ Minimalistische Planer-PWA mit Nextcloud als Datenbasis – gruppiert über hier
 
 Fünf Ansichten über die untere Navigation (Do Day, Do Morrow, Do Week, Do Month, UN:DONE), per Wisch oder Pfeiltasten wechselbar; Oberfläche auf Deutsch/Englisch.
 
-* Aufgaben
-   * ──► Nextcloud-Tasks
-* Termine
-   * ──► Nextcloud-Termine
-* Gewohnheiten
-   * …
-* Ziele
-   * …
+```mermaid
+flowchart LR
+    subgraph doday
+        Aufgaben
+        Termine
+        Gewohnheiten
+        Ziele
+    end
+    subgraph Nextcloud
+        Tasks[Nextcloud-Tasks]
+        Kalender[Nextcloud-Termine]
+        Achievements["achievements.json<br/>(WebDAV)"]
+    end
+    Aufgaben --> Tasks
+    Termine --> Kalender
+    Gewohnheiten --> Achievements
+    Ziele --> Achievements
+```
 
 ### Tags
 z. B. `Keller entrümpeln #Zuhause.Aufräumen`). 
