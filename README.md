@@ -1,10 +1,16 @@
 # doday
 
-Minimalistische Planer-PWA mit Nextcloud als Datenbasis: Aufgaben, Termine,
-Gewohnheiten und Ziele – gruppiert über hierarchische `#Tags` im Klartext
-(z. B. `Keller entrümpeln #Zuhause.Aufräumen`). Fünf Ansichten über die
-untere Navigation (Do Day, Do Morrow, Do Week, Do Month, UN:DONE), per
-Wisch oder Pfeiltasten wechselbar; Oberfläche auf Deutsch/Englisch.
+Minimalistische Planer-PWA mit Nextcloud als Datenbasis – gruppiert über hierarchische `#Tags` im Klartext.
+
+Fünf Ansichten über die untere Navigation (Do Day, Do Morrow, Do Week, Do Month, UN:DONE), per Wisch oder Pfeiltasten wechselbar; Oberfläche auf Deutsch/Englisch.
+
+* Aufgaben
+* Termine
+* Gewohnheiten
+* Ziele
+
+### Tags
+z. B. `Keller entrümpeln #Zuhause.Aufräumen`). 
 
 ## Architektur
 
