@@ -4,6 +4,8 @@ Minimalistische Planer-PWA mit Nextcloud als Datenbasis – gruppiert über hier
 
 Fünf Ansichten über die untere Navigation (Do Day, Do Morrow, Do Week, Do Month, UN:DONE), per Wisch oder Pfeiltasten wechselbar; Oberfläche auf Deutsch/Englisch.
 
+Gewohnheiten bekommen eine eigene Farbe: Vorschlag-Rechtecke (gegen Rot-Grün-Sehschwäche geprüft, per Würfel-Button neu mischbar) plus ein eingebetteter [iro.js](https://iro.js.org/)-Regler (Hue/Sättigung/Helligkeit, kein Alpha) für eigene Töne – alles in einem Popover.
+
 ```mermaid
 flowchart LR
     subgraph doday
@@ -24,7 +26,8 @@ flowchart LR
 ```
 
 ### Tags
-z. B. `Keller entrümpeln #Zuhause.Aufräumen`). 
+
+z. B. `Keller entrümpeln #Zuhause.Aufräumen`).
 
 ## Architektur
 
@@ -73,6 +76,7 @@ npm run build   # Typprüfung + Produktions-Build
 ```
 
 ## Deployment
+
 auf eigenem server docker-Installation verfügbar machen.
 
 ```bash
@@ -87,7 +91,7 @@ docker build -t doday .
 | `src/models`                   | Datenmodelle (Habit, Achievement, Task, …)                  |
 | `src/services`                 | Logik: Tags, Registry, Auswahl, ICS, Nextcloud-API-Client   |
 | `src/ui`                       | Rendering: Tagesansicht, Wochen/Monats-Cockpit, Drag & Drop |
-| `src/utils`                    | Helfer: Datum, Farb-Validierung                             |
+| `src/utils`                    | Helfer: Datum, Farb-Validierung/-Erzeugung (HSV→Hex)        |
 | `src/i18n.ts`, `src/lang.json` | Deutsch/Englisch-Umschaltung                                |
 | `server/`                      | Hono-Backend + WebDAV-Client                                |
 | `deploy/`                      | Compose-Vorlage für Traefik                                 |
