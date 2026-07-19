@@ -1410,6 +1410,9 @@ details[open] > summary .chevron {
 /* Popover: aktuelle Farbe + Vorschläge + Würfel oben, iro.js-Regler darunter –
    alles gleichzeitig sichtbar. ^-Pfeil (::before/::after, zwei gestapelte
    Dreiecke für Rand + Füllung) zeigt auf den auslösenden Farbkreis. */
+/* Grid statt Flex-Spalte: Kreis nur in Zeile 1/Spalte 1 (Platz darunter bleibt
+   leer), Vorschläge+Würfel und die iro.js-Regler darunter teilen sich Spalte 2
+   – Regler fluchten so exakt mit der Breite der Vorschlag-Reihe. */
 .habit-color-popover {
   position: absolute;
   top: calc(100% + 0.55rem);
@@ -1417,9 +1420,10 @@ details[open] > summary .chevron {
      GERADEN Kante sitzt statt in der abgerundeten Ecke (border-radius) */
   left: -0.5rem;
   z-index: 5;
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 0.5rem 0.55rem;
   padding: 0.7rem;
   background: var(--glow);
   border: 1px solid var(--hairline);
@@ -1427,19 +1431,14 @@ details[open] > summary .chevron {
   box-shadow: 0 0.5rem 1.5rem rgb(38 37 31 / 0.18);
 }
 
-.habit-color-top {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-}
-
 /* Aktuelle Farbe – DEUTLICH größer/hervorgehoben, da hier über den iro.js-
-   Regler darunter angepasst wird; jede Vorschlag-Wahl aktualisiert sie live. */
+   Regler angepasst wird; jede Vorschlag-Wahl aktualisiert sie live. Nur
+   Zeile 1 – darunter bleibt die Spalte bewusst leer. */
 .habit-color-current {
-  flex: none;
+  grid-column: 1;
+  grid-row: 1;
   width: 2.3rem;
   height: 2.3rem;
-  margin-right: 0.2rem;
   border-radius: 50%;
   background: var(--hc);
   border: 2.5px solid var(--ink);
@@ -1473,7 +1472,10 @@ details[open] > summary .chevron {
 /* Rechtecke statt Kreise: signalisieren "nur Vorauswahl", im Gegensatz zum
    großen, deutlich hervorgehobenen Kreis (aktueller Wert) links davon. */
 .habit-color-swatches {
+  grid-column: 2;
+  grid-row: 1;
   display: flex;
+  align-items: center;
   gap: 0.4rem;
 }
 
@@ -1513,10 +1515,12 @@ details[open] > summary .chevron {
   border-color: var(--accent);
 }
 
-/* iro.js-Regler (Hue/Sättigung/Helligkeit) – von main.ts eingehängt */
+/* iro.js-Regler (Hue/Sättigung/Helligkeit) – von main.ts eingehängt.
+   Spalte 2/Zeile 2: fluchtet mit der Vorschlag-Reihe, NICHT mit dem Kreis
+   links (dessen Spalte bleibt in Zeile 2 bewusst leer). */
 .habit-iro-mount {
-  display: flex;
-  justify-content: center;
+  grid-column: 2;
+  grid-row: 2;
 }
 
 .habit-iro-mount .IroSlider {

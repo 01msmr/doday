@@ -524,8 +524,12 @@ function mountHabitColorPicker(): void {
   if (!habit || !mount) {
     return;
   }
+  // Genau so breit wie die Vorschlag-Reihe darüber (gleiche Grid-Spalte) –
+  // Breite live messen statt zu raten, damit es bei CSS-Änderungen nicht wegdriftet.
+  const swatchesRow = mount.parentElement?.querySelector<HTMLElement>('.habit-color-swatches');
+  const width = swatchesRow?.getBoundingClientRect().width || 200;
   const picker = iro.ColorPicker(mount, {
-    width: 200,
+    width,
     color: habit.color ?? DEFAULT_HABIT_COLOR,
     padding: 5,
     handleRadius: 8,

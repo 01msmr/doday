@@ -659,11 +659,9 @@ function renderColorPopover(habit: Habit, colorSwatches: string[]): string {
       </button>`;
   return `
     <div class="habit-color-popover">
-      <div class="habit-color-top">
-        <div class="habit-color-current" id="habit-color-current-${habit.id}" style="--hc:${current}"
-          aria-hidden="true"></div>
-        <div class="habit-color-swatches">${swatches}${randomize}</div>
-      </div>
+      <div class="habit-color-current" id="habit-color-current-${habit.id}" style="--hc:${current}"
+        aria-hidden="true"></div>
+      <div class="habit-color-swatches">${swatches}${randomize}</div>
       <div class="habit-iro-mount" id="habit-iro-mount-${habit.id}" data-habit-id="${habit.id}"></div>
     </div>`;
 }
