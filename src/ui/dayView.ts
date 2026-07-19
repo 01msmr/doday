@@ -59,6 +59,8 @@ export interface AppState {
   editingHabits: boolean;
   /** Farbwahl-Popover einer Gewohnheit offen (id) – null = keine */
   editingHabitColor: string | null;
+  /** Aktuelle Farbvorschläge im Popover (Rechtecke) – per Würfel-Button ersetzbar */
+  habitColorSwatches: string[];
   /** Formular "Termin anlegen" offen? */
   creatingEvent: boolean;
   /** Formular "Aufgabe anlegen" offen? */
@@ -581,7 +583,12 @@ function renderTaskProgress(stats: { done: number; total: number }): string {
 }
 
 /** Gewohnheiten als schlichte Kreise – erledigt = gefüllt mit Haken, jede in eigener Farbe */
-function renderHabits(habits: Habit[], editing: boolean, editingColorId: string | null): string {
+function renderHabits(
+  habits: Habit[],
+  editing: boolean,
+  editingColorId: string | null,
+  colorSwatches: string[],
+): string {
   const today = isoDate();
   const items = habits
     .map((habit) => {
@@ -614,42 +621,59 @@ function renderHabits(habits: Habit[], editing: boolean, editingColorId: string 
       <h2 class="section-label section-label--gear"><span class="label-badge">${t('habits')}</span>${gear}</h2>
       <div class="habit-row">${items}</div>
       ${emptyHint}
-      ${editing ? renderHabitEditor(habits, editingColorId) : ''}
+      ${editing ? renderHabitEditor(habits, editingColorId, colorSwatches) : ''}
     </section>`;
 }
 
-/** Farbvorschläge im Stil der App (gedeckt, aber etwas satter als --accent/--pill/--pill-red) */
-const HABIT_COLOR_PRESETS: { key: Parameters<typeof t>[0]; hex: string }[] = [
-  { key: 'colorSage', hex: '#57844b' },
-  { key: 'colorBlue', hex: '#5373a2' },
-  { key: 'colorBrick', hex: '#ae5144' },
-  { key: 'colorOchre', hex: '#c18d33' },
-  { key: 'colorTeal', hex: '#43847e' },
-  { key: 'colorPlum', hex: '#874f83' },
-  { key: 'colorTaupe', hex: '#967c57' },
+/** Anfängliche Farbvorschläge – per OKLab/CVD-Validator (dataviz-Skill) geprüft:
+    ΔE ≥ 15 (Normalsicht) und ≥ 8 (Rot-Grün-Sehschwäche) für jede Kombination.
+    Der Würfel-Button ersetzt sie zur Laufzeit durch zufällige (siehe main.ts). */
+export const DEFAULT_HABIT_COLOR_SWATCHES: string[] = [
+  '#4bb400',
+  '#3b7cd8',
+  '#ff8aa0',
+  '#897200',
+  '#00d8f0e6',
+  '#7f2eb9',
+  '#cb202e',
 ];
 
-/** Popover: Farbvorschläge + native Farbwahl für Eigenes – öffnet sich erst
-    auf Klick, damit man beim Bedienen der Zeile nicht versehentlich draufklickt. */
-function renderColorPopover(habit: Habit): string {
+/** Popover: aktuelle Farbe (Kreis) + Vorschläge (Rechtecke) + Würfel-Button +
+    eingebetteter iro.js-Farbwähler darunter – alles gleichzeitig sichtbar,
+    öffnet sich erst auf Klick (sonst tippt man beim Bedienen der Zeile
+    versehentlich rein). iro.js wird in main.ts nach dem Rendern eingehängt. */
+function renderColorPopover(habit: Habit, colorSwatches: string[]): string {
   const current = (habit.color ?? DEFAULT_HABIT_COLOR).toLowerCase();
-  const swatches = HABIT_COLOR_PRESETS.map(
-    ({ key, hex }) => `
+  const swatches = colorSwatches
+    .map(
+      (hex) => `
       <button type="button" class="habit-color-swatch${hex.toLowerCase() === current ? ' active' : ''}"
         style="--sc:${hex}" data-action="set-habit-color" data-id="${habit.id}" data-color="${hex}"
-        aria-label="${t('ariaColorSwatch', { color: t(key) })}"></button>`,
-  ).join('');
+        aria-label="${t('ariaColorSwatch', { color: hex })}"></button>`,
+    )
+    .join('');
+  const randomize = `
+      <button type="button" class="habit-color-randomize" data-action="randomize-habit-colors"
+        aria-label="${t('ariaRandomizeColors')}">
+        <i class="fa-solid fa-shuffle" aria-hidden="true"></i>
+      </button>`;
   return `
     <div class="habit-color-popover">
-      <input type="color" value="${escapeHtml(current)}"
-        data-edit="color" data-id="${habit.id}"
-        aria-label="${t('ariaColorOf', { name: escapeHtml(habit.title) })}" />
-      <div class="habit-color-swatches">${swatches}</div>
+      <div class="habit-color-top">
+        <div class="habit-color-current" id="habit-color-current-${habit.id}" style="--hc:${current}"
+          aria-hidden="true"></div>
+        <div class="habit-color-swatches">${swatches}${randomize}</div>
+      </div>
+      <div class="habit-iro-mount" id="habit-iro-mount-${habit.id}" data-habit-id="${habit.id}"></div>
     </div>`;
 }
 
 /** Editor-Panel: pro Gewohnheit Farbe, Name, Zeitraum, Ziel – plus Anlegen/Löschen */
-function renderHabitEditor(habits: Habit[], editingColorId: string | null): string {
+function renderHabitEditor(
+  habits: Habit[],
+  editingColorId: string | null,
+  colorSwatches: string[],
+): string {
   const rows = habits
     .map((habit) => {
       const open = editingColorId === habit.id;
@@ -660,7 +684,7 @@ function renderHabitEditor(habits: Habit[], editingColorId: string | null): stri
           <button type="button" class="habit-color-trigger" style="--hc:${color}"
             data-action="toggle-habit-color-picker" data-id="${habit.id}" aria-expanded="${open}"
             aria-label="${t('ariaColorOf', { name: escapeHtml(habit.title) })}"></button>
-          ${open ? renderColorPopover(habit) : ''}
+          ${open ? renderColorPopover(habit, colorSwatches) : ''}
         </div>
         <input type="text" value="${escapeHtml(habit.title)}"
           data-edit="title" data-id="${habit.id}" aria-label="${t('habitName')}" />
@@ -917,7 +941,7 @@ export function buildPageHtml(state: AppState): string {
     });
     extrasHtml =
       state.view === 'day'
-        ? `${renderHabits(state.data.habits, state.editingHabits, state.editingHabitColor)}${renderAchievements(state.data.achievements, state.data.habits, taskStats)}`
+        ? `${renderHabits(state.data.habits, state.editingHabits, state.editingHabitColor, state.habitColorSwatches)}${renderAchievements(state.data.achievements, state.data.habits, taskStats)}`
         : '';
   } else if (state.view === 'undone') {
     // „UN DONE": GLEICHES Karten-Gerüst wie Tabs 1–4 – offene Aufgaben im

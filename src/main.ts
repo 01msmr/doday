@@ -29,11 +29,19 @@ import { monthRange, weekRange } from './services/selectors';
 import { InMemoryTagRegistry } from './services/tagRegistry';
 import { retagTask, untagTask, reorderTopAreas } from './services/dragMove';
 import { buildEventIcs } from './services/ics';
-import { renderApp, buildPageHtml, type AppState, type ViewId } from './ui/dayView';
+import {
+  renderApp,
+  buildPageHtml,
+  DEFAULT_HABIT_COLOR_SWATCHES,
+  type AppState,
+  type ViewId,
+} from './ui/dayView';
 import { initDragDrop, type DropInfo } from './ui/dragDrop';
 import { isoDate, shiftDays } from './utils/dates';
+import { hsvToHex } from './utils/colors';
 import { t, toggleLang } from './i18n';
 import { DEFAULT_HABIT_COLOR, type Habit } from './models/types';
+import iro from '@jaames/iro';
 
 const root = document.querySelector<HTMLDivElement>('#app');
 if (!root) {
@@ -52,6 +60,7 @@ const state: AppState = {
   editing: null,
   editingHabits: false,
   editingHabitColor: null,
+  habitColorSwatches: DEFAULT_HABIT_COLOR_SWATCHES,
   creatingEvent: false,
   creatingTask: false,
   editingTask: null,
@@ -69,6 +78,51 @@ function switchMobileColumn(next: 'main' | 'side'): void {
   state.columnAnim = next === 'side' ? 'to-side' : 'to-main';
   rerender();
   state.columnAnim = null; // Flag nur für diesen einen Render – danach wieder ruhig
+}
+
+/** Grün bis Hellblau (100°–200°) wirkt bei gleichem Hue-ABSTAND enger
+    beieinander als andere Töne. Punkte, die gleichmäßig nach GEWICHT verteilt
+    werden, landen automatisch weiter auseinander (in Grad) dort, wo pro Grad
+    WENIGER Gewicht anfällt – daher bekommt die Zone ein NIEDRIGERES Gewicht. */
+function hueWeight(hue: number): number {
+  return hue >= 100 && hue <= 200 ? 0.25 : 1;
+}
+
+/** Position 0–360 in „gewichteten" Grad umrechnen (kumulatives Gewicht in 1°-Schritten). */
+const HUE_WEIGHT_TABLE = (() => {
+  const table = [0];
+  for (let h = 1; h <= 360; h++) {
+    table.push(table[h - 1]! + hueWeight(h - 0.5));
+  }
+  return table;
+})();
+const TOTAL_HUE_WEIGHT = HUE_WEIGHT_TABLE[360]!;
+
+/** Gewichteten Zielwert zurück in eine Hue-Gradzahl auflösen (lineare Suche im Grad-Raster). */
+function hueAtWeight(target: number): number {
+  const wrapped = ((target % TOTAL_HUE_WEIGHT) + TOTAL_HUE_WEIGHT) % TOTAL_HUE_WEIGHT;
+  for (let h = 1; h <= 360; h++) {
+    if (HUE_WEIGHT_TABLE[h]! >= wrapped) {
+      return h - 1;
+    }
+  }
+  return 359;
+}
+
+/** 7 neue Farbvorschläge: über den Farbkreis verteilt (reichlich Hue-Abstand,
+    im engeren Grün-Hellblau-Bereich zusätzlich gespreizt) ab einem zufälligen
+    Start-Ton, plus ±8° Jitter pro Farbe (sonst variiert ein Würfel-Klick vom
+    nächsten nur durch Drehung derselben 7er-Menge). Helligkeit wechselt
+    abwechselnd ±0,2 um die Basis 0,75 – zusätzlicher Kontrast neben dem Hue. */
+function randomHabitColors(): string[] {
+  const count = 7;
+  const startWeight = Math.random() * TOTAL_HUE_WEIGHT;
+  return Array.from({ length: count }, (_, i) => {
+    const hue = hueAtWeight(startWeight + (TOTAL_HUE_WEIGHT / count) * i);
+    const jitter = (Math.random() - 0.5) * 16; // ±8°
+    const value = 0.75 + (i % 2 === 1 ? 0.2 : -0.2);
+    return hsvToHex((hue + jitter + 360) % 360, 0.66, value);
+  });
 }
 
 /** Reihenfolge der Tabs für den Kanten-Wisch (mit Umlauf). */
@@ -451,6 +505,54 @@ function showToast(message: string): void {
 }
 
 /**
+ * iro.js in das Farb-Popover einhängen, falls eines offen ist. Da jedes
+ * rerender() das komplette DOM neu aufbaut (auch den Mount-Punkt), wird hier
+ * bei JEDEM Render eine frische iro-Instanz erzeugt – die alte verschwindet
+ * einfach mit ihrem (entfernten) Container. `input:end` (Ziehen beendet)
+ * übernimmt die Farbe dauerhaft in den State + persistiert; `color:change`
+ * (läuft auch WÄHREND des Ziehens) aktualisiert nur die beiden Kreis-
+ * Anzeigen direkt per Style – kein rerender() mitten in der Geste, das
+ * würde iro sonst unter der Maus wegreißen.
+ */
+function mountHabitColorPicker(): void {
+  const habitId = state.editingHabitColor;
+  if (!habitId) {
+    return;
+  }
+  const habit = state.data.habits.find((h) => h.id === habitId);
+  const mount = root!.querySelector<HTMLElement>(`#habit-iro-mount-${habitId}`);
+  if (!habit || !mount) {
+    return;
+  }
+  const picker = iro.ColorPicker(mount, {
+    width: 200,
+    color: habit.color ?? DEFAULT_HABIT_COLOR,
+    padding: 5,
+    handleRadius: 8,
+    borderWidth: 2,
+    borderColor: '#fff',
+    layout: [
+      { component: iro.ui.Slider, options: { sliderType: 'hue' } },
+      { component: iro.ui.Slider, options: { sliderType: 'saturation' } },
+      { component: iro.ui.Slider, options: { sliderType: 'value' } },
+    ],
+  });
+  const current = root!.querySelector<HTMLElement>(`#habit-color-current-${habitId}`);
+  const trigger = root!.querySelector<HTMLElement>(
+    `.habit-color-trigger[data-id="${habitId}"]`,
+  );
+  picker.on('color:change', (color: { hexString: string }) => {
+    current?.style.setProperty('--hc', color.hexString);
+    trigger?.style.setProperty('--hc', color.hexString);
+  });
+  picker.on('input:end', (color: { hexString: string }) => {
+    habit.color = color.hexString;
+    rerender();
+    queue(persistAchievements);
+  });
+}
+
+/**
  * Statusleisten-/Browser-Chrome-Farbe an die ECHTE Seitenfarbe angleichen.
  * Wir lesen den berechneten Hintergrund der Seite (inkl. blauer Tönung) und
  * schreiben ihn ins <meta name="theme-color"> – so kann die iOS-Statusleiste
@@ -477,6 +579,7 @@ function rerender(): void {
   renderApp(root!, state);
   syncThemeColor();
   updateDividerSurface(); // Marke an aktive Spalte/View anpassen (UN:DONE-Festfarben)
+  mountHabitColorPicker(); // iro.js neu einhängen, falls das Farb-Popover offen ist
   // Nur beim NEUEN Auftreten eines Fehlers den Toast zeigen (nicht bei jedem Render)
   if (state.syncError && state.syncError !== lastToastError) {
     showToast(state.syncError);
@@ -1315,6 +1418,11 @@ root.addEventListener('click', (event) => {
     rerender();
   }
 
+  if (action === 'randomize-habit-colors') {
+    state.habitColorSwatches = randomHabitColors();
+    rerender();
+  }
+
   if (action === 'toggle-event-form') {
     // Gerade per Verlassen eines leeren Formulars geschlossen? Dann NICHT sofort
     // wieder öffnen (derselbe Tipp auf die Pille hat das Schließen ausgelöst).
@@ -1433,7 +1541,7 @@ root.addEventListener('click', (event) => {
     const habit = state.data.habits.find((h) => h.id === id);
     if (habit) {
       habit.color = color;
-      state.editingHabitColor = null;
+      // Popover bleibt offen – weitere Anpassung (Vorschlag oder native Farbwahl) möglich
       rerender();
       queue(persistAchievements);
     }
@@ -1503,6 +1611,21 @@ root.addEventListener('click', (event) => {
   }
 });
 
+// Farbwahl-Popover einer Gewohnheit schließt bei Klick irgendwo außerhalb
+// (Trigger + Popover selbst schließen/wechseln bereits über ihre eigenen
+// data-action-Handler oben – hier nur der Rest der Seite).
+root.addEventListener('click', (event) => {
+  if (!state.editingHabitColor) {
+    return;
+  }
+  const target = event.target as HTMLElement;
+  if (target.closest('.habit-color-cell')) {
+    return;
+  }
+  state.editingHabitColor = null;
+  rerender();
+});
+
 // Formulare: Termin → Nextcloud-Kalender, Aufgabe → Nextcloud Tasks
 root.addEventListener('submit', (event) => {
   const form = event.target as HTMLElement;
@@ -1536,10 +1659,6 @@ root.addEventListener('change', (event) => {
   const habit = state.data.habits.find((h) => h.id === id);
   if (!habit) {
     return;
-  }
-  if (edit === 'color' && field instanceof HTMLInputElement) {
-    habit.color = field.value;
-    state.editingHabitColor = null;
   }
   if (edit === 'title' && field instanceof HTMLInputElement && field.value.trim()) {
     habit.title = field.value.trim();
